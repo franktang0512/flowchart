@@ -1,0 +1,1294 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>flow chart</title>
+    <!-- include css -->
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <script src="./shapes.js"></script>
+    
+    <script src="./decoder.js"></script>
+    <script src="./diagramflow.js"></script>
+    <script src="https://kit.fontawesome.com/e9c74dcff3.js" crossorigin="anonymous"></script>
+	
+	<script>
+		// 获取 URL 中的参数
+		function getParameterByName(name, url) {
+			  if (!url) url = window.location.href;
+			  name = name.replace(/[\[\]]/g, "\\$&");
+			  var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+				  results = regex.exec(url);
+			  if (!results) return null;
+			  if (!results[2]) return '';
+			  return decodeURIComponent(results[2].replace(/\+/g, " "));
+		}
+
+
+		// 根据参数加载不同的 JavaScript 文件
+		window.onload = function() {
+		  var weekParam = getParameterByName('w');
+		  var homeworkParam = getParameterByName('h');
+		  if (weekParam && homeworkParam) {
+		  console.log(weekParam, homeworkParam)
+				var scriptElement = document.createElement('script');
+				// scriptElement.src = "../~61147010s/js/" + (weekParam) + "/" + (homeworkParam) + '.js'; 
+                scriptElement.src = "./js/" + (weekParam) + "/" + (homeworkParam) + '.js'; 
+				document.head.appendChild(scriptElement);
+				console.log(scriptElement.src)
+		  }
+		  else{
+				var scriptElement = document.createElement('script');
+				scriptElement.src = "./js/example.js";
+				document.head.appendChild(scriptElement);
+		  }
+		};
+	</script>
+	
+</head>
+<body>
+    
+    <div id="header">
+        <div style="width: 30%;">
+			<a class="logo" herf="#">
+				<img src="./libs/logo.png" alt="">
+				電子式學習單
+			</a>
+			<select class="select" id="file_select" onchange="handleSelectChange()">
+				<option selected style="display: none;">檔案</option>
+				<option value="upload">上傳檔案</option>
+				<option value="download">下載檔案</option>
+				<option value="download_pdf">下載成PDF</option>
+			</select>
+			<button style="display: none;" class="submit-button" id="finish" onclick="download_PDF();">交作業</button>
+		</div>
+        <div id="student_info">
+            班級：<input id="class" value=""> 座號：<input id="number" value=""> 姓名：<input id="name"> 
+        </div>
+        
+    </div>
+    
+
+    <dialog id="node_info"></dialog>
+
+    <div id="workspace" class="content" style="display: block;">
+        
+        
+        <div id="page_set">
+            <button class="btn btn-lg page_tab selected">第一步：看題目</button>
+            <button class="btn btn-lg page_tab">第二步：拆解問題、想測資</button>
+            <button class="btn btn-lg page_tab">第三步：定義變數、設計流程</button>
+			<button class="btn btn-lg page_tab">第四步：測試執行並除錯</button>
+        </div>
+        <div id="left_div" class="my_column">
+            <!-- 題目設定區  -->
+            <div id="step0">
+                <h5 id="question_name">題目名稱：</h5>
+                <h5>題目：</h5><textarea id="question_info" readonly></textarea><br>
+                <table id="array" class="my_table" rules="ALL"></table>
+                <h5>範例輸入：</h5>
+                <table id="example_testcase" class="my_table" rules="ALL"></table>
+            </div>
+            
+            <!-- 第一步：讀懂題目 -->
+            <div id="step1" class="my_row" style="display: block;">
+                <table class="my_table" rules="none" cellpadding="10" style="border: 0;">
+                    <tr>
+                        <td style="width: 30%;">題目請你做什麼？</td>
+                        <td style="width: 50%;"><input id="question_note" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td style="width: 30%;">輸入值代表什麼？</td>
+                        <td style="width: 50%;"><input id="question_hint" style="width: 100%;"></td>
+                    </tr>
+                    <tr>
+                        <td style="width: 30%;">輸出值代表什麼？</td>
+                        <td style="width: 50%;"><input id="question_hint2" style="width: 100%;"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div id="step2" class="my_row">
+                <h5>測試資料：</h5>
+                <table id="case_table" class="my_table" rules="ALL">
+                    <tr>
+                        <th style="width: 30%;">輸入</th>
+                        <th style="width: 20%;">輸出</th>
+                        <th style="width: 40%;">測試重點</th>
+                    </tr>
+                    <tr>
+                        <td style="width: 30%;"><textarea class="case_input"></textarea></td>
+                        <td style="width: 20%;"><textarea class="case_input"></textarea></td>
+                        <td style="width: 40%;"><textarea class="case_input"></textarea></td>
+                    </tr>
+                    <tr>
+                        <td style="width: 30%;"><textarea class="case_input"></textarea></td>
+                        <td style="width: 20%;"><textarea class="case_input"></textarea></td>
+                        <td style="width: 40%;"><textarea class="case_input"></textarea></td>
+                    </tr>
+                    <tr>
+                        <td style="width: 30%;"><textarea class="case_input"></textarea></td>
+                        <td style="width: 20%;"><textarea class="case_input"></textarea></td>
+                        <td style="width: 40%;"><textarea class="case_input"></textarea></td>
+                    </tr>
+                    
+                </table>
+            </div>
+            <div id="step3" class="my_row">
+				<h5>變數：</h5>
+                <table id="var_table" class="my_table" rules="ALL">
+                    <tr>
+                        <th style="width: 20%;">名稱</th>
+                        <th style="width: 20%;">型別</th>
+                        <th style="width: 20%;">初始值</th>
+                        <th style="width: 30%;">說明</th>
+                        <th></th>
+                    </tr>
+                </table>
+                <button id="createRow">新增變數</button>
+                
+                <div class="set_array" style="display: none;">
+                    <h5>清單名稱：<input id="arr_name" style="width: 20%; border:none;" readonly></h5>
+                    <h5 style="width: 45%; display: inline;">清單大小：<input id="arr_size" style="width: 20%;"></h5>
+					<h6 style="width: 45%; margin-left: 20%; text-align: right; display: inline;">全部預設為：<input id="arr_size" style="width: 20%;"></h6>
+                    <table id="array_table"  class="my_table" rules="ALL">
+                        <tr>
+                            <th style="width: 20%;">索引值</th>
+                            <th style="width: 20%;">型別</th>
+                            <th style="width: 30%;">元素</th>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="right_div" class="my_column" style="padding: 0; width: 60%; display: none;">
+            <div id="toolbox" class="toolbox">
+                <button id="Circle" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/start.png"></button>
+                <button id="Parallelogram" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/io.png"></button>
+                <button id="Diamond" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/if.png"></button>
+                <button id="Rectangle" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/cal.png"></button>
+                <button id="Loop" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/loop.png"></button>
+                <button id="straight" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/arrow.png"></button>
+                <button id="square" class="toolbox_btn"><img class="toolbox_img" src="./libs/icon/turn_arrow.png"></button>
+            </div>
+            <div id="first_toolbox" class="toolbox">
+                <button id="Circle" class="first_toolbox_btn"><img class="toolbox_img" src="./libs/icon/start.png"></button>
+                <button id="Function" class="first_toolbox_btn"><img class="toolbox_img" src="./libs/icon/func.png"></button>
+                <button id="straight" class="first_toolbox_btn"><img class="toolbox_img" src="./libs/icon/arrow.png"></button>
+                <button id="square" class="first_toolbox_btn"><img class="toolbox_img" src="./libs/icon/turn_arrow.png"></button>
+            </div>
+            <canvas id="my_canvas" style="display: none;"></canvas>
+            <canvas id="first_canvas" style="display: none;"></canvas>
+            <button id="clear_canvas" style="position: absolute; top: 1px; right: 1px;">清空流程圖</button>
+			<input type="file" style="display:none;" id="fileInput">
+        </div>
+        <div id="run_code_area" style="position:absolute; z-index: 10000; display: none; height: 100%; width: 100%; background-color: white;">
+			<div class="grid-container">
+				<div class="grid-item item1-2">
+					<div class="sub-item sub-item-1">
+						<!-- 放流程圖，可以highlight -->
+						<canvas id="my_canvas_show" style="height: 100% ;width: 100%;"></canvas>
+					</div>
+				</div>
+				<div class="grid-item item3">
+					<div class="sub-item sub-item-2">
+						<!-- 可以按下一步，並顯示結果 -->
+						<div style="height: 20%;">
+							<p id="stepCount">步數：</p>
+							<input type="range" id="stepSlider" min="0" max="5" step="0" value="0" onchange="updateStep(Number(this.value))">
+							<button id="preStep" onclick="updateStep(Number(current_step)-1);">上一步</button>
+							<button id="postStep" onclick="updateStep(Number(current_step)+1);">下一步</button>
+						</div>
+						<div style="height: 30%;">
+							<p>輸出：</p>
+							<textarea id="output_area"></textarea>
+						</div>
+						<div style="height: 50%;">
+							<input type="radio" name="which_testdata" value="0" checked>測資1
+							<input type="radio" name="which_testdata" value="1">測資2
+							<input type="radio" name="which_testdata" value="2">測資3
+							<table id="run_case_table" class="my_table" rules="ALL">
+								<tr>
+									<th style="width: 30%;">輸入</th>
+									<th style="width: 20%;">輸出</th>
+									<th style="width: 40%;">測試重點</th>
+								</tr>
+							</table>
+						</div>
+					</div>
+					<div id="variableTable" class="sub-item sub-item-3">
+						
+					</div>
+				</div>
+			</div>
+			
+		</div>
+        
+    </div>
+
+    </div>
+
+    <div id="print" class="content" style="display: none; ">
+        <div style="font-size: 40px; text-align: center;">
+            班級：<span id="print_class" style="text-decoration:underline;"></span>
+            座號：<span id="print_number" style="text-decoration:underline;"></span>
+            姓名：<span id="print_name" style="text-decoration:underline;"></span>
+        </div>
+        <table class="my_table" rules="ALL">
+            <tr>
+                <th>題目名稱</th>
+                <td id="print_question_name"></td>
+            </tr>
+            <tr>
+                <th>題目重點</th>
+                <td id="print_question_note"></td>
+            </tr>
+            <tr>
+                <th>變數</th>
+                <td>
+                    <table id="print_var_table" class="print_table" rules="ALL">
+                        <tr>
+                            <th style="width: 20%;">名稱</th>
+                            <th style="width: 20%;">型別</th>
+                            <th style="width: 50%;">說明</th>
+                        </tr>
+                    </table>
+                    <table id="print_array_table" class="print_table" rules="ALL" style="display: none;">
+                        <tr>
+                            <th style="width: 20%;">索引值</th>
+                            <th style="width: 20%;">型別</th>
+                            <th style="width: 30%;">元素</th>
+                        </tr>
+                    </table>
+
+                </td>
+            </tr>
+            <tr>
+                <th>測試資料</th>
+                <td>
+                    <table id="print_case_table" class="print_table" rules="ALL">
+                        <tr>
+                            <th style="width: 20%;">輸入</th>
+                            <th style="width: 20%;">輸出</th>
+                            <th style="width: 40%;">測試重點</th>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <th>流程圖</th>
+                <td id="print_img"><img id="flow_chart" style="margin: auto;"></td>
+            </tr>
+        </table>
+    </div>
+    
+    <div id="footer">
+        <div class="contact">
+            <p>聯絡我們：<a href="mailto:785@syijh.tp.edu.tw">785@syijh.tp.edu.tw</a></p>
+        </div>
+        <div class="copyright">
+            <p>&copy; 2023 張煜. All rights reserved.</p>
+        </div>
+        
+    </div>
+
+    <script>
+        const DEBUG_MODE = false;
+        let my_mouse = {
+            x: 0,
+            y: 0,
+            selected_img: "none"
+        }
+        var var_list = {
+            "name":[],
+            "value":[]
+        };
+        var type_var_list = {
+            "number": [],
+            "text": [],
+            "array": []
+        }
+        let connector_r = 0;
+        model.init("my_canvas");
+        first_model.init("first_canvas");
+        var canvas = model.myCanvas;
+        var first_canvas = first_model.myCanvas;
+
+        var testdata_json_list = [];
+        
+        var total_step = 0;
+        var current_step = 0;
+
+        var page=0;
+        
+        var h=["第一步：看題目","第二步：拆解問題、想測資", "第三步：定義變數、設計流程", "第四步：測試執行並除錯"]
+
+        $("#clear_canvas").click(function(){
+			let node_info=document.querySelector("#node_info");
+			document.getElementById("node_info").innerHTML = node_model["clear"];
+			node_info.showModal();
+			// Get the input field
+
+			let hint_yes=document.querySelector("#hint_yes");
+			let hint_no=document.querySelector("#hint_no");
+			hint_yes.addEventListener("click", function(){
+				if(page==2){
+					model.clear();
+					model.init("my_canvas");
+					node_info.close();
+				}
+				else{
+					first_model.clear();
+					first_model.init("first_canvas");
+					node_info.close();
+				}
+			})
+
+			hint_no.addEventListener("click", function(){
+				node_info.close();
+			})
+            
+        })
+        $(".page_tab").click(function(){
+			let pre_page = page; 
+            page = $(".page_tab").index(this);
+            $(this).siblings().removeClass('selected');
+            $(this).addClass('selected');
+			my_mouse.selected_img = "none";
+			$(".toolbox_btn, .first_toolbox_btn").css("border-color", "black");
+			mouse.pause = false;
+			first_mouse.pause = false;
+            if(page==0){
+				$("#left_div").css("display", "block");
+                $("#right_div").css("display", "none");
+                $("#first_canvas").css("display", "none");
+                $("#toolbox").css("display", "none");
+                $("#first_toolbox").css("display", "none");
+                $("#my_canvas").css("display", "none");
+                $(".my_row").css("display", "none")
+                $(".my_row").eq(0).css("display", "block")
+				close_run_code_area();
+            }
+            else if(page==1){
+				$("#left_div").css("display", "block");
+                $("#right_div").css("display", "block");
+                $("#first_canvas").css("display", "block");
+                $("#my_canvas").css("display", "none");
+                $("#toolbox").css("display", "none");
+                $("#first_toolbox").css("display", "block");
+                first_model.init("first_canvas");
+                canvas = first_canvas;
+                $(".my_row").css("display", "none")
+                $(".my_row").eq(1).css("display", "block")
+				mouse.selNode = null;
+				mouse.selLink = null;
+				first_mouse.selNode = null;
+				first_mouse.selLink = null;
+				close_run_code_area();
+            }
+            else if(page==2){
+				$("#left_div").css("display", "block");
+                $("#right_div").css("display", "block");
+                $("#first_canvas").css("display", "none");
+                $("#my_canvas").css("display", "block");
+                $("#toolbox").css("display", "block");
+                $("#first_toolbox").css("display", "none");
+                model.init("my_canvas");
+                canvas = model.myCanvas;
+                $(".my_row").css("display", "none")
+                $(".my_row").eq(2).css("display", "block")
+				first_mouse.selNode = null;
+				first_mouse.selLink = null;
+				mouse.selNode = null;
+				mouse.selLink = null;
+				close_run_code_area();
+            }
+			else if(page==3){
+				if((model.nodes.find(element => element && element.text=='開始') && model.nodes.find(element => element && element.text=='結束'))){
+					$("#left_div").css("display", "none");
+					$("#right_div").css("display", "none");
+					$("#first_canvas").css("display", "none");
+					$("#my_canvas").css("display", "block");
+					$("#toolbox").css("display", "block");
+					$("#first_toolbox").css("display", "none");
+					model.init("my_canvas");
+					canvas = model.myCanvas;
+					$(".my_row").css("display", "none")
+					first_mouse.selNode = null;
+					first_mouse.selLink = null;
+					mouse.selNode = null;
+					mouse.selLink = null;
+					//將測資與變數var_list建檔
+					for(let i=0;i<3;i++){
+						testdata_json_list.push(
+							{
+								"input":$(".case_input:eq("+(i*3+0)+")").val(),
+								"output":$(".case_input:eq("+(i*3+1)+")").val()
+							}
+						);
+					}
+					$("#run_code_area").css("display", "block");
+					model.init("my_canvas_show");
+					$('input[name="which_testdata"]:checked').trigger('change');
+				}
+				else{
+					alert("記得要加上開始跟結束！");
+					page=pre_page;
+					$(".page_tab").removeClass('selected');
+					$(".page_tab").eq(page).addClass('selected');
+				}
+            }
+
+            $(".case_input").css("height", "55px")
+        });
+
+        function close_run_code_area(){
+            $('#run_code_area').css('display','none'); 
+            model.init('my_canvas'); 
+            total_step = 0;
+            output_result=''; 
+            step_list.step=[];
+            step_list.var=[];
+            testdata_json_list = [];
+            set_var_list()
+        }
+		function handleSelectChange() {
+            var select = document.getElementById("file_select");
+            var selectedValue = select.value;
+
+            // 重置選項為顯示"檔案"
+            select.selectedIndex = 0;
+
+            // 根據選擇的值執行不同功能
+            if (selectedValue === "upload") {
+                document.getElementById('fileInput').click();
+            } else if (selectedValue === "download") {
+                download_file();
+            } else if (selectedValue === "download_pdf") {
+                download_PDF();
+            }
+        }
+        
+		function sleep(s) 
+		{
+		  return new Promise(resolve => setTimeout(resolve, s*1000));
+		}
+        
+
+        $('input[name="which_testdata"]').change(function() {
+            
+            total_step = 0;
+            step_list.step=[];
+            step_list.var=[];
+            step_list.output=[];
+            build_run();
+            $("#preStep").attr("disabled", true);
+            $("#stepCount").text("步數："+current_step);
+            $("#stepSlider").attr("max" , total_step);
+
+            $("#run_case_table").empty()
+            $("#run_case_table").append('<tr>\
+                        <th style="width: 30%;">輸入</th>\
+                        <th style="width: 20%;">輸出</th>\
+                        <th style="width: 40%;">測試重點</th>\
+                    </tr>')
+            let wt = Number($("input[name='which_testdata']:checked").val());
+            let td = '';
+            td += '<tr>';
+            td += '<td style="width: 30%">' + $(".case_input:eq("+ (wt*3) +")").val()||" " + '</td>'
+            td += '<td style="width: 20%">' + $(".case_input:eq("+ (wt*3+1) +")").val()||" " + '</td>'
+            td += '<td style="width: 40%">' + $(".case_input:eq("+ (wt*3+2) +")").val()||" " + '</td>'
+            td += '</tr>'
+            $("#run_case_table").append(td);
+            output_result='';
+            updateStep(0);
+        });
+
+        $("#createRow").click(function(){
+            let row_num = $("#var_table").find("tr").length-1;
+            let tr = '<tr>'+
+                    '<td style="width: 20%;"><input class="var_input"></td>'+
+                    '<td style="width: 20%;"><select class="var_input" value="數字">'+
+                            '<option value="數字">數字</option>'+
+                            '<option value="文字">文字</option>'+
+							//'<option value="清單">清單</option>'+
+                        '</select></td>'+
+                    '<td style="width: 20%;"><input class="var_input" value="0"></td>'+
+                    '<td style="width: 30%;"><input class="var_input"></td>'+
+                    '<td style="width: 10%"><button class="delete_var">刪除</button></td>'+
+                '</tr>'
+            $("#var_table").append(tr)
+            $(".delete_var").click(function(){
+                let tr = $(this).parent().parent();
+                tr.remove();
+                set_var_list();
+            })
+            $(".var_input,.array_input").change(function(){
+            set_var_list();
+            create_list_area();
+        });
+        })
+
+        $(".toolbox_btn, .first_toolbox_btn").click(function(){
+            if($(this).attr("id") == my_mouse.selected_img){
+                my_mouse.selected_img = "none";
+                $(this).css("border-color", "black");
+            }
+            else{
+                my_mouse.selected_img = $(this).attr("id");
+                $(this).siblings().css("border-color", "black");
+                $(this).css("border-color", "yellow");
+            }
+            // console.log("select: "+ my_mouse.selected_img)
+            if(my_mouse.selected_img=='straight' || my_mouse.selected_img=='square'){
+                connector_r = 7;
+            }
+            else{
+                connector_r = 0;
+            }
+        })
+
+        $("textarea").on('input keyup paste',function(){
+            $(this).css("height", "auto");
+            let h=$(this).prop('scrollHeight')+'px'
+            $(this).parent().parent().find("textarea").css("height",h)
+        })
+
+        $("#question_hint").change(function(){
+            let var_tmp = $(this).val().split(new RegExp(/[^\w\u4E00-\u9FA5]+/g));
+            
+            for(let i=0;i<var_tmp.length;i++){
+                if(var_tmp[i] && !var_list["name"].includes(var_tmp[i])){
+                    $("#createRow").click();
+                    $(".var_input").eq(4*($(".var_input").length/4-1)).val(var_tmp[i]);
+                    $(".var_input").eq(4*($(".var_input").length/4-1)+3).val("輸入用的到");
+                }
+            }
+            set_var_list()
+        })
+
+        $("#question_hint2").change(function(){
+            let var_tmp = $(this).val().split(new RegExp(/[^\w\u4E00-\u9FA5]+/g));
+            for(let i=0;i<var_tmp.length;i++){
+                if(var_tmp[i] && !var_list["name"].includes(var_tmp[i])){
+                    $("#createRow").click();
+                    $(".var_input").eq(4*($(".var_input").length/4-1)).val(var_tmp[i]);
+                    $(".var_input").eq(4*($(".var_input").length/4-1)+3).val("輸出用的到");
+                }
+                
+            }
+            set_var_list()
+        })
+		
+        $(".var_input,.array_input").change(function(){
+            set_var_list();
+			create_list_area();
+            if($(this).val()=="清單"||$(this).val()=="array"){
+                $(".set_array").css("display", "block");
+                $("#arr_name").val( $(".var_input").eq($(".var_input").index(this)-1).val() )
+            }
+            if($(".var_input").eq($(".var_input").index(this)+1).val()=="清單"||$(".var_input").eq($(".var_input").index(this)+1).val()=="array"){
+                $("#arr_name").val( $(".var_input").eq($(".var_input").index(this)).val() )
+            }
+        });
+		
+		function create_list_area(){
+			console.log($(".var_input"))
+			if(type_var_list["array"].includes()){
+				console.log("haha")
+			}
+		}
+		
+        $("#arr_size").on("input", function(){
+            let tr = '<tr>\
+                            <th style="width: 20%;">索引值</th>\
+                            <th style="width: 20%;">型別</th>\
+                            <th style="width: 30%;">元素</th>\
+                        </tr>';
+            for(let i=0;i< parseFloat($(this).val()); i++){
+                if(i==0){
+                    tr += '<tr>'+
+                    '<td style="width: 20%;">'+(i+1)+'</td>'+
+                    '<td style="width: 20%;" rowspan="'+ parseFloat($(this).val()) +'"><select class="type_input" value="數字">'+
+                            '<option value="數字">數字</option>'+
+                            '<option value="文字">文字</option>'+
+                        '</select></td>'+
+                    '<td style="width: 30%;"><input class="array_input"></td>'+
+                '</tr>'
+                }
+                else{
+                    tr += '<tr>'+
+                        '<td style="width: 20%;">'+(i+1)+'</td>'+
+                        '<td style="width: 30%;"><input class="array_input"></td>'+
+                    '</tr>';
+                }
+                
+            }
+            $("#array_table").empty()       
+            $("#array_table").append(tr);
+        })
+        
+        $(document).ready(function(){
+            var a = document.getElementsByTagName('textarea');
+            for(var i=0,inb=a.length;i<inb;i++) {
+                a[i].style.height = 'auto';
+	            a[i].style.height = Number(a[i].scrollHeight)+30+'px';
+            }
+            // $("#right").click()
+        })
+        $(window).resize(function(){
+            var a = document.getElementsByTagName('textarea');
+            for(var i=0,inb=a.length;i<inb;i++) {
+                a[i].style.height = 'auto';
+	            a[i].style.height = a[i].scrollHeight+'px';
+            }
+        });
+		var connectorDecoration={fillStyle:"white", strokeStyle: "black", 
+		highlightStrokeStyle:"red", highlightText:"black"};
+
+		var options={dropAllowed:true, dragAllowed:true, radius:7};
+
+		var connectors=[
+			new model.connector(0,0.5,"mixed","",connectorDecoration, options),
+			new model.connector(0.5,0,"mixed","",connectorDecoration, options),
+			new model.connector(1,0.5,"mixed","",connectorDecoration, options),
+			new model.connector(0.5,1,"mixed","",connectorDecoration, options),
+		];
+        window.addEventListener('mousemove', function(event) {
+            let Left = canvas.offsetLeft + canvas.parentNode.offsetLeft;
+            let Top = canvas.offsetTop + canvas.parentNode.offsetTop;
+            if(!mouse.pause && !first_mouse.pause && in_object(event.pageX, event.pageY, canvas)){
+                my_mouse.x=event.pageX - Left;
+                my_mouse.y=event.pageY - Top;
+            }
+			//console.log(event.pageX, Left,event.pageY,Top);
+			if(!in_object(event.pageX, event.pageY, canvas)){
+				model.copyNode = null;
+			}
+        })
+
+        let node_info=document.querySelector("#node_info");
+        canvas.addEventListener('click', function(event){
+            //設定彈出框內容
+            if(canvas == model.myCanvas){
+                if(((my_mouse.selected_img!="none") && (my_mouse.selected_img!="straight") && (my_mouse.selected_img!="square")) && (!mouse.pause))
+                {
+                    document.getElementById("node_info").innerHTML = node_model[my_mouse.selected_img];
+                    set_var_list();
+                    mouse.pause = true;
+                    node_info.showModal();
+                    // Get the input field
+                    var input = document.getElementById("code");
+                    if(input){
+                        input.addEventListener("keypress", function(event) {
+							if (event.key === "Enter") {
+								event.preventDefault();
+								document.getElementById("hint_yes").click();
+							}
+                        });
+                    }
+                    
+                    let hint_yes=document.querySelector("#hint_yes");
+                    let hint_no=document.querySelector("#hint_no");
+                    hint_yes.addEventListener("click", function(){
+						let text;
+						let node_var;
+						switch (my_mouse.selected_img){
+							case('Circle'):
+								text = $("input[name='radio']:checked").val();
+								model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text,"white",my_mouse.selected_img));
+								node_info.close();
+								mouse.pause = false;
+								model.draw();
+								break;
+							case('Parallelogram'):
+								if( $("input[name='radio']:checked").val()=="輸入" && ( $("#var_select").length==0 || check_var($("#var_select").val(), false) ) )
+								{
+									text = $("input[name='radio']:checked").val() +  ($("#var_select").val() ? " "+$("#var_select").val() : "");
+									node_var = get_code_var(text);
+									model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white",my_mouse.selected_img, node_var));
+									node_info.close();
+									mouse.pause = false;
+									model.draw()
+								}
+								else if( ( $("input[name='radio']:checked").val()=="輸出" && $("#var_select_output").length==0 || check_var($("#var_select_output").val(), true)))
+								{
+									text = $("input[name='radio']:checked").val() +  ($("#var_select_output").val() ? " "+$("#var_select_output").val() : "");
+									node_var = get_code_var(text);
+									model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white",my_mouse.selected_img, node_var));
+									node_info.close();
+									mouse.pause = false;
+									model.draw()
+								}
+								else{}
+								break;
+							case('Diamond'):
+								if( $("#code").length==0||check_var($("#code").val(), true) ){
+									text = ($("#code").val() );
+									model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white",my_mouse.selected_img,get_code_var(text)));
+									node_info.close();
+									mouse.pause = false;
+									model.draw();
+								}
+								break;
+							case('Loop'):
+								if($("#code").length==0 || check_var($("#for_number").val(), true) || check_var($("#code").val(), true)){
+									text = ($("input[name='radio']:checked").val()=="while")?($("#code").val() ):($("#for_number").val()+"次" );
+									if($("input[name='radio']:checked").val()=='for'){
+										model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white","For_Loop",get_code_var(text)));
+									}
+									else{
+										model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white","While_Loop",get_code_var(text)));
+									}
+									node_info.close();
+									mouse.pause = false;
+									model.draw();
+								}
+								break;
+							case('Rectangle'):
+								if( ( $("#code").length==0 || check_var($("#for_number").val(), true) || check_var($("#code").val(), true)) 
+							&& (  $("#var_select").length==0 || check_var($("#var_select").val(), false)) ){
+									let data = $("input[name='radio']:checked").val();
+									text = ($("#var_select").val() ? " "+$("#var_select").val() : "") +' 設為 '+ ($("#code").val());
+									node_var = get_code_var(text);
+									if(!node_var.includes(($("#var_select").val() ? $("#var_select").val() : ""))){
+										node_var.push(($("#var_select").val() ? $("#var_select").val() : ""));
+									}
+									
+									if(data=="Math.round"){
+										text += "(取四捨五入)"
+									}
+									else if(data=="Math.ceil"){
+										text += "(取無條件進位)"
+									}
+									else if(data=="Math.floor"){
+										text += "(取無條件捨去)"
+									}
+									model.addNode(new model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white",my_mouse.selected_img,node_var, data));
+									node_info.close();
+									mouse.pause = false;
+									model.draw();
+								}
+								break;
+							default:
+								// console.log("none")
+								break;
+						}
+                    
+					})
+
+					hint_no.addEventListener("click", function(){
+						node_info.close();
+						mouse.pause = false;
+					})
+
+				}
+			}
+            
+		})
+			
+
+        
+        first_canvas.addEventListener('click', function(event){
+            //設定彈出框內容
+            if(((my_mouse.selected_img!="none") && (my_mouse.selected_img!="straight") && (my_mouse.selected_img!="square")) && !first_mouse.pause)
+            {
+                document.getElementById("node_info").innerHTML = node_model[my_mouse.selected_img];
+                set_var_list();
+                first_mouse.pause = true;
+                node_info.showModal();
+                // Get the input field
+                var input = document.getElementById("code");
+                if(input){
+                    input.addEventListener("keypress", function(event) {
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+                        document.getElementById("hint_yes").click();
+                    }
+                    });
+                }
+                
+                let hint_yes=document.querySelector("#hint_yes");
+                let hint_no=document.querySelector("#hint_no");
+                hint_yes.addEventListener("click", function(){
+                    if( ($("#code").length==0 || check_var($("#code").val(), true)) && ($("#var_select").length==0 || check_var($("#var_select").val(), false)) ){
+                        var connectorDecoration={fillStyle:"white", strokeStyle: "black", 
+                        highlightStrokeStyle:"red", highlightText:"black"};
+
+                        var options={dropAllowed:true, dragAllowed:true, radius:7};
+
+                        var connectors=[
+                            new first_model.connector(0,0.5,"mixed","",connectorDecoration, options),
+                            new first_model.connector(0.5,0,"mixed","",connectorDecoration, options),
+                            new first_model.connector(1,0.5,"mixed","",connectorDecoration, options),
+                            new first_model.connector(0.5,1,"mixed","",connectorDecoration, options),
+                        ];
+                        let text;
+                        switch (my_mouse.selected_img){
+                            case('Circle'):
+                                text = $("input[name='radio']:checked").val();
+                                first_model.addNode(new first_model.node(my_mouse.x,my_mouse.y,120,80,connectors,text,"white",my_mouse.selected_img));
+                                break;
+                            case('Function'):
+                                text =($("#doing_something").val() ? $("#doing_something").val() : "");
+                                first_model.addNode(new first_model.node(my_mouse.x,my_mouse.y,120,80,connectors,text ,"white",my_mouse.selected_img));
+                                break;
+                            default:
+                                // console.log("none")
+                                break;
+                        }
+                        node_info.close();
+                        first_mouse.pause = false;
+                        first_model.draw();
+                        
+                    }
+                    
+                })
+
+                hint_no.addEventListener("click", function(){
+                    node_info.close();
+                    first_mouse.pause = false;
+                })
+
+            }
+            
+        })
+
+        
+        function in_object(x,y,obj) {
+            let Left = obj.offsetLeft + obj.parentNode.offsetLeft;
+            let Top = obj.offsetTop + obj.parentNode.offsetTop;
+            let Right = Left + obj.offsetWidth;
+            let Bottom = Top + obj.offsetHeight;
+            if(Left<x && x<Right && Top<y && y<Bottom){
+                return true;
+            }
+            return false;
+        }
+
+        function set_var_list(){
+			let ori_var_list = JSON.parse(JSON.stringify(var_list));
+            var_list.name.length = 0;
+            var_list.value.length = 0;
+            type_var_list.number.length = 0;
+            type_var_list.text.length = 0;
+            type_var_list.array.length = 0;
+            for(let i=0;i<$(".var_input").length/4;i++){
+                var_list["name"].push($(".var_input:eq("+ (i*4) +")").val());
+                var_list["value"].push($(".var_input:eq("+ (i*4+2) +")").val());
+                switch($(".var_input:eq("+ (i*4+1) +")").val()){
+                    case ("數字"):
+                    case("number"):
+                    case("num"):
+                        type_var_list["number"].push($(".var_input:eq("+ (i*4) +")").val());
+                        break;
+                    case ("文字"):
+                    case("text"):
+                    case("string"):
+                        type_var_list["text"].push($(".var_input:eq("+ (i*4) +")").val());
+                        break;
+                    case ("清單"):
+                    case("array"):
+                    case("arr"):
+                        type_var_list["array"].push($(".var_input:eq("+ (i*4) +")").val());
+						let values = [];
+						$('.array_input').each(function() {
+							values.push($(this).val());
+						});
+						var_list["value"][var_list["value"].length-1] = values;
+                        break;
+                    default:
+                        break;
+                }
+            }
+			
+			let replaced = ori_var_list.name.filter((e)=>{
+			  return var_list.name.indexOf(e) === -1
+			})
+			//console.log("replaced",replaced)
+			let new_var = var_list.name.filter((e)=>{
+			  return ori_var_list.name.indexOf(e) === -1
+			})
+			//console.log(new_var)
+			//替換流程圖中的變數
+			if(replaced.length&&new_var.length){
+			console.log(model.nodes.length)
+				for(let i=0;i<model.nodes.length;i++){
+					console.log(model.nodes[i].variables)
+					try{
+						if(model.nodes[i].variables.includes(replaced[0])){
+							model.nodes[i].variables = model.nodes[i].variables.map(item => item == replaced[0] ? new_var[0] : item);
+							model.nodes[i].text=model.nodes[i].text.replaceAll(replaced[0], new_var[0])
+						}
+					}
+					catch(e){}
+				}
+			}
+			
+        }
+		
+		
+        function build_run(){
+            var start = model.nodes.find(element => element && element.text=='開始');
+            // console.log("開始的node index = ", model.nodes.indexOf(start), "node = ", model.nodes[model.nodes.indexOf(start)]);
+            var start_link = model.links.find(element => element && element.from==model.nodes.indexOf(start));
+            var link_index = model.links.indexOf(start_link);
+            // console.log("找到的 = ", start_link, "link = ", model.links[link_index]);
+            window.LoopTrap = 1000;
+            let wt = Number($("input[name='which_testdata']:checked").val());
+            // console.log("wt="+wt)
+            let input_list = testdata_json_list[wt].input.split(/[\n\s,]+/g);
+            console.log(input_list);
+            var input_str = "[";
+            for(let i=0;i<input_list.length;i++){
+                if((!isNaN(parseFloat(input_list[i])) && isFinite(input_list[i]))){
+                    input_str += input_list[i] + ',';
+                }
+                else{
+                    input_str += '"' + input_list[i] + '"' + ',';
+                }
+            }
+            input_str += "]";
+			// 要做非數字的字串處理
+
+            var code="";
+            for(let i = 0;i < var_list.name.length;i++){
+				if(typeof var_list.value[i] == "object"){
+					code += ("var "+var_list.name[i]+" = ["+(var_list.value[i]||"0")+"]\n");
+				}
+				else{
+					code += ("var "+var_list.name[i]+" = "+(var_list.value[i]||"0")+"\n");
+				}
+            }
+            code += "function Update_output(a,b){\nif(typeof b=='object'){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(JSON.parse(JSON.stringify(b)));\n}\nelse{\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(b);\n}\n}\n";
+            var run_result = "";
+            var to_code_ret;
+            while(start.text!="結束"){
+                to_code_ret = to_code(start);
+                code += to_code_ret.code;
+                start=to_code_ret.next;
+            }
+            code += (to_code(start).code);
+            code += "flowchart_code("+input_str+");\n";
+
+            console.log("code = \n", code);
+
+            run_result = Function(code + "return 0\n")();
+            // console.log(run_result);
+        }
+
+        function updateStep(num){
+            
+            current_step = num;
+            $("#stepCount").text("步數："+current_step);
+            $("#stepSlider").attr("value" , current_step);
+
+            if(current_step==0){
+                $("#preStep").attr("disabled", true);
+                $("#postStep").attr("disabled", false);
+            }
+            else if(current_step==total_step){
+                $("#preStep").attr("disabled", false);
+                $("#postStep").attr("disabled", true);
+            }
+            else{
+                $("#preStep").attr("disabled", false);
+                $("#postStep").attr("disabled", false);
+            }
+
+            //節點標記
+            model.draw();
+            model.nodes[step_list.step[current_step]].stepHighlight(model.ctx);
+            //更新變數狀態
+            $("#variableTable").empty()
+            for(let i=0;i<var_list.name.length;i++){
+				if(typeof(step_list.var[num][var_list.name[i]])=="object"){
+					let list_str='';
+					for(let j=0;j<step_list.var[num][var_list.name[i]].length;j++){
+						list_str += '<tr>';
+						list_str += '<td style="width: 40%;">'+j+'</td>';
+						list_str += '<td style="width: 60%;">'+step_list.var[num][var_list.name[i]][j]+'</td>';
+						list_str += '</tr>';
+						
+					}
+					$("#variableTable").append('<table style="width: 45%; font-size:24px; text-align:center" class="my_table" rules="ALL">\
+						<tr>\
+							<th colspan="2" style="width: 100%;">'+var_list.name[i]+'</th>'+
+						'</tr>'+
+						list_str +
+					'</table>')
+				}
+				else{
+					$("#variableTable").append('<table style="width: 45%; font-size:24px; text-align:center" class="my_table" rules="ALL">\
+						<tr>\
+							<th style="width: 50%;">'+var_list.name[i]+'</th>\
+							<td style="width: 50%;">'+step_list.var[num][var_list.name[i]]+'</td>\
+						</tr>\
+					</table>')
+				}
+            }
+            //更新輸出狀態
+
+            document.getElementById("output_area").innerHTML= step_list.output[num];
+			
+            var a = document.getElementsByTagName('textarea');
+			for(var i=0,inb=a.length;i<inb;i++) {
+				a[i].style.height = 'auto';
+				a[i].style.height = a[i].scrollHeight+'px';
+			}	
+			
+			if(num == total_step){
+				let wt = Number($("input[name='which_testdata']:checked").val());
+				// console.log("wt="+wt)
+				var output_str = testdata_json_list[wt].output;
+				if(step_list.output[num].replaceAll(/\s/g, '') == output_str.replaceAll(/\s/g, '')){
+					$("#output_area").css("background-color", "#82FF82")
+				}
+				else{
+					$("#output_area").css("background-color", "#FF8282")
+				}
+			}
+			else{
+				$("#output_area").css("background-color", "transparent")
+			}
+			
+
+        }
+		async function download_PDF(){
+            if($("#class").val() && $("#number").val()||DEBUG_MODE){
+                $("#workspace").toggle()
+                $("#print").toggle()
+				if($("#finish").text()=="返回編輯"){
+					$("#finish").text("交作業");
+					$("#finish").css("display", "none");
+				}
+				else{
+					$("#finish").text("返回編輯");
+					$("#finish").css("display", "inline");
+				}
+                document.title = $("#class").val() + $("#number").val();
+                $("#print_class").text($("#class").val());
+                $("#print_number").text($("#number").val());
+                $("#print_name").text($("#name").val());
+
+                $("#print_question_name").text(title);
+                $("#print_question_note").text($("#question_note").val());
+
+                $("#print_var_table").empty()
+                $("#print_var_table").append('<tr>\
+                            <th style="width: 20%;">名稱</th>\
+                            <th style="width: 20%;">型別</th>\
+                            <th style="width: 20%;">初始值</th>\
+                            <th style="width: 30%;">說明</th>\
+                        </tr>')
+
+                for(let i=0;i<$(".var_input").length/4;i++){
+                    let td = '';
+                    td += '<tr>';
+                    td += '<td style="width: 20%">' + $(".var_input:eq("+ (i*4) +")").val() + '</td>'
+                    td += '<td style="width: 20%">' + $(".var_input:eq("+ (i*4+1) +")").val() + '</td>'
+                    td += '<td style="width: 20%">' + $(".var_input:eq("+ (i*4+2) +")").val() + '</td>'
+                    td += '<td style="width: 50%">' + $(".var_input:eq("+ (i*4+3) +")").val() + '</td>'
+                    td += '</tr>'
+                    $("#print_var_table").append(td)
+                }
+                if(Number($("#arr_size").val())){
+                    $("#print_array_table").css("display", "block");
+                    $("#print_array_table").empty()
+                    $("#print_array_table").append('<tr>\
+                                <th style="width: 20%;">索引值</th>\
+                                <th style="width: 20%;">型別</th>\
+                                <th style="width: 30%;">元素</th>\
+                            </tr>')
+                    for(let i=0;i<parseFloat($("#arr_size").val());i++){
+                        let td = '';
+                        td += '<tr>';
+                        td += '<td style="width: 20%">' + (i+1) + '</td>'
+                        if(i==0){
+                            td += '<td style="width: 20%" rowspan="'+ parseFloat($("#arr_size").val())+ '"">' + $(".array_input:eq("+ (parseFloat($("#arr_size").val())) +")").val() + '</td>\n'
+                        }
+                        td += '<td style="width: 30%">' + $(".array_input:eq("+ (i) +")").val() + '</td>'
+                        td += '</tr>'
+                        $("#print_array_table").append(td)
+                    }
+                }
+                
+
+                $("#print_case_table").empty()
+                $("#print_case_table").append('<tr>\
+                            <th style="width: 30%;">輸入</th>\
+                            <th style="width: 20%;">輸出</th>\
+                            <th style="width: 40%;">測試重點</th>\
+                        </tr>')
+                for(let i=0;i<$(".case_input").length/3;i++){
+                    let td = '';
+                    td += '<tr>';
+                    td += '<td style="width: 30%">' + $(".case_input:eq("+ (i*3) +")").val()||" " + '</td>'
+                    td += '<td style="width: 20%">' + $(".case_input:eq("+ (i*3+1) +")").val()||" " + '</td>'
+                    td += '<td style="width: 40%">' + $(".case_input:eq("+ (i*3+2) +")").val()||" " + '</td>'
+                    td += '</tr>'
+                    $("#print_case_table").append(td)
+                }
+				model.draw();
+				if(page==3){
+					canvas = document.getElementById("my_canvas_show");
+				}
+				else{
+					canvas = model.myCanvas;
+				}
+                img_src = canvas.toDataURL("image/png")
+                if(img_src.includes("image")){
+                    $("#flow_chart").attr("src", img_src)
+                    $("#flow_chart").css("margin", "auto");
+                }
+				if($("#finish").text()=="返回編輯"){
+					await sleep(1);
+					window.print();
+				}
+            }
+            else {
+                alert("請填寫班級座號");
+            }
+		}
+		
+		function download_file(){
+			
+			var download_data = {
+				variables: [],
+				testdatas: [],
+				nodes: model.nodes,
+				links: model.links
+			}
+			let tmp = [];
+			for(let i=0;i<$(".var_input").length/4;i++){
+				tmp = [];
+                tmp.push($(".var_input:eq("+ (i*4) +")").val());
+				tmp.push($(".var_input:eq("+ (i*4+1) +")").val());
+                tmp.push($(".var_input:eq("+ (i*4+2) +")").val());
+                tmp.push($(".var_input:eq("+ (i*4+3) +")").val());
+				download_data.variables.push(tmp);
+            }
+			for(let i=0;i<$(".case_input").length/3;i++){
+				tmp = [];
+				tmp.push($(".case_input:eq("+ (i*3) +")").val());
+				tmp.push($(".case_input:eq("+ (i*3+1) +")").val());
+				tmp.push($(".case_input:eq("+ (i*3+2) +")").val());
+				download_data.testdatas.push(tmp);
+			}
+			console.log(download_data)
+			const jsonString = JSON.stringify(download_data, null, 4);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+			if($("#class").val() && $("#number").val()){
+				a.download = $("#class").val() + $("#number").val() + '.json';
+			}
+			else{
+				a.download = 'output.json';
+			}
+            a.click();
+            URL.revokeObjectURL(url);
+		}
+		
+		function upload_data(obj){
+			if(obj){
+				for(let i=0;i<obj.nodes.length;i++){
+					if(obj.nodes[i].variables){
+						model.addNode(new model.node(obj.nodes[i].x,obj.nodes[i].y,obj.nodes[i].w,obj.nodes[i].h,connectors,obj.nodes[i].text ,"white",obj.nodes[i].figure, obj.nodes[i].variables,obj.nodes[i].data));
+					}
+					else{
+						model.addNode(new model.node(obj.nodes[i].x,obj.nodes[i].y,obj.nodes[i].w,obj.nodes[i].h,connectors,obj.nodes[i].text ,"white",obj.nodes[i].figure,null,obj.nodes[i].data));
+					}
+				}
+				for(let i=0;i<obj.links.length;i++){
+					model.addLink(new model.link(obj.links[i].from,obj.links[i].to, obj.links[i].anchorFrom,obj.links[i].anchorTo, obj.links[i].text));
+				}
+				
+				for(let i=0;i<obj.variables.length;i++){
+					let row_num = $("#var_table").find("tr").length-1;
+					let tr = '<tr>'+
+							'<td style="width: 20%;"><input class="var_input" value="'+obj.variables[i][0]+'"></td>'+
+							'<td style="width: 20%;"><select class="var_input" >'+
+									'<option value="數字">數字</option>'+
+									'<option value="文字">文字</option>'+
+									//'<option value="清單">清單</option>'+
+								'</select></td>'+
+							'<td style="width: 20%;"><input class="var_input" value="'+obj.variables[i][2]+'"></td>'+
+							'<td style="width: 30%;"><input class="var_input" value="'+obj.variables[i][3]+'"></td>'+
+							'<td style="width: 10%"><button class="delete_var">刪除</button></td>'+
+						'</tr>'
+					$("#var_table").append(tr)
+					$("select:eq("+i+") option[value='"+obj.variables[i][1]+"']").attr("selected", "selected");
+					set_var_list()
+					if(obj.variables[i][1]=="清單"){
+						$(".set_array").css("display", "block");
+						$("#arr_name").val( obj.variables[i][0] )
+					}
+					
+					$(".delete_var").click(function(){
+						let tr = $(this).parent().parent();
+						tr.remove();
+						set_var_list();
+					})
+					$(".var_input,.array_input").change(function(){
+						set_var_list()
+						if($(this).val()=="清單"||$(this).val()=="array"){
+							$(".set_array").css("display", "block");
+							$("#arr_name").val( $(".var_input").eq($(".var_input").index(this)-1).val() )
+						}
+						else{
+							$(".set_array").css("display", "none");
+						}
+						if($(".var_input").eq($(".var_input").index(this)+1).val()=="清單"||$(".var_input").eq($(".var_input").index(this)+1).val()=="array"){
+							$("#arr_name").val( $(".var_input").eq($(".var_input").index(this)).val() )
+						}
+					});
+				}
+			}
+			
+			
+		}
+		
+		document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.type === "application/json") {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const jsonObject = JSON.parse(e.target.result);
+                        console.log(jsonObject);
+						
+						upload_data(jsonObject);						
+						
+                    } catch (error) {
+                        console.error("Error parsing JSON:", error);
+                    }
+                };
+
+                reader.onerror = function() {
+                    console.error("Error reading file:", reader.error);
+                };
+                reader.readAsText(file);
+            } else {
+                alert("Please upload a valid JSON file.");
+            }
+        });
+		
+
+        /*
+        TODO LIST：
+        1. 整體縮放
+        2. 彈出框內容
+        3. 顏色
+        5. undefined 回到上一部
+        題目重點？輸入的值用甚麼變數存？
+        
+        */
+    </script>
+</body>
+</html>
