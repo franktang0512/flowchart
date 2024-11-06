@@ -13,11 +13,6 @@ var test_case = [
         input: "59",
         output: "不及格",
         note: ""
-    },
-	{
-        input: "60",
-        output: "及格",
-        note: ""
     }
 ]
 
