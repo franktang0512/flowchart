@@ -85,13 +85,13 @@ function to_condition(str){
     if(str.includes("=")){
         str = str.replaceAll("=", "==");
     }
-    if(str.includes("not")){
+    if(str.includes(" not ")){
         str = str.replaceAll("not", "!").replaceAll("非", "!");
     }
-    if(str.includes("and")){
+    if(str.includes(" and ")){
         str = str.replaceAll("and", "&&").replaceAll("且", "&&");
     }
-    if(str.includes("or")){
+    if(str.includes(" or ")){
         str = str.replaceAll("or", "||").replaceAll("或", "||");
     }
     //console.log(str);
