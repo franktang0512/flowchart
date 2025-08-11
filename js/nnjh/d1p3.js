@@ -11,7 +11,7 @@ var array = [
 var test_case = [
     {
         input: "100",
-        output: "159\n135",
+        output: "150\n135",
         note: "成本價100，乘上1.5倍作為售價，再打九折，為135元。"
     }
 ]
