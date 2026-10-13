@@ -1,0 +1,34 @@
+{
+  "title": "投籃機",
+  "question": "有一台投籃機，投進的球皆設定為2分球或3分球。得分超過30分便通關，且會記錄投了幾次球，請完成此投籃機程式，根據每次投球的得分，顯示投了幾顆球。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "2 2 2 2 2 2 3 3 3 3 3 3",
+      "output": "12",
+      "note": "投進2分球6顆，3分球6顆後通關。共投了12顆球。"
+    },
+    {
+      "input": "2 0 0 0 2 3 3 3 0 0 3 3 3 3 3 3",
+      "output": "16",
+      "note": "沒投進5顆，投進2分球2顆，3分球9顆後通關。共投了16顆球。"
+    }
+  ],
+  "en": {
+    "title": "Basketball Game",
+    "question": "A basketball game. Each ball you get in is 2 points or 3 points. Get more than 30 points to win. Input the points of each throw. Output how many balls you threw.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "2 2 2 2 2 2 3 3 3 3 3 3",
+        "output": "12",
+        "note": "Six 2-point balls and six 3-point balls, then you win. 12 balls in total."
+      },
+      {
+        "input": "2 0 0 0 2 3 3 3 0 0 3 3 3 3 3 3",
+        "output": "16",
+        "note": "5 misses, two 2-point balls, nine 3-point balls, then you win. 16 balls in total."
+      }
+    ]
+  }
+}

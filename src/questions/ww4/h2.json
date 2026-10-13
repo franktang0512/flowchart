@@ -1,0 +1,34 @@
+{
+  "title": "終極密碼(1~100)",
+  "question": "老師先隨機挑選一個1~100的數字讓5位學生來猜，猜到就贏了！\n猜到時恭喜該位學生！沒猜到的話恭喜老師！",
+  "array": [],
+  "test_case": [
+    {
+      "input": "25\n2 95 5 20 26",
+      "output": "恭喜老師",
+      "note": "密碼設定為25，學生依序猜測2、95、5、20、26。沒人猜到，恭喜老師"
+    },
+    {
+      "input": "50\n30 70 50",
+      "output": "恭喜3號學生",
+      "note": "密碼設定為50，學生依序猜測30、70、50，由3號學生猜到"
+    }
+  ],
+  "en": {
+    "title": "Guess the Number (1~100)",
+    "question": "The teacher picks a number from 1~100. 5 students guess. If a student gets it, the student wins!\nIf nobody gets it, the teacher wins!",
+    "array": [],
+    "test_case": [
+      {
+        "input": "25\n2 95 5 20 26",
+        "output": "Teacher wins",
+        "note": "The number is 25. Students guess 2, 95, 5, 20, 26. Nobody gets it. Teacher wins"
+      },
+      {
+        "input": "50\n30 70 50",
+        "output": "Student 3 wins",
+        "note": "The number is 50. Students guess 30, 70, 50. Student 3 gets it"
+      }
+    ]
+  }
+}

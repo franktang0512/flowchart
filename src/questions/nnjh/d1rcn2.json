@@ -1,0 +1,76 @@
+{
+  "title": "第二題、抽獎",
+  "question": "有一台抽獎機，可以多次投入抽獎券增加抽獎機會，更有機會拿大獎。隨機抽出獎項後(1~100)，顯示抽到的最大獎項。\n",
+  "array": [
+    [
+      "抽中號碼",
+      "獎項"
+    ],
+    [
+      "1",
+      "頭獎"
+    ],
+    [
+      "2~3",
+      "二獎"
+    ],
+    [
+      "4~10",
+      "三獎"
+    ],
+    [
+      "11~100",
+      "四獎"
+    ]
+  ],
+  "test_case": [
+    {
+      "input": "5<br>3 5 6 7 8",
+      "output": "二獎",
+      "note": "投入5張抽獎券，抽到號碼為3號、5號、6號、7號、8號，最大獎為二獎。"
+    },
+    {
+      "input": "3<br>90 30 1",
+      "output": "頭獎",
+      "note": "投入3張抽獎券，抽到號碼為90號、30號、1號，最大獎為頭獎。"
+    }
+  ],
+  "en": {
+    "title": "Q2: Lucky Draw",
+    "question": "A lucky draw machine. Put in more tickets to get more chances. Each ticket gets a number (1~100). Output the best prize you get.\n",
+    "array": [
+      [
+        "Number",
+        "Prize"
+      ],
+      [
+        "1",
+        "1st prize"
+      ],
+      [
+        "2~3",
+        "2nd prize"
+      ],
+      [
+        "4~10",
+        "3rd prize"
+      ],
+      [
+        "11~100",
+        "4th prize"
+      ]
+    ],
+    "test_case": [
+      {
+        "input": "5<br>3 5 6 7 8",
+        "output": "2nd prize",
+        "note": "5 tickets. Numbers: 3, 5, 6, 7, 8. Best prize: 2nd prize."
+      },
+      {
+        "input": "3<br>90 30 1",
+        "output": "1st prize",
+        "note": "3 tickets. Numbers: 90, 30, 1. Best prize: 1st prize."
+      }
+    ]
+  }
+}

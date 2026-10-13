@@ -1,0 +1,34 @@
+{
+  "title": "餐費",
+  "question": "小明一天的餐費有300元，請設計一款記帳程式，輸入他三餐的金額後，計算餘額。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "35 100 70",
+      "output": "95",
+      "note": "小明一天的餐費300元，扣掉三餐的價格後，剩餘95元。"
+    },
+    {
+      "input": "60 100 140",
+      "output": "0",
+      "note": "小明一天的餐費300元，扣掉三餐的價格後，剩餘0元。"
+    }
+  ],
+  "en": {
+    "title": "Food Money",
+    "question": "Ming has $300 for food today. Input the price of his three meals. Output the money left.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "35 100 70",
+        "output": "95",
+        "note": "Ming has $300. He pays for three meals. $95 is left."
+      },
+      {
+        "input": "60 100 140",
+        "output": "0",
+        "note": "Ming has $300. He pays for three meals. $0 is left."
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "怒氣值",
+  "question": "冒險遊戲中，攻擊可以累積怒氣值，可以讓傷害增加。怒氣值累積到30~49，攻擊力提升1.2倍；累積到50~79，攻擊力提升1.5倍；累積到80以上，攻擊力兩倍。請根據輸入的初始攻擊力與現在累積的怒氣值，輸出造成的傷害。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "80 30",
+      "output": "96",
+      "note": "怒氣值30，提升攻擊力1.2倍。傷害為80*1.2=96"
+    },
+    {
+      "input": "100 100",
+      "output": "200",
+      "note": "怒氣值100，提升攻擊力2倍。傷害為100*2=200"
+    }
+  ],
+  "en": {
+    "title": "Angry Points",
+    "question": "In a game, you get angry points when you attack. Angry points make your attack stronger. 30~49 points: attack × 1.2. 50~79 points: attack × 1.5. 80 points or more: attack × 2. Input your attack and your angry points. Output your damage.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "80 30",
+        "output": "96",
+        "note": "30 angry points: attack × 1.2. Damage is 80*1.2=96"
+      },
+      {
+        "input": "100 100",
+        "output": "200",
+        "note": "100 angry points: attack × 2. Damage is 100*2=200"
+      }
+    ]
+  }
+}

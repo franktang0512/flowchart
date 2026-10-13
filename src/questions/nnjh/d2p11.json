@@ -1,0 +1,58 @@
+{
+  "title": "腳踏車",
+  "question": "公共腳踏車的計費方式如下：騎乘未滿半小時，以半小時計算。\n",
+  "array": [
+    [
+      "前半小時",
+      "5元"
+    ],
+    [
+      "半小時後~四小時內",
+      "每半小時10元"
+    ],
+    [
+      "四小時後~八小時內",
+      "每半小時20元"
+    ],
+    [
+      "八小時後",
+      "每半小時40元"
+    ]
+  ],
+  "test_case": [
+    {
+      "input": "4.5",
+      "output": "95",
+      "note": "5(半小時)+7*10(四小時之內有7個半小時)+1*20(八小時內有1個半小時) = 95。"
+    }
+  ],
+  "en": {
+    "title": "Bike Rental",
+    "question": "Bike rental prices are below. Less than half an hour counts as half an hour.\n",
+    "array": [
+      [
+        "First half hour",
+        "$5"
+      ],
+      [
+        "Half an hour to 4 hours",
+        "$10 for each half hour"
+      ],
+      [
+        "4 hours to 8 hours",
+        "$20 for each half hour"
+      ],
+      [
+        "More than 8 hours",
+        "$40 for each half hour"
+      ]
+    ],
+    "test_case": [
+      {
+        "input": "4.5",
+        "output": "95",
+        "note": "5 (first half hour) + 7*10 (7 half hours up to 4 hours) + 1*20 (1 half hour up to 8 hours) = 95."
+      }
+    ]
+  }
+}

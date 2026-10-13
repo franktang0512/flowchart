@@ -1,0 +1,34 @@
+{
+  "title": "請寫一個流程圖，這個流程圖會讀入成績，如果分數60以上，請輸出 及格 ，如果分數小於60則輸出 不及格 ",
+  "question": "請做出成績判斷的流程！\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "59",
+      "output": "不及格",
+      "note": ""
+    },
+    {
+      "input": "60",
+      "output": "及格",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Make a flowchart. Input a score. If the score is 60 or more, output Pass. If the score is less than 60, output Fail.",
+    "question": "Make a flowchart to check a score!\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "59",
+        "output": "Fail",
+        "note": ""
+      },
+      {
+        "input": "60",
+        "output": "Pass",
+        "note": ""
+      }
+    ]
+  }
+}

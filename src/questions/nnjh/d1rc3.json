@@ -1,0 +1,34 @@
+{
+  "title": "第三題、平均成績",
+  "question": "請設計成績登記簿，輸入五個科目的分數，計算平均。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "90 95 92 98 90",
+      "output": "93",
+      "note": "五個科目的分數分別為90、95、92、98、90，總分為465分，平均為465/5=93分。"
+    },
+    {
+      "input": "60 70 67 75 82",
+      "output": "70.8",
+      "note": "五個科目的分數分別為60、70、67、75、82，總分為354分，平均為354/5=70.8分。"
+    }
+  ],
+  "en": {
+    "title": "Q3: Average Score",
+    "question": "Input 5 test scores. Output the average score.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "90 95 92 98 90",
+        "output": "93",
+        "note": "Scores: 90, 95, 92, 98, 90. Total: 465. Average: 465/5=93."
+      },
+      {
+        "input": "60 70 67 75 82",
+        "output": "70.8",
+        "note": "Scores: 60, 70, 67, 75, 82. Total: 354. Average: 354/5=70.8."
+      }
+    ]
+  }
+}

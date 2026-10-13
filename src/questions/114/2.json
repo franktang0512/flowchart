@@ -1,0 +1,24 @@
+{
+  "title": "輸入與變數",
+  "question": "請試著跟不同人打招呼！\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "Sinyi",
+      "output": "Hello Sinyi",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Input and Variables",
+    "question": "Try to say hello to different people!\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "Sinyi",
+        "output": "Hello Sinyi",
+        "note": ""
+      }
+    ]
+  }
+}

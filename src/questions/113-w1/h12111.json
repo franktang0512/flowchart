@@ -1,0 +1,44 @@
+{
+  "title": "遊戲中，會根據積分給予不同的排位，也會根據積分與排位給予不同的金幣獎勵。  1.達到金牌分數 10000 獎金乘積 × 1.8 \n 2.達到銀牌分數 5000 獎金乘積× 1.4 \n 3. 達到銅牌分數 0 × 1",
+  "question": "請根據玩家積分，輸出對應的排位與應獲得的金幣數量。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1500",
+      "output": "銅牌 1500",
+      "note": ""
+    },
+    {
+      "input": "6000",
+      "output": "銀牌 8400",
+      "note": ""
+    },
+    {
+      "input": "12000",
+      "output": "金牌 21600",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "In a game, you get a medal from your points. You also get coins.  1. Gold: 10000 points, coins × 1.8 \n 2. Silver: 5000 points, coins × 1.4 \n 3. Bronze: 0 points, coins × 1",
+    "question": "Input the points. Output the medal and the coins.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1500",
+        "output": "Bronze 1500",
+        "note": ""
+      },
+      {
+        "input": "6000",
+        "output": "Silver 8400",
+        "note": ""
+      },
+      {
+        "input": "12000",
+        "output": "Gold 21600",
+        "note": ""
+      }
+    ]
+  }
+}

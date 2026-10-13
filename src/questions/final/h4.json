@@ -1,0 +1,34 @@
+{
+  "title": "超速",
+  "question": "社區道路上設有測速照相，時速限制為30(km/h)，時速超過(不包含)30(km/h)為超速。請根據每輛車的時速，計算今日有幾輛車超速。(-1代表今日結束)",
+  "array": [],
+  "test_case": [
+    {
+      "input": "20 27 60 -1",
+      "output": "1",
+      "note": "車輛時速分別為20、27、60(km/h)，共有1輛車超速。"
+    },
+    {
+      "input": "25 70 62 47 -1",
+      "output": "3",
+      "note": "車輛時速分別為25、70、62、47(km/h)，共有3輛車超速。"
+    }
+  ],
+  "en": {
+    "title": "Too Fast",
+    "question": "A road has a speed camera. The speed limit is 30 (km/h). Faster than 30 (not 30) is too fast. Input the speed of each car. Output how many cars are too fast today. (-1 means the end of the day)",
+    "array": [],
+    "test_case": [
+      {
+        "input": "20 27 60 -1",
+        "output": "1",
+        "note": "Car speeds: 20, 27, 60 (km/h). 1 car is too fast."
+      },
+      {
+        "input": "25 70 62 47 -1",
+        "output": "3",
+        "note": "Car speeds: 25, 70, 62, 47 (km/h). 3 cars are too fast."
+      }
+    ]
+  }
+}

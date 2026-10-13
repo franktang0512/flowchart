@@ -1,0 +1,24 @@
+{
+  "title": "重複幾次",
+  "question": "請試著使用「迴圈」來輸出五次Hello {name}!\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "",
+      "output": "Hello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "How Many Times",
+    "question": "Use a loop. Output Hello {name}! five times.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "",
+        "output": "Hello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!",
+        "note": ""
+      }
+    ]
+  }
+}

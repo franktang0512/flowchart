@@ -1,0 +1,74 @@
+{
+  "title": "夜市小吃",
+  "question": "小吃攤販有六種食物，品項與價格如下。\n請建立價格陣列，輸入遊客有多少錢（元），輸出可以買的起幾種小吃。",
+  "array": [
+    [
+      "夜市牛排",
+      "200"
+    ],
+    [
+      "藥燉排骨",
+      "120"
+    ],
+    [
+      "炸雞排",
+      "60"
+    ],
+    [
+      "奶茶",
+      "55"
+    ],
+    [
+      "臭豆腐",
+      "40"
+    ],
+    [
+      "地瓜球",
+      "30"
+    ]
+  ],
+  "test_case": [
+    {
+      "input": "100",
+      "output": "4",
+      "note": "可以買炸雞排、奶茶、臭豆腐、地瓜球，共四種"
+    }
+  ],
+  "en": {
+    "title": "Night Market Food",
+    "question": "A night market shop has six foods. Here are the foods and prices.\nMake a list of the prices. Input how much money you have. Output how many foods you can buy.",
+    "array": [
+      [
+        "Steak",
+        "200"
+      ],
+      [
+        "Pork soup",
+        "120"
+      ],
+      [
+        "Fried chicken",
+        "60"
+      ],
+      [
+        "Milk tea",
+        "55"
+      ],
+      [
+        "Stinky tofu",
+        "40"
+      ],
+      [
+        "Sweet potato balls",
+        "30"
+      ]
+    ],
+    "test_case": [
+      {
+        "input": "100",
+        "output": "4",
+        "note": "You can buy fried chicken, milk tea, stinky tofu, and sweet potato balls. Four foods"
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "記帳",
+  "question": "請設計一款記帳程式，輸入一週的每日花費，計算本週總花費多少元？\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "300 200 300 280 600 200 300",
+      "output": "2180",
+      "note": "本週花費分別是300、200、300、280、600、200、300，加起來總和2180元。"
+    },
+    {
+      "input": "100 0 100 50 80 120 150",
+      "output": "600",
+      "note": "本週花費分別是100、0、100、50、80、120、150，加起來總和600元。"
+    }
+  ],
+  "en": {
+    "title": "My Money",
+    "question": "Input how much you spend each day for 7 days. Output the total for the week.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "300 200 300 280 600 200 300",
+        "output": "2180",
+        "note": "Money spent: 300, 200, 300, 280, 600, 200, 300. Total: $2180."
+      },
+      {
+        "input": "100 0 100 50 80 120 150",
+        "output": "600",
+        "note": "Money spent: 100, 0, 100, 50, 80, 120, 150. Total: $600."
+      }
+    ]
+  }
+}

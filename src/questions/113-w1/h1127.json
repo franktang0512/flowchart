@@ -1,0 +1,44 @@
+{
+  "title": "遊樂園的票價是100元，但只要有學生證可以打8折，老人可以打65折",
+  "question": "請做一個票價告知的機器，這台機器會讀取身分，然後告訴查詢的人所需要付的票價。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "學生",
+      "output": "80",
+      "note": ""
+    },
+    {
+      "input": "一般民眾",
+      "output": "100",
+      "note": ""
+    },
+    {
+      "input": "老人",
+      "output": "65",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "A park ticket is $100. Students pay 80%. Old people pay 65%.",
+    "question": "Make a ticket machine. Input who you are. Then output the ticket price.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "Student",
+        "output": "80",
+        "note": ""
+      },
+      {
+        "input": "Adult",
+        "output": "100",
+        "note": ""
+      },
+      {
+        "input": "Old person",
+        "output": "65",
+        "note": ""
+      }
+    ]
+  }
+}

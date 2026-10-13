@@ -1,0 +1,76 @@
+{
+  "title": "第一題、郵資",
+  "question": "在寄包裹時，郵局會先計算總共要處理幾個包裹，再根據每個包裹的重量來計算總共的郵資。請寫程式計算郵資。\n",
+  "array": [
+    [
+      "重量限制",
+      "郵資費用"
+    ],
+    [
+      "不逾5公斤",
+      "70"
+    ],
+    [
+      "逾5公斤<br>不逾10公斤",
+      "90"
+    ],
+    [
+      "逾10公斤<br>不逾15公斤",
+      "110"
+    ],
+    [
+      "逾15公斤<br>不逾20公斤",
+      "135"
+    ]
+  ],
+  "test_case": [
+    {
+      "input": "3<br>2 3 5",
+      "output": "210",
+      "note": "總共寄出3個包裹，分別為2公斤、3公斤、5公斤，郵資皆為70元，共210元。"
+    },
+    {
+      "input": "4<br>6 11 16 20",
+      "output": "470",
+      "note": "總共寄出4個包裹，分別為6公斤、11公斤、16公斤、20公斤，郵資分別為90元、110元、135元、135元，共470元。"
+    }
+  ],
+  "en": {
+    "title": "Q1: Mail",
+    "question": "You want to mail some boxes. First input how many boxes. Then input the weight of each box. Output the total price.\n",
+    "array": [
+      [
+        "Weight",
+        "Price"
+      ],
+      [
+        "5 kg or less",
+        "70"
+      ],
+      [
+        "More than 5 kg<br>10 kg or less",
+        "90"
+      ],
+      [
+        "More than 10 kg<br>15 kg or less",
+        "110"
+      ],
+      [
+        "More than 15 kg<br>20 kg or less",
+        "135"
+      ]
+    ],
+    "test_case": [
+      {
+        "input": "3<br>2 3 5",
+        "output": "210",
+        "note": "3 boxes: 2 kg, 3 kg, 5 kg. Each box is $70. Total: $210."
+      },
+      {
+        "input": "4<br>6 11 16 20",
+        "output": "470",
+        "note": "4 boxes: 6 kg, 11 kg, 16 kg, 20 kg. Prices: $90, $110, $135, $135. Total: $470."
+      }
+    ]
+  }
+}

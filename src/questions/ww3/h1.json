@@ -1,0 +1,34 @@
+{
+  "title": "施放魔法",
+  "question": "玩家魔力上限為100，每次施放魔法會消耗魔力，魔力歸零或魔力不足便無法施放魔法。請計算玩家剩餘多少魔力，以及總共施放幾次魔法。\n(如果剩下10魔力，卻想施放消耗超過10魔力的魔法會無法施放。)\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 10 15 20 24 30",
+      "output": "26 5",
+      "note": "依序放出消耗為5、10、15、20、24的魔法後，剩餘26魔力，魔力不足以施放30的魔法。因此共施放5次魔法。"
+    },
+    {
+      "input": "100 50",
+      "output": "0 1",
+      "note": "放出消耗為100的魔法後，魔力用光。共施放1次魔法。"
+    }
+  ],
+  "en": {
+    "title": "Magic",
+    "question": "You have 100 magic points. Each spell uses some magic points. When you do not have enough, you cannot use the spell. Output the magic points left and how many spells you used.\n(If you have 10 points left, you cannot use a spell that needs more than 10.)\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 10 15 20 24 30",
+        "output": "26 5",
+        "note": "Spells: 5, 10, 15, 20, 24. 26 points are left. That is not enough for 30. You used 5 spells."
+      },
+      {
+        "input": "100 50",
+        "output": "0 1",
+        "note": "One spell uses 100. No points are left. You used 1 spell."
+      }
+    ]
+  }
+}

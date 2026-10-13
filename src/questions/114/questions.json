@@ -1,0 +1,24 @@
+{
+  "title": "重複幾次",
+  "question": "0練習輸出\n1四則運算\n2輸入與變數\n3服飾店(單一輸入、單一輸出、單一變數、四則運算)\n4服飾店-改(單一輸入、多輸出、單一變數、四則運算)\n5記帳(多輸入、單一輸出、單一變數、四則運算)\n6加法(多輸入、單一輸出、多變數、四則運算)\n7BMI(多輸入、單一輸出、多變數、四則運算)\n8網路商城(單一輸入、單一輸出、單變數、四則運算、布林運算、單一條件if)\n9台鐵團體票(單一輸入、單一輸出、單變數、四則運算、布林運算、兩個條件if/else)\n10腳踏車(單一輸入、單一輸出、單變數、四則運算、布林運算、兩個條件if/else)\n11養成遊戲(單一輸入、單一輸出、單變數、布林運算、巢狀條件)\n12怒氣值(多輸入、單一輸出、多變數、四則運算、布林運算、巢狀條件)\n13排位獎勵(單一輸入、多輸出、多變數、四則運算、布林運算、巢狀條件)\n14重複幾次(多輸出、次數迴圈)，scratch要用持續兩秒的積木比較看得出來\n====================================================================\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "",
+      "output": "Hello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "How Many Times",
+    "question": "0 Output Practice\n1 Math\n2 Input and Variables\n3 Clothes Shop (1 input, 1 output, 1 variable, math)\n4 Clothes Shop (Sale) (1 input, many outputs, 1 variable, math)\n5 My Money (many inputs, 1 output, 1 variable, math)\n6 Add Two Numbers (many inputs, 1 output, many variables, math)\n7 BMI (many inputs, 1 output, many variables, math)\n8 Online Shop (1 input, 1 output, 1 variable, math, true/false, if)\n9 Train Tickets (1 input, 1 output, 1 variable, math, true/false, if/else)\n10 Bike Rental (1 input, 1 output, 1 variable, math, true/false, if/else)\n11 Pet Game (1 input, 1 output, 1 variable, true/false, if inside if)\n12 Angry Points (many inputs, 1 output, many variables, math, true/false, if inside if)\n13 Medals and Coins (1 input, many outputs, many variables, math, true/false, if inside if)\n14 How Many Times (many outputs, loop); in Scratch, use a 2-second block so you can see it\n====================================================================\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "",
+        "output": "Hello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!\nHello Sinyi!",
+        "note": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "腳踏車",
+  "question": "腳踏車出租店有兩種費率，4小時以內(含4小時)為每小時10元；4小時以上為每小時15元。請根據租車時間，計算總租金。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3",
+      "output": "30",
+      "note": "租車3小時，以四小時以內費率收費，為每小時10元。租金為3*10 = 30元。"
+    },
+    {
+      "input": "5",
+      "output": "75",
+      "note": "租車5小時，以四小時以上費率收費，為每小時15元。租金為5*15 = 75元。"
+    }
+  ],
+  "en": {
+    "title": "Bike Rental",
+    "question": "You can rent a bike. 4 hours or less: $10 an hour. More than 4 hours: $15 an hour. Input the hours. Output the total price.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3",
+        "output": "30",
+        "note": "3 hours. That is 4 hours or less, so $10 an hour. 3*10 = $30."
+      },
+      {
+        "input": "5",
+        "output": "75",
+        "note": "5 hours. That is more than 4 hours, so $15 an hour. 5*15 = $75."
+      }
+    ]
+  }
+}

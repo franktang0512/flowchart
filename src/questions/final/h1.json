@@ -1,0 +1,24 @@
+{
+  "title": "額溫儀",
+  "question": "紅外線額溫儀會根據額溫讓使用者知道他是否發燒。若額溫高於37度（不含37度），額溫儀會顯示「你發燒了」，否則會顯示「溫度正常」。請撰寫額溫儀程式，輸出並顯示溫度狀況。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "35",
+      "output": "溫度正常",
+      "note": "額溫35度，不高於37度，沒有發燒"
+    }
+  ],
+  "en": {
+    "title": "Thermometer",
+    "question": "A thermometer checks if you have a fever. If your temperature is more than 37 (not 37), it shows \"You have a fever\". If not, it shows \"Normal\". Input the temperature. Output what it shows.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "35",
+        "output": "Normal",
+        "note": "The temperature is 35. It is not more than 37. No fever"
+      }
+    ]
+  }
+}

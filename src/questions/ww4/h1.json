@@ -1,0 +1,34 @@
+{
+  "title": "總傷害",
+  "question": "戰鬥遊戲過程會不停的累計傷害量。請寫程式統計並輸出總傷害量，輸入-1時代表戰鬥結束。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "10 15 20 -1",
+      "output": "45",
+      "note": "造成的傷害分別為10、15、20，共造成45點傷害。"
+    },
+    {
+      "input": "1 2 4 8 16 32 64 -1",
+      "output": "127",
+      "note": "造成的傷害分別為1、2、4、8、16、32、64，共造成127點傷害。"
+    }
+  ],
+  "en": {
+    "title": "Total Damage",
+    "question": "In a fighting game, you keep doing damage. Add up all the damage and output the total. Input -1 to end the fight.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "10 15 20 -1",
+        "output": "45",
+        "note": "Damage: 10, 15, 20. Total: 45."
+      },
+      {
+        "input": "1 2 4 8 16 32 64 -1",
+        "output": "127",
+        "note": "Damage: 1, 2, 4, 8, 16, 32, 64. Total: 127."
+      }
+    ]
+  }
+}

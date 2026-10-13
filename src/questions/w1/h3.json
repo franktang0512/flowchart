@@ -1,0 +1,24 @@
+{
+  "title": "服飾店-改",
+  "question": "服飾店決定以成本價的1.5倍作為衣服的售價。本週適逢週年慶，服飾店再打9折作為衣服的售價。請協助服飾店根據成本價，輸出一次原本的售價，再計算打折後的售價。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "100",
+      "output": "150 135",
+      "note": "成本價100，乘上1.5倍作為售價，為150元。再打九折，為135元。"
+    }
+  ],
+  "en": {
+    "title": "Clothes Shop (Sale)",
+    "question": "A clothes shop sells clothes for 1.5 times the cost. This week there is a big sale: 10% off. Input the cost. Output the price. Then output the sale price.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "100",
+        "output": "150 135",
+        "note": "Cost: 100. Price: 100 × 1.5 = $150. Sale price: 150 × 0.9 = $135."
+      }
+    ]
+  }
+}

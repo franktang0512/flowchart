@@ -1,0 +1,24 @@
+{
+  "title": "四則運算",
+  "question": "請試著輸出45/9+7*3的結果\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "",
+      "output": "26",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Math",
+    "question": "Try to output the answer to 45/9+7*3\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "",
+        "output": "26",
+        "note": ""
+      }
+    ]
+  }
+}

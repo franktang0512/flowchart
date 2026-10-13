@@ -1,0 +1,34 @@
+{
+  "title": "台鐵團體票",
+  "question": "搭乘台鐵可購買團體票，如果超過10人(含)，則團體票價為每人7元；否則一般票價為每人13元。請根據出遊人數，計算總車費。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5",
+      "output": "65",
+      "note": "出遊人數5人，未達團體票10人限制，總車費為5*13 = 65元。"
+    },
+    {
+      "input": "11",
+      "output": "77",
+      "note": "出遊人數11人，達團體票10人限制，總車費為11*7 = 77元。"
+    }
+  ],
+  "en": {
+    "title": "Train Tickets",
+    "question": "Train tickets: 10 people or more pay $7 each. Fewer than 10 people pay $13 each. Input the number of people. Output the total price.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5",
+        "output": "65",
+        "note": "5 people. That is fewer than 10, so 5*13 = $65."
+      },
+      {
+        "input": "11",
+        "output": "77",
+        "note": "11 people. That is 10 or more, so 11*7 = $77."
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "title": "糕餅店",
+  "question": "糕餅店舉辦促銷活動。店內所有禮盒原價皆為200元，每筆訂單運費為80元。本次促銷活動如下：\n\t購買1~5個禮盒，享9折優惠\n\t購買6~10個禮盒，享8折優惠\n\t購買11~15個禮盒，享7折優惠\n\t購買16個禮盒以上，享6折優惠\n\t折扣完滿1200元再享免運優惠\n請設計本次促銷活動計價程式，根據購買禮盒的數量，計算顧客應付金額。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3",
+      "output": "620",
+      "note": "購買3個禮盒，共600元。打9折後為540。需付運費，共620元。"
+    }
+  ],
+  "en": {
+    "title": "Cake Shop",
+    "question": "A cake shop has a sale. A gift box is $200. Shipping is $80 for each order. The sale:\n\tBuy 1~5 boxes: 10% off\n\tBuy 6~10 boxes: 20% off\n\tBuy 11~15 boxes: 30% off\n\tBuy 16 boxes or more: 40% off\n\tAfter the sale price, $1200 or more: free shipping\nInput the number of boxes. Output the total price.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3",
+        "output": "620",
+        "note": "Buy 3 boxes: $600. 10% off: $540. Add shipping: $620."
+      }
+    ]
+  }
+}

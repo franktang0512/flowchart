@@ -1,0 +1,24 @@
+{
+  "title": "電費",
+  "question": "台電依照用電度數分段收取對應的電費，如下表：\n介於0~120度的部分，每度收取1.63元；\n介於121~330度的部分，每度收取2.10元；\n介於331~500度的部分，每度收取2.89元；\n介於501~700度的部分，每度收取3.94元；\n請設計電費計算系統，根據用電度數，計算應繳多少電費(四捨五入至整數位)。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "155",
+      "output": "269",
+      "note": "1.63*120(120度內的費用)+2.10*35(121~330度的費用) = 269.1。四捨五入至整數後為269。"
+    }
+  ],
+  "en": {
+    "title": "Power Bill",
+    "question": "You pay for power by the unit:\n0~120 units: $1.63 for each unit;\n121~330 units: $2.10 for each unit;\n331~500 units: $2.89 for each unit;\n501~700 units: $3.94 for each unit;\nInput the units. Output the bill (round the number).\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "155",
+        "output": "269",
+        "note": "1.63*120 (first 120 units) + 2.10*35 (units 121~155) = 269.1. Round it: 269."
+      }
+    ]
+  }
+}

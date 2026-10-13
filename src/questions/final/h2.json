@@ -1,0 +1,58 @@
+{
+  "title": "驗光儀",
+  "question": "驗光儀可測量眼睛的度數，請根據驗光儀測得度數，輸出近視狀況。",
+  "array": [
+    [
+      "度數<300",
+      "輕度近視"
+    ],
+    [
+      "300≦度數<500",
+      "中度近視"
+    ],
+    [
+      "500≦度數<800",
+      "高度近視"
+    ],
+    [
+      "800≦度數",
+      "病理性近視"
+    ]
+  ],
+  "test_case": [
+    {
+      "input": "200",
+      "output": "輕度近視",
+      "note": "度數200度，為輕度近視"
+    }
+  ],
+  "en": {
+    "title": "Eye Test",
+    "question": "An eye test machine checks your eyes. Input the number from the machine. Output how bad your eyes are.",
+    "array": [
+      [
+        "number<300",
+        "A little bad"
+      ],
+      [
+        "300≦number<500",
+        "Bad"
+      ],
+      [
+        "500≦number<800",
+        "Very bad"
+      ],
+      [
+        "800≦number",
+        "See a doctor"
+      ]
+    ],
+    "test_case": [
+      {
+        "input": "200",
+        "output": "A little bad",
+        "note": "The number is 200. A little bad"
+      }
+    ]
+  }
+}

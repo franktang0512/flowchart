@@ -1,0 +1,34 @@
+{
+  "title": "區間測速",
+  "question": "花花公路設有區間測速系統，其平均速率計算方式為總距離除以行駛時間。\n已知花花公路全長10公里，最低速限60公里，最高速限80公里。\n若車輛平均速率低於最低速限，罰款3000元；\n高於最高速限1公里~20公里，罰款4000元；\n高於最高速限21公里~40公里，罰款5000元；\n高於最高速限超過40公里，罰款6000元；\n\n請設計區間測速罰單系統，根據行駛時間(分鐘)，顯示罰款金額。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "12",
+      "output": "罰款3000元",
+      "note": "行駛12分鐘，為0.2小時，平均速率為10/0.2=50(km/h)，低於最低速限，罰款3000元。"
+    },
+    {
+      "input": "8",
+      "output": "罰款0元",
+      "note": "行駛8分鐘，為0.133小時，平均速率約為10/0.133=75(km/h)，在標準內，罰款0元。"
+    }
+  ],
+  "en": {
+    "title": "Speed Check",
+    "question": "A road checks your average speed. Average speed = distance ÷ time.\nThe road is 10 km long. The slowest speed is 60 km/h. The fastest speed is 80 km/h.\nSlower than 60: pay $3000;\n1~20 km/h too fast: pay $4000;\n21~40 km/h too fast: pay $5000;\nmore than 40 km/h too fast: pay $6000;\n\nInput the driving time (minutes). Output the money to pay.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "12",
+        "output": "Pay $3000",
+        "note": "12 minutes is 0.2 hours. Speed: 10/0.2=50 (km/h). Slower than 60, so pay $3000."
+      },
+      {
+        "input": "8",
+        "output": "Pay $0",
+        "note": "8 minutes is about 0.133 hours. Speed: about 10/0.133=75 (km/h). That is OK, so pay $0."
+      }
+    ]
+  }
+}

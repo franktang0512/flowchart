@@ -1,0 +1,34 @@
+{
+  "title": "密碼鎖",
+  "question": "玩密室逃脫遊戲時，門上的鎖需要三位數密碼才能解開。\n三位數密碼依序為：圓形積木總數量的個位數、三角形積木總數量的個位數、正方形積木總數量的個位數。\n房間內有許多箱子，箱子內有各種積木。請解開密碼鎖，逃出密室。\n(提示：將數字除以10，餘數即為個位數。)\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "2<br>5 8 2<br>10 0 3",
+      "output": "585",
+      "note": "有2個箱子，第一個箱子，圓形積木有5個，三角形積木有8個，正方形積木有2個；第二個箱子，圓形積木有10個，三角形積木有0個，正方形積木有3個。<br>圓形的數量是5+10=15，三角形的數量是8+0=8，正方形的總數量是2+3=5，因此密碼為585。"
+    },
+    {
+      "input": "3<br>7 2 4<br>3 5 8<br>2 0 0",
+      "output": "272",
+      "note": "有3個箱子，第一個箱子，圓形積木有7個，三角形積木有2個，正方形積木有4個，以此類推。<br>圓形的數量是7+3+2=12，三角形的數量是2+5+0=7，正方形的總數量是4+8+0=12，因此密碼為272。"
+    }
+  ],
+  "en": {
+    "title": "Number Lock",
+    "question": "You are in an escape room. The door lock needs a 3-number code.\nThe code is: the last number of all circles, the last number of all triangles, the last number of all squares.\nThere are boxes in the room. Each box has circles, triangles, and squares. Open the lock and get out!\n(Tip: number % 10 gives you the last number.)\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "2<br>5 8 2<br>10 0 3",
+        "output": "585",
+        "note": "2 boxes. Box 1: 5 circles, 8 triangles, 2 squares. Box 2: 10 circles, 0 triangles, 3 squares.<br>Circles: 5+10=15. Triangles: 8+0=8. Squares: 2+3=5. The code is 585."
+      },
+      {
+        "input": "3<br>7 2 4<br>3 5 8<br>2 0 0",
+        "output": "272",
+        "note": "3 boxes. Box 1: 7 circles, 2 triangles, 4 squares, and so on.<br>Circles: 7+3+2=12. Triangles: 2+5+0=7. Squares: 4+8+0=12. The code is 272."
+      }
+    ]
+  }
+}

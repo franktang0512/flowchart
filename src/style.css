@@ -1,0 +1,861 @@
+/* ============================================================
+   電子式學習單
+   配色沿用舊版：淺綠 #c7e1c5（主色）、淺灰藍 #f4f7f9（卡片底）
+   ============================================================ */
+:root {
+    --green: #c7e1c5;
+    --green-dark: #1a8c3e;
+    --green-darker: #166b2f;
+    --panel: #f4f7f9;
+    --line: #b4bec7;
+    /* 卡片外框：比表格線淡一點，但看得出範圍 */
+    --card-line: #cfd7de;
+    --text: #212529;
+    --muted: #6c757d;
+    --ok-bg: #dcf5dc;
+    --ok-line: #5cb85c;
+    --bad-bg: #fde2e1;
+    --bad-line: #e57373;
+    --radius: 16px;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background: #fff;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+input, textarea, select, button {
+    font-family: inherit;
+}
+
+/* ---------- 整體骨架：頁首、內容（撐滿視窗）、頁尾 ---------- */
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* 首頁內容比視窗長時整頁捲動 */
+.app.app_scroll {
+    height: auto;
+    min-height: 100vh;
+}
+
+#header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--green);
+    padding: 8px 20px;
+    flex-shrink: 0;
+}
+
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.2rem;
+    color: inherit;
+    text-decoration: none;
+}
+.logo:hover {
+    color: inherit;
+    text-decoration: none;
+}
+.logo img {
+    height: 34px;
+}
+
+/* 左上角：logo＋中英切換 */
+.header_left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.lang_toggle {
+    display: inline-flex;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #9fbf9c;
+    border-radius: 999px;
+    padding: 2px;
+}
+.lang_toggle button {
+    border: none;
+    background: transparent;
+    border-radius: 999px;
+    padding: 2px 12px;
+    font-size: 0.85rem;
+    color: #3d5a3b;
+    cursor: pointer;
+}
+.lang_toggle button.selected {
+    background: var(--green-dark);
+    color: #fff;
+}
+#student_info {
+    display: flex;
+    align-items: center;
+    gap: 6px 10px;
+    flex-wrap: wrap;
+}
+#student_info label {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+#student_info input {
+    width: 90px;
+    padding: 3px 8px;
+    border: 1px solid #b5ccb3;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.submit-button {
+    padding: 6px 18px;
+    background: var(--green-dark);
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+}
+.submit-button:hover {
+    background: var(--green-darker);
+}
+
+/* 頁首的「檔案」選單 */
+.file_menu {
+    position: relative;
+}
+.file_menu_list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 100;
+    width: 280px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+    padding: 6px;
+}
+.file_menu_list button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 1rem;
+}
+.file_menu_list button:hover,
+.file_menu_list button:focus-visible {
+    background: var(--panel);
+    outline: none;
+}
+.file_menu_list small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+.file_menu_sep {
+    height: 1px;
+    background: var(--line);
+    margin: 4px 8px;
+}
+
+#footer {
+    display: flex;
+    justify-content: space-between;
+    background: var(--green);
+    padding: 4px 20px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+#footer p {
+    margin: 0;
+}
+
+/* ---------- 學習單主體 ---------- */
+#workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 20px 16px;
+    gap: 12px;
+}
+
+/* 步驟分頁 */
+#page_set {
+    display: flex;
+    align-self: center;
+    width: min(900px, 100%);
+    background: var(--panel);
+    border-radius: 999px;
+    padding: 4px;
+    flex-shrink: 0;
+}
+.page_tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1rem;
+}
+.page_tab:not(.selected):hover {
+    background: #e7ecef;
+}
+.page_tab.selected {
+    background: var(--green);
+    font-weight: 600;
+}
+.step_badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.page_tab {
+    white-space: nowrap;
+}
+#var_table th {
+    white-space: nowrap;
+}
+#var_table select.var_input {
+    min-width: 92px;
+}
+
+/* 左右兩欄，各自捲動 */
+.stage {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(340px, 2fr) 3fr;
+    gap: 16px;
+}
+.col {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-right: 4px;
+}
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--card-line);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+}
+.card_title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+.card_title .step_badge {
+    background: var(--green);
+}
+.muted {
+    color: var(--muted);
+}
+
+/* ---------- 題目 ---------- */
+#question_name {
+    margin: 0 0 8px;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+#question_info {
+    white-space: pre-wrap;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 12px;
+}
+.section_label {
+    margin: 12px 0 6px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* ---------- 表格 ---------- */
+.data_table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    font-size: 1rem;
+}
+.data_table th,
+.data_table td {
+    border: 1px solid var(--line);
+    padding: 6px 8px;
+    vertical-align: middle;
+}
+.data_table th {
+    background: #dde5ea;
+    font-weight: 600;
+}
+#array:empty {
+    display: none;
+}
+
+/* 表格裡的輸入框（變數、測資） */
+.var_input,
+.case_input {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 3px 6px;
+    background: transparent;
+}
+.var_input:focus,
+.case_input:focus {
+    outline: none;
+    border-color: var(--ok-line);
+    background: #fff;
+}
+.data_table td:has(.var_input),
+.data_table td:has(.case_input) {
+    padding: 2px;
+}
+.case_input {
+    display: block;
+    min-height: 56px;
+    resize: none;
+}
+.delete_var {
+    display: inline-flex;
+    border: none;
+    background: none;
+    color: #9aa5ad;
+    padding: 4px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.delete_var:hover {
+    background: var(--bad-bg);
+    color: #c0392b;
+}
+#createRow {
+    margin-top: 10px;
+    border: 1px dashed #9aa5ad;
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 14px;
+}
+#createRow:hover {
+    border-color: var(--green-dark);
+    color: var(--green-dark);
+}
+
+/* ---------- 第一步／第二步的卡片：還不能做的那張蓋上半透明灰色 ---------- */
+.step_card {
+    position: relative;
+}
+.step_form {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 10px 12px;
+    align-items: center;
+}
+.step_form label {
+    margin: 0;
+}
+.step_form input {
+    width: 100%;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+.step_lock {
+    position: absolute;
+    inset: 0;
+    border: none;
+    border-radius: var(--radius);
+    background: rgba(108, 117, 125, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.step_lock span {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 999px;
+    padding: 8px 20px;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.step_lock:focus-visible {
+    outline: 3px solid var(--green-dark);
+    outline-offset: 2px;
+}
+.step_lock:hover span {
+    background: #fff;
+    color: var(--green-darker);
+}
+
+/* ---------- 第三步：流程圖畫布 ---------- */
+.canvas_card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px;
+    gap: 8px;
+}
+.canvas_head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.canvas_hint {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+#clear_canvas {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 3px 12px;
+    flex-shrink: 0;
+}
+#clear_canvas:hover {
+    border-color: var(--bad-line);
+    color: #c0392b;
+}
+.canvas_body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 8px;
+}
+.canvas_wrap {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+.canvas_wrap canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* 工具列 */
+#toolbox {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 60px;
+    flex-shrink: 0;
+    overflow-y: auto;
+}
+.toolbox_btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 2px;
+    border: 2px solid var(--card-line);
+    border-radius: 10px;
+    background: #fff;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    cursor: pointer;
+}
+.toolbox_btn:hover {
+    border-color: #8f9ba5;
+}
+.toolbox_btn.selected {
+    border-color: var(--green-dark);
+    background: var(--green);
+}
+.toolbox_img {
+    width: 40px;
+    height: 32px;
+    object-fit: contain;
+}
+.toolbox_sep {
+    height: 1px;
+    background: var(--line);
+    margin: 4px 6px;
+}
+
+/* ---------- 第四步：逐步執行 ---------- */
+#run_code_area {
+    grid-template-columns: 3fr 2fr;
+}
+.run_side {
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.run_error {
+    background: var(--bad-bg);
+    border: 2px solid var(--bad-line);
+}
+.run_error p {
+    margin: 0 0 6px;
+}
+.run_error p:last-child {
+    margin: 0;
+    font-size: 0.9rem;
+}
+.run_error_title {
+    font-weight: 600;
+    color: #c0392b;
+    font-size: 1.05rem;
+}
+
+.run_steps {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#stepCount {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+#stepSlider {
+    flex: 1;
+    accent-color: var(--green-dark);
+}
+.run_steps button {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 12px;
+}
+.run_steps button:disabled {
+    opacity: 0.45;
+}
+/* 輸出畫面：只是給學生看，不像輸入框 */
+.output_screen {
+    min-height: 2.6em;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #e4e9ed;
+    font-family: Consolas, "Microsoft JhengHei", monospace;
+    font-size: 1.05rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    cursor: default;
+    transition: background-color 0.2s;
+}
+.output_screen.ok {
+    background: #c8efc8;
+}
+.output_screen.bad {
+    background: #f8d0ce;
+}
+.case_picker {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.case_picker label {
+    margin: 0;
+    padding: 3px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: #fff;
+    cursor: pointer;
+}
+.case_picker label:has(input:checked) {
+    background: var(--green);
+    border-color: var(--green-dark);
+}
+.case_picker input {
+    margin-right: 4px;
+}
+/* 變數：每個變數一塊（名稱＋放值的小方塊），排不下就換行 */
+.var_boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+}
+.var_box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+}
+.var_box_name {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+.var_box_value {
+    min-width: 64px;
+    max-width: 260px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 12px;
+    background: #e4e9ed;
+    border-radius: 8px;
+    font-size: 1.15rem;
+    overflow-wrap: anywhere;
+    cursor: default;
+}
+/* 第四步：清單的值 */
+.list_value {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.list_item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0 8px;
+    background: #fff;
+}
+.list_item small {
+    color: var(--muted);
+    font-size: 0.75rem;
+}
+
+/* ---------- 對話框（新增/修改積木） ---------- */
+#node_info {
+    border: none;
+    border-radius: 14px;
+    padding: 24px 28px;
+    min-width: 340px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+#node_info::backdrop {
+    background: rgba(0, 0, 0, 0.3);
+}
+#node_info p {
+    margin: 0 0 10px;
+}
+#node_info #hint {
+    font-weight: 600;
+}
+#node_info input:not([type=radio]) {
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin: 4px 0;
+}
+#node_info input[type=radio] {
+    margin: 0 4px 0 10px;
+}
+#hint_yes,
+#hint_no {
+    margin-top: 14px;
+    padding: 5px 22px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: #fff;
+}
+#hint_yes {
+    background: var(--green-dark);
+    border-color: var(--green-dark);
+    color: #fff;
+}
+#hint_yes:hover {
+    background: var(--green-darker);
+}
+
+/* ---------- 列印（交作業） ---------- */
+#print {
+    width: 80%;
+    margin: 20px auto;
+}
+.print_head {
+    font-size: 32px;
+    text-align: center;
+    margin-bottom: 16px;
+}
+.print_head span {
+    text-decoration: underline;
+    margin-right: 24px;
+}
+.my_table {
+    width: 100%;
+    font-size: 18px;
+    border: 2px solid black;
+    border-collapse: collapse;
+}
+.my_table th,
+.my_table td {
+    border: 1px solid #555;
+    padding: 4px 8px;
+}
+.my_table > tbody > tr > th {
+    background: #e5e5e5;
+    white-space: nowrap;
+}
+.print_table {
+    width: 95%;
+    margin: 8px auto;
+    font-size: 18px;
+    border-collapse: collapse;
+}
+.print_table {
+    border: 1px solid #555;
+}
+.print_table th,
+.print_table td {
+    border: 1px solid #555;
+    padding: 4px 8px;
+    white-space: pre-wrap;
+}
+.print_table th {
+    background: #e5e5e5;
+}
+#flow_chart {
+    display: block;
+    margin: auto;
+    max-width: 100%;
+}
+
+@media print {
+    .app {
+        height: auto;
+    }
+    #header, #footer {
+        display: none !important;
+    }
+    #print {
+        width: 100%;
+        margin: 0;
+    }
+}
+
+/* ---------- 窄螢幕：改成上下排 ---------- */
+@media (max-width: 900px) {
+    .app {
+        height: auto;
+        min-height: 100vh;
+    }
+    .stage,
+    #run_code_area {
+        grid-template-columns: 1fr;
+    }
+    .col {
+        overflow: visible;
+    }
+    .canvas_card,
+    .run_canvas_card {
+        height: 75vh;
+    }
+    .page_tab {
+        font-size: 0.85rem;
+    }
+}
+
+/* ============================================================
+   首頁：課程與題目清單
+   ============================================================ */
+.home_main {
+    flex: 1;
+    width: min(1000px, 100% - 32px);
+    margin: 24px auto;
+}
+.home_heading {
+    margin: 10px 0 20px;
+}
+.home_breadcrumb {
+    margin: 0;
+    color: var(--muted);
+}
+.home_courses {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+}
+.home_card {
+    display: block;
+    padding: 20px 25px;
+    background: var(--panel);
+    border-radius: 25px;
+    color: inherit;
+}
+.home_card:hover {
+    background: var(--green);
+    color: inherit;
+    text-decoration: none;
+}
+.home_card_title {
+    font-size: 1.3rem;
+}
+.home_card_desc {
+    margin-top: 5px;
+    color: #555;
+}
+.home_card_meta {
+    margin-top: 10px;
+    color: var(--muted);
+}
+.home_unit {
+    background: var(--panel);
+    border-radius: 25px;
+    padding: 15px 25px;
+    margin-bottom: 15px;
+}
+.home_questions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.home_questions a {
+    display: flex;
+    padding: 6px 10px;
+    border-radius: 10px;
+    color: inherit;
+}
+.home_questions a:hover {
+    background: var(--green);
+    color: inherit;
+    text-decoration: none;
+}
+.home_no {
+    width: 40px;
+    flex-shrink: 0;
+    color: var(--muted);
+}
+.home_title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}

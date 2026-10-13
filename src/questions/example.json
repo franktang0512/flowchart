@@ -1,0 +1,24 @@
+{
+  "title": "範例題目",
+  "question": "請設計一台計算機，輸入兩個數字，輸出總和\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1 2",
+      "output": "3",
+      "note": "輸入兩個數字為1和2，總和為3。"
+    }
+  ],
+  "en": {
+    "title": "Example",
+    "question": "Make a calculator. Input two numbers. Output the total.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1 2",
+        "output": "3",
+        "note": "The numbers are 1 and 2. The total is 3."
+      }
+    ]
+  }
+}

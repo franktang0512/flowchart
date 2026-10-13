@@ -1,0 +1,44 @@
+{
+  "title": "第一題:加法",
+  "question": "輸入兩個數字，程式會幫你相加並輸出\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "10 2",
+      "output": "12",
+      "note": "10+2=12"
+    },
+    {
+      "input": "5 -3",
+      "output": "2",
+      "note": "5+(-3) =2"
+    },
+    {
+      "input": "-1.5 -1",
+      "output": "-2.5",
+      "note": "(-1.5)+(-1) = -2.5"
+    }
+  ],
+  "en": {
+    "title": "Q1: Add Two Numbers",
+    "question": "Input two numbers. Add them. Output the answer.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "10 2",
+        "output": "12",
+        "note": "10+2=12"
+      },
+      {
+        "input": "5 -3",
+        "output": "2",
+        "note": "5+(-3) =2"
+      },
+      {
+        "input": "-1.5 -1",
+        "output": "-2.5",
+        "note": "(-1.5)+(-1) = -2.5"
+      }
+    ]
+  }
+}

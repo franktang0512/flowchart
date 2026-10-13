@@ -1,0 +1,24 @@
+{
+  "title": "雞排飲料店",
+  "question": "雞排飲料店販賣雞排與珍珠奶茶，每個盒子最多可以裝5塊雞排，每個紙架最多能放4杯珍珠奶茶。\n給定每日訂單的數量與資訊，且每筆訂單會分開裝袋，計算該日使用盒子與紙架的總數量。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "4<br>10 15<br>33 30<br>50 25<br>100 100\t39",
+      "output": "44",
+      "note": "本日有4筆訂單，第一筆訂單訂購10塊雞排、15杯珍珠奶茶，需要2個紙盒與4個紙架，依此類推。共需2+7+10+20，共39個紙盒，以及4+8+7+25，共44個紙架。"
+    }
+  ],
+  "en": {
+    "title": "Chicken and Tea Shop",
+    "question": "A shop sells fried chicken and milk tea. One box holds 5 pieces of chicken. One cup holder holds 4 cups of tea.\nInput the number of orders and each order. Each order is packed alone. Output how many boxes and cup holders the shop uses today.\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "4<br>10 15<br>33 30<br>50 25<br>100 100\t39",
+        "output": "44",
+        "note": "4 orders today. Order 1: 10 chicken and 15 teas. It needs 2 boxes and 4 cup holders, and so on. Boxes: 2+7+10+20 = 39. Cup holders: 4+8+7+25 = 44."
+      }
+    ]
+  }
+}

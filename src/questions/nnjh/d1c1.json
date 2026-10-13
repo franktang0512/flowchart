@@ -1,0 +1,34 @@
+{
+  "title": "第一題：網路商城",
+  "question": "本月適逢88節，網路商城推出消費滿499免60元運費。請根據消費者的消費金額，計算總共需花費多少元（含運費）。\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "120",
+      "output": "180",
+      "note": "總消費金額為120元，且未滿499元，需60元運費，共花費180元。"
+    },
+    {
+      "input": "500",
+      "output": "500",
+      "note": "總消費金額為500元，因滿499元免運費，共花費500元。"
+    }
+  ],
+  "en": {
+    "title": "Q1: Online Shop",
+    "question": "Big sale this month! Shipping is $60. If you buy $499 or more, shipping is free. Input how much you buy. Output the total price (with shipping).\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "120",
+        "output": "180",
+        "note": "You buy $120. That is less than $499, so shipping is $60. Total: $180."
+      },
+      {
+        "input": "500",
+        "output": "500",
+        "note": "You buy $500. That is $499 or more, so shipping is free. Total: $500."
+      }
+    ]
+  }
+}

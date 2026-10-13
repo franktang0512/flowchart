@@ -1,0 +1,34 @@
+{
+  "title": "讀書",
+  "question": "有一本小說，有450頁。每天讀個幾頁，並記錄下讀的頁數。請計算總共花了幾天讀完？\n(應該剛好讀完450頁)",
+  "array": [],
+  "test_case": [
+    {
+      "input": "100 100 100 150",
+      "output": "4",
+      "note": "每天分別讀100頁、100頁、100頁、150頁，花4天讀完"
+    },
+    {
+      "input": "1 2 4 8 16 32 64 128 195",
+      "output": "9",
+      "note": "每天分別讀1頁、2頁、4頁、......、195頁，花9天讀完"
+    }
+  ],
+  "en": {
+    "title": "Reading",
+    "question": "A book has 450 pages. Each day you read some pages and write down the number. How many days do you need to finish?\n(You read exactly 450 pages)",
+    "array": [],
+    "test_case": [
+      {
+        "input": "100 100 100 150",
+        "output": "4",
+        "note": "Pages each day: 100, 100, 100, 150. 4 days"
+      },
+      {
+        "input": "1 2 4 8 16 32 64 128 195",
+        "output": "9",
+        "note": "Pages each day: 1, 2, 4, ......, 195. 9 days"
+      }
+    ]
+  }
+}

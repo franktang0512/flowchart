@@ -1,0 +1,24 @@
+{
+  "title": "練習輸出",
+  "question": "請試著輸出Hello!\n",
+  "array": [],
+  "test_case": [
+    {
+      "input": "",
+      "output": "Hello!",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Output Practice",
+    "question": "Try to output Hello!\n",
+    "array": [],
+    "test_case": [
+      {
+        "input": "",
+        "output": "Hello!",
+        "note": ""
+      }
+    ]
+  }
+}
