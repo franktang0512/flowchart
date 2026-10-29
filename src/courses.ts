@@ -1,6 +1,8 @@
 // 課程與題目清單：首頁列出課程，點進去依單元列出題目。
 // 題目寫成 "資料夾/檔名"，對應 src/questions/資料夾/檔名.json，網址是 ?w=資料夾&h=檔名。
 // 要調整課程名稱、單元、題目順序、隱藏某題，都只要改這個檔案。
+import { link } from './i18n';
+
 export interface Unit {
   name: string;
   nameEn: string;
@@ -71,5 +73,5 @@ export const COURSES: Course[] = [
 /** 題目的網址 */
 export const questionHref = (path: string) => {
   const [w, h] = path.split('/');
-  return `?w=${encodeURIComponent(w)}&h=${encodeURIComponent(h)}`;
+  return link(`?w=${encodeURIComponent(w)}&h=${encodeURIComponent(h)}`);
 };

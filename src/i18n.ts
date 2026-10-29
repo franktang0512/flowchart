@@ -6,7 +6,11 @@ export type Lang = 'zh' | 'en';
 
 const KEY = 'flowchart-lang';
 
+/** 網址加 ?lang=en：固定英文、不顯示中／英切換（給學生的連結用） */
+export const LOCKED_EN = new URLSearchParams(window.location.search).get('lang') == 'en';
+
 function load(): Lang {
+  if (LOCKED_EN) return 'en';
   try {
     return localStorage.getItem(KEY) == 'en' ? 'en' : 'zh';
   }
@@ -41,6 +45,12 @@ export function onLangChange(f: () => void) {
 /** React 元件裡用：語言切換時重新畫面 */
 export function useLang(): Lang {
   return useSyncExternalStore(onLangChange, getLang);
+}
+
+/** 站內連結：固定英文時把 lang=en 帶到下一頁，例如 link('?course=114')、link('./') */
+export function link(href: string) {
+  if (!LOCKED_EN) return href;
+  return href.includes('?') ? href + '&lang=en' : href + '?lang=en';
 }
 
 /** 依目前語言回傳中文或英文 */

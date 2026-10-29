@@ -15,7 +15,7 @@ import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
 import { fitRowOnInput } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
-import { getLang, onLangChange, t, useLang } from './i18n';
+import { getLang, link, onLangChange, t, useLang } from './i18n';
 import { useCommit } from './useCommit';
 import { downloadWorkFile, makeWorkFile, parseWorkFile, pickTextFile, stashPendingImport, takePendingImport, type WorkContent, type WorkFile } from './workFile';
 
@@ -402,7 +402,7 @@ export function App() {
         return;
       }
       const [w, h] = work.question.split('/');
-      window.location.href = `?w=${encodeURIComponent(w)}&h=${encodeURIComponent(h)}`;
+      window.location.href = link(`?w=${encodeURIComponent(w)}&h=${encodeURIComponent(h)}`);
       return;
     }
     if (hasWork() && !confirm(t('匯入後，目前畫面上的內容會被檔案裡的內容取代。確定要匯入嗎？', 'Your work on this page will be replaced by the file. Open it?'))) return;
@@ -438,7 +438,7 @@ export function App() {
     <div className="app">
       <div id="header">
         <div className="header_left">
-        <a className="logo" href="./" title={t('回到選擇課程（目前的作答不會保存）', 'Back to courses (your work will not be saved)')} onClick={e => {
+        <a className="logo" href={link('./')} title={t('回到選擇課程（目前的作答不會保存）', 'Back to courses (your work will not be saved)')} onClick={e => {
           if (!confirm(t('回到選擇課程？目前的作答不會保存。', 'Go back to courses? Your work will not be saved.'))) e.preventDefault();
         }}>
           <img src="./libs/logo.png" alt="" />

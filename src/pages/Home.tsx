@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { LangToggle } from '../components/LangToggle';
 import { COURSES, questionHref, type Course } from '../courses';
-import { t, useLang } from '../i18n';
+import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -10,7 +10,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="app app_scroll">
       <div id="header">
         <div className="header_left">
-          <a className="logo" href="./">
+          <a className="logo" href={link('./')}>
             <img src="./libs/logo.png" alt="" />
             {t('電子式學習單', 'Flowchart Worksheet')}
           </a>
@@ -41,7 +41,7 @@ export function CourseList() {
       <h4 className="home_heading">{t('選擇課程', 'Choose a course')}</h4>
       <div className="home_courses">
         {COURSES.map(c => (
-          <a key={c.id} className="home_card" href={`?course=${encodeURIComponent(c.id)}`}>
+          <a key={c.id} className="home_card" href={link(`?course=${encodeURIComponent(c.id)}`)}>
             <div className="home_card_title">{courseName(c)}</div>
             {c.description && <div className="home_card_desc">{c.description}</div>}
             <div className="home_card_meta">
@@ -73,7 +73,7 @@ export function QuestionList({ courseId }: { courseId: string }) {
   if (!course) {
     return (
       <Shell>
-        <p className="home_breadcrumb"><a href="./">{t('課程', 'Courses')}</a></p>
+        <p className="home_breadcrumb"><a href={link('./')}>{t('課程', 'Courses')}</a></p>
         <p>{t('找不到這門課程。', 'This course is not found.')}</p>
       </Shell>
     );
@@ -82,7 +82,7 @@ export function QuestionList({ courseId }: { courseId: string }) {
   let no = 0;
   return (
     <Shell>
-      <p className="home_breadcrumb"><a href="./">{t('課程', 'Courses')}</a> › {courseName(course)}</p>
+      <p className="home_breadcrumb"><a href={link('./')}>{t('課程', 'Courses')}</a> › {courseName(course)}</p>
       <h4 className="home_heading">{courseName(course)}</h4>
       {course.units.map(unit => (
         <div key={unit.name} className="home_unit">
