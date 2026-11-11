@@ -558,6 +558,10 @@ input, textarea, select, button {
     border-radius: 6px;
     padding: 2px 12px;
 }
+/* 看程式：Scratch / Blockly 切換（樣式跟中英切換一樣） */
+.code_mode {
+    align-self: flex-start;
+}
 .code_blockly {
     flex: 1;
     min-height: 0;

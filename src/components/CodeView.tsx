@@ -1,38 +1,56 @@
 // 「看程式」：把目前的流程圖轉成程式給學生看（只能看、不能改）。
-// 學習目標是積木 → 用 Blockly 畫成積木（Scratch 風格的外觀）；是 C++ → 顯示 C++ 程式碼，可以複製。
+// 學習目標是積木 → 畫成積木，可以切換 Scratch / Blockly 兩種外觀（跟全國賽練習網頁 individual_demo 一樣）；
+// 是 C++ → 顯示 C++ 程式碼，可以複製。
 import { useEffect, useRef, useState } from 'react';
 import type { Diagram } from '../engine/diagram';
 import { FlowError } from '../engine/decoder';
+import { defineBlocks } from '../engine/scratchBlocks';
 import { structure, type VarInfo } from '../engine/structure';
-import { blocklyLoadError, toBlockly } from '../engine/toBlockly';
+import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
 import { toCpp } from '../engine/toCpp';
 import { getLang, t, useLang } from '../i18n';
 import { getTarget, targetName } from '../target';
 
-// Blockly 只有打開「看程式」時才從 CDN 載入（不放進打包檔，網站一開始比較快）
-const BLOCKLY = 'https://cdn.jsdelivr.net/npm/blockly@10.4.3';
+// Blockly 只有打開「看程式」時才從 CDN 載入（不放進打包檔，網站一開始比較快）；版本跟練習網頁一樣
+const BLOCKLY = 'https://cdn.jsdelivr.net/npm/blockly@11.2.1';
 type BlocklyModule = any;
-let blocklyPromise: Promise<BlocklyModule> | null = null;
+interface Loaded {
+  Blockly: BlocklyModule;
+  themes: { scratch: unknown; blockly: unknown };
+}
+let blocklyPromise: Promise<Loaded> | null = null;
 
-function loadBlockly(): Promise<BlocklyModule> {
+/** 依序試幾個網址，第一個載得到的就用 */
+async function importFirst(urls: string[]) {
+  for (const url of urls) {
+    try {
+      return await import(/* @vite-ignore */ url);
+    }
+    catch {
+      // 試下一個
+    }
+  }
+  return null;
+}
+
+function loadBlockly(): Promise<Loaded> {
   blocklyPromise ??= (async () => {
     const mod = await import(/* @vite-ignore */ `${BLOCKLY}/+esm`);
     const Blockly = mod.default ?? mod;
+    let zh = null;
     if (getLang() != 'en') {
-      // 積木上的字用繁體中文；載入失敗就維持英文
-      try {
-        const zh = await import(/* @vite-ignore */ `${BLOCKLY}/msg/zh-hant/+esm`);
-        Blockly.setLocale(zh.default ?? zh);
-      }
-      catch {
-        // 英文積木也看得懂
-      }
+      // Blockly 內建積木的字用繁體中文；載入失敗就維持英文（Scratch 積木本來就是中文）
+      zh = await importFirst([`${BLOCKLY}/msg/zh-hant/+esm`, `${BLOCKLY}/msg/zh-hant.js/+esm`]);
+      if (zh) Blockly.setLocale(zh.default ?? zh);
     }
-    return Blockly;
+    return { Blockly, themes: defineBlocks(Blockly, zh != null) };
   })();
   blocklyPromise.catch(() => { blocklyPromise = null; });
   return blocklyPromise;
 }
+
+const BLOCK_MODES: [BlockMode, string][] = [['scratch', 'Scratch'], ['blockly', 'Blockly']];
+const MODE_KEY = 'flowchart-block-mode';
 
 interface Props {
   open: boolean;
@@ -104,18 +122,37 @@ function BlocklyCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
   const { program, error } = programOf(diagram);
   const boxRef = useRef<HTMLDivElement>(null);
   const [loadError, setLoadError] = useState(false);
-  const json = program ? JSON.stringify(toBlockly(program, vars)) : null;
+  const [mode, setMode] = useState<BlockMode>(() => {
+    try {
+      return localStorage.getItem(MODE_KEY) == 'blockly' ? 'blockly' : 'scratch';
+    }
+    catch {
+      return 'scratch';
+    }
+  });
+  const json = program ? JSON.stringify(toBlockly(program, vars, mode)) : null;
+
+  const pick = (m: BlockMode) => {
+    setMode(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    }
+    catch {
+      // 記不住也沒關係
+    }
+  };
 
   useEffect(() => {
     if (!json) return;
     let workspace: { dispose(): void } | null = null;
     let cancelled = false;
-    loadBlockly().then(Blockly => {
+    loadBlockly().then(({ Blockly, themes }) => {
       if (cancelled || !boxRef.current) return;
       // 只能看：readOnly 不能拖積木、沒有工具箱；可以拖動畫面、放大縮小
       workspace = Blockly.inject(boxRef.current, {
         readOnly: true,
-        renderer: 'zelos',
+        renderer: mode == 'scratch' ? 'zelos' : 'geras',
+        theme: mode == 'scratch' ? themes.scratch : themes.blockly,
         move: { scrollbars: true, drag: true, wheel: true },
         zoom: { controls: true, startScale: 0.8 },
       });
@@ -125,9 +162,19 @@ function BlocklyCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
       cancelled = true;
       workspace?.dispose();
     };
-  }, [json]);
+  }, [json, mode]);
 
   if (!program) return <p className="run_error">{error}</p>;
   if (loadError) return <p className="run_error">{blocklyLoadError()}</p>;
-  return <div className="code_blockly" ref={boxRef} />;
+  return (
+    <>
+      <div className="lang_toggle code_mode" role="group" aria-label={t('積木的樣子', 'Block style')}>
+        {BLOCK_MODES.map(([m, name]) => (
+          <button key={m} className={mode == m ? 'selected' : ''} aria-pressed={mode == m} onClick={() => pick(m)}>{name}</button>
+        ))}
+      </div>
+      {/* 換外觀時整個重建，Blockly 才不會留著上一個工作區 */}
+      <div key={mode} className="code_blockly" ref={boxRef} />
+    </>
+  );
 }
