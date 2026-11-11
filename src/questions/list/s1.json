@@ -1,0 +1,44 @@
+{
+  "title": "倒著拼單字",
+  "question": "請輸入一個英文單字，把它倒過來拼，輸出倒過來的單字。\n提示：文字變數也可以用 [第幾個字]：如果 單字 是 \"apple\"，單字[1] 是 \"a\"，長度(單字) 是 5。準備一個文字變數 新字（一開始是空的），從最後一個字開始，用 新字 設為 新字 + 單字[i] 一個一個接上去。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "apple",
+      "output": "elppa",
+      "note": "apple 有 5 個字，從第 5 個字 e 開始接"
+    },
+    {
+      "input": "level",
+      "output": "level",
+      "note": "倒過來拼也一樣的字"
+    },
+    {
+      "input": "a",
+      "output": "a",
+      "note": "只有 1 個字"
+    }
+  ],
+  "en": {
+    "title": "Spell It Backward",
+    "question": "Input an English word. Spell it backward and output it.\nTip: Text works like a list. If word is \"apple\", word[1] is \"a\", and length(word) is 5. Make a text variable result (it starts empty). Start from the last letter. Each time, set result to result + word[i].",
+    "array": [],
+    "test_case": [
+      {
+        "input": "apple",
+        "output": "elppa",
+        "note": "apple has 5 letters. Start from letter 5, e"
+      },
+      {
+        "input": "level",
+        "output": "level",
+        "note": "This word is the same backward"
+      },
+      {
+        "input": "a",
+        "output": "a",
+        "note": "Only 1 letter"
+      }
+    ]
+  }
+}

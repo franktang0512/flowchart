@@ -1,6 +1,6 @@
 {
   "title": "平方清單",
-  "question": "請輸入一個數字 n，把 1×1、2×2、…、n×n 依序加到清單的最後面，最後輸出整個清單。\n提示：「計算」積木選「加到清單最後」，就可以把算出來的值加進清單。",
+  "question": "請輸入一個數字 n，把 1×1、2×2、…、n×n 依序加到清單的最後面，最後輸出整個清單。\n提示：「計算」積木選「添加」，就可以把算出來的值加進清單。",
   "array": [],
   "test_case": [
     {
@@ -21,7 +21,7 @@
   ],
   "en": {
     "title": "Square List",
-    "question": "Input a number n. Put 1×1, 2×2, ... n×n at the end of a list, one by one. Then output the whole list.\nTip: In the Math block, choose \"Add to list\". It puts a value at the end of the list.",
+    "question": "Input a number n. Put 1×1, 2×2, ... n×n at the end of a list, one by one. Then output the whole list.\nTip: In the Math block, choose \"Add\". It puts a value at the end of the list.",
     "array": [],
     "test_case": [
       {

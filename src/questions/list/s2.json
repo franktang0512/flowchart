@@ -1,0 +1,44 @@
+{
+  "title": "數母音",
+  "question": "請輸入一個小寫的英文單字，數一數裡面有幾個母音（a、e、i、o、u），輸出母音的個數。\n提示：用迴圈一個字一個字看，判斷 單字[i] = \"a\" or 單字[i] = \"e\" or …，是母音就把次數加 1。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "apple",
+      "output": "2",
+      "note": "a 和 e 是母音"
+    },
+    {
+      "input": "banana",
+      "output": "3",
+      "note": "有 3 個 a"
+    },
+    {
+      "input": "sky",
+      "output": "0",
+      "note": "沒有母音，輸出 0"
+    }
+  ],
+  "en": {
+    "title": "Count the Vowels",
+    "question": "Input a word in small letters. Count the vowels (a, e, i, o, u) in it. Output the number.\nTip: Use a loop to check each letter. Is word[i] = \"a\" or word[i] = \"e\" or ...? If yes, add 1 to the count.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "apple",
+        "output": "2",
+        "note": "a and e are vowels"
+      },
+      {
+        "input": "banana",
+        "output": "3",
+        "note": "There are 3 a's"
+      },
+      {
+        "input": "sky",
+        "output": "0",
+        "note": "No vowels. Output 0"
+      }
+    ]
+  }
+}

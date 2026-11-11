@@ -5,11 +5,15 @@
 //   清單（從第 1 項開始） 成績[i]           → __at(成績, "成績", 積木編號, i)
 //                       成績[i] 設為 x     → __set(成績, "成績", 積木編號, i, x)
 //                       長度(成績)         → __len(...)
+//                       項目編號(成績, x)   → __find(...)：x 在第幾項，找不到是 0（跟 Scratch 一樣）
+//                       包含(成績, x)       → __has(...)：真/假
 //                       成績 加入 x        → __push(...)：把 x 加到清單最後
 //                       成績 在第 k 項插入 x → __insert(...)：k 可以是 1 到 長度+1
 //                       成績 刪除第 k 項    → __remove(...)
+//                       成績 刪除所有項目   → __clear(...)
 //                       輸入 成績          → 把讀到的值加到清單最後
 //                       輸入 成績[k]       → 把讀到的值存進第 k 項（第 k 項要已經存在）
+//   文字（從第 1 個字開始） 名字[i]、長度(名字) → 跟清單一樣用 __at、__len，但不能改其中一個字
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
@@ -30,7 +34,15 @@ export const createVarStore = (): VarStore => ({
 const isNumeric = (s: string) => !isNaN(parseFloat(s)) && isFinite(s as unknown as number);
 
 /** 取清單長度的寫法：長度(成績) 或 length(成績) */
-const LENGTH_WORDS = ['長度', 'length'];
+/** 算式裡可以用的清單/文字函式（名稱跟 Scratch 一樣）→ 執行時的小工具 */
+const FUNCTIONS: Record<string, string> = {
+  長度: '__len', length: '__len',
+  項目編號: '__find', indexof: '__find',
+  包含: '__has', contains: '__has',
+};
+const isFunc = (name: string) => Object.prototype.hasOwnProperty.call(FUNCTIONS, name);
+/** 第 i 個積木的程式有沒有用到上面的函式 */
+const FUNC_CALL = (i: number) => new RegExp(`__(len|find|has)_${i}\\(`);
 const LOGIC_WORDS = ['and', 'or', 'not'];
 
 type Token = { type: 'string' | 'number' | 'name' | 'op'; text: string };
@@ -68,6 +80,10 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
   if (!can_number) {
     const item = listItemTarget(str);
     if (item) {
+      if (type_var_list.text.includes(item.list)) {
+        alert(t(`「${item.list}」是文字，不能只改其中一個字：可以用 + 把字接起來，存成新的文字。`, `"${item.list}" is text. You cannot change one letter. Use + to join letters into new text.`));
+        return false;
+      }
       if (!type_var_list.array.includes(item.list)) {
         alert(t(`「${item.list}」不是清單：只有型別是「清單」的變數才能用 [第幾項]。`, `"${item.list}" is not a list. Only list variables can use [ ].`));
         return false;
@@ -80,7 +96,7 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     return false;
   }
   for (const tk of tokenize(str)) {
-    if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || LENGTH_WORDS.includes(tk.text)) continue;
+    if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || isFunc(tk.text)) continue;
     alert(t(`「${tk.text}」沒有定義：請先在變數表新增這個變數。如果是文字，要用 "雙引號" 括起來。`, `"${tk.text}" is not a variable yet. Add it to the variable table first. For words, use "quotes".`));
     return false;
   }
@@ -145,13 +161,17 @@ const runtimeMessages = () => ({
   nanToNum: t('計算結果不是數字，不能存進數字變數「{name}」：檢查運算式裡是不是用到了文字。', 'The answer is not a number, so it cannot go into the number variable "{name}". Check if the math uses text.'),
   listToText: t('清單不能直接存進文字變數「{name}」。', 'A list cannot go into the text variable "{name}".'),
   wholeList: t('「{name}」是清單，要改其中一項請寫 {name}[第幾項]。', '"{name}" is a list. To change one item, write {name}[item number].'),
-  notList: t('「{name}」不是清單，不能用 [第幾項]。', '"{name}" is not a list. You cannot use [ ].'),
+  notList: t('「{name}」不是清單也不是文字，不能用 [第幾項]。', '"{name}" is not a list or text. You cannot use [ ].'),
+  textOutOfRange: t('文字「{name}」只有 {len} 個字，沒有第 {k} 個字（從第 1 個字開始）。', 'The text "{name}" has only {len} letters. There is no letter {k}. (Start at letter 1.)'),
+  emptyText: t('文字「{name}」是空的，沒有第 {k} 個字。', 'The text "{name}" is empty. There is no letter {k}.'),
+  textItemSet: t('「{name}」是文字，不能只改其中一個字：可以用 + 把字接起來，存成新的文字。', '"{name}" is text. You cannot change one letter. Use + to join letters into new text.'),
   notListEdit: t('「{name}」不是清單，不能加入、插入或刪除。', '"{name}" is not a list. You cannot add, insert or remove.'),
   insertRange: t('清單「{name}」現在有 {len} 項，只能插在第 1 到第 {max} 項，沒有第 {k} 項（插在第 {max} 項就是加到最後）。', 'The list "{name}" has {len} items. You can insert at item 1 to item {max}. There is no item {k}.'),
   listInList: t('不能把整個清單加進清單「{name}」，請一次加一項。', 'You cannot add a whole list to "{name}". Add one item at a time.'),
   outOfRange: t('清單「{name}」只有 {len} 項，沒有第 {k} 項（清單從第 1 項開始）。', 'The list "{name}" has only {len} items. There is no item {k}. (Lists start at item 1.)'),
   emptyList: t('清單「{name}」是空的，沒有第 {k} 項。', 'The list "{name}" is empty. There is no item {k}.'),
-  lenNotList: t('長度( ) 的括號裡要放清單。', 'Put a list inside length( ).'),
+  lenNotList: t('長度( ) 的括號裡要放清單或文字。', 'Put a list or text inside length( ).'),
+  findNotList: t('項目編號( ) 和 包含( ) 的括號裡，第一個要放清單或文字，例如 包含(名單, "Amy")。', 'The first thing inside indexof( ) or contains( ) must be a list or text. Example: contains(names, "Amy").'),
   countNotNum: t('迴圈的次數不是數字。', 'The loop count is not a number.'),
 });
 
@@ -193,14 +213,19 @@ function __list(v, i, name) {
   return v.slice();
 }
 function __index(list, name, i, k) {
-  if (!Array.isArray(list)) __err('notList', i, { name: name });
+  var isText = typeof list == 'string';
+  if (!Array.isArray(list) && !isText) __err('notList', i, { name: name });
   if (!(Number.isInteger(k) && k >= 1 && k <= list.length)) {
-    __err(list.length ? 'outOfRange' : 'emptyList', i, { name: name, len: list.length, k: k });
+    var key = isText ? (list.length ? 'textOutOfRange' : 'emptyText') : (list.length ? 'outOfRange' : 'emptyList');
+    __err(key, i, { name: name, len: list.length, k: k });
   }
   return k - 1;
 }
 function __at(list, name, i, k) { return list[__index(list, name, i, k)]; }
-function __set(list, name, i, k, v) { list[__index(list, name, i, k)] = v; }
+function __set(list, name, i, k, v) {
+  if (typeof list == 'string') __err('textItemSet', i, { name: name });
+  list[__index(list, name, i, k)] = v;
+}
 function __push(list, name, i, v) {
   if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
   if (Array.isArray(v)) __err('listInList', i, { name: name });
@@ -219,8 +244,19 @@ function __remove(list, name, i, k) {
   list.splice(__index(list, name, i, k), 1);
 }
 function __len(v, i) {
-  if (!Array.isArray(v)) __err('lenNotList', i, {});
+  if (!Array.isArray(v) && typeof v != 'string') __err('lenNotList', i, {});
   return v.length;
+}
+function __find(list, v, i) {
+  if (typeof list == 'string') return list.indexOf(String(v)) + 1;
+  if (!Array.isArray(list)) __err('findNotList', i, {});
+  for (var k = 0; k < list.length; k++) if (list[k] == v) return k + 1;
+  return 0;
+}
+function __has(list, v, i) { return __find(list, v, i) > 0; }
+function __clear(list, name, i) {
+  if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
+  list.length = 0;
 }
 function __count(v, i) {
   if (!__isNum(v)) __err('countNotNum', i, {});
@@ -258,7 +294,12 @@ class CodeGenerator {
     return this.vars.type_var_list.array.includes(name);
   }
 
-  /** 學生寫的運算式 → JavaScript：清單[第幾項]、長度(清單)、判斷式的 and/or/= */
+  /** 變數後面接 [ ] 一律交給 __at/__set 檢查：清單是第幾項、文字是第幾個字，數字會提示不能用 */
+  private isVar(name: string) {
+    return this.vars.var_list.name.includes(name);
+  }
+
+  /** 學生寫的運算式 → JavaScript：清單或文字[第幾項]、長度(清單或文字)、判斷式的 and/or/= */
   private expr(text: string, i: number, condition = false): string {
     const tokens = tokenize(text);
     const stack: boolean[] = [];
@@ -267,14 +308,14 @@ class CodeGenerator {
     tokens.forEach((t, k) => {
       const word = t.type != 'op';
       let piece = t.text;
-      if (t.type == 'name' && this.isList(t.text) && tokens[k + 1]?.text == '[') {
+      if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '[') {
         piece = `__at(${t.text}, ${JSON.stringify(t.text)}, ${i}, `;
       }
-      else if (t.type == 'name' && LENGTH_WORDS.includes(t.text) && !this.vars.var_list.name.includes(t.text) && tokens[k + 1]?.text == '(') {
-        piece = '__len';
+      else if (t.type == 'name' && isFunc(t.text) && !this.isVar(t.text) && tokens[k + 1]?.text == '(') {
+        piece = FUNCTIONS[t.text];
       }
       else if (t.text == '[') {
-        const isItem = tokens[k - 1]?.type == 'name' && this.isList(tokens[k - 1].text);
+        const isItem = tokens[k - 1]?.type == 'name' && this.isVar(tokens[k - 1].text);
         stack.push(isItem);
         piece = isItem ? '(' : '[';
       }
@@ -284,8 +325,8 @@ class CodeGenerator {
       out += (word && prevWord ? ' ' : '') + piece;
       prevWord = word;
     });
-    // 長度(清單) 要把積木編號傳進去，錯誤時才能標出積木
-    out = out.replace(/__len\(/g, `__len_${i}(`);
+    // 長度( )、項目編號( )、包含( ) 要把積木編號傳進去，錯誤時才能標出積木
+    out = out.replace(/__(len|find|has)\(/g, `__$1_${i}(`);
     return condition ? toCondition(out) : out;
   }
 
@@ -304,7 +345,8 @@ class CodeGenerator {
   /** 把 value 存進 target（變數或 清單[第幾項]），依型別檢查 */
   private assign(target: string, value: string, i: number) {
     const item = listItemTarget(target);
-    if (item && this.isList(item.list)) {
+    // 文字、數字變數接 [ ] 也交給 __set，執行時會說明為什麼不行
+    if (item && this.isVar(item.list)) {
       return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${value});\n`;
     }
     const { number, text } = this.vars.type_var_list;
@@ -315,15 +357,15 @@ class CodeGenerator {
     return `${target} = ${value};\n`;
   }
 
-  /** 長度(清單) 用到的積木編號版本 */
-  private lenHelpers = new Set<number>();
+  /** 用到 長度( )、項目編號( )、包含( ) 的積木編號 */
+  private funcHelpers = new Set<number>();
 
   toCode(node: FlowNode): CodeResult {
     const i = this.idx(node);
     const update = 'Update_output(' + i + ', ' + this.varStr + ');\n';
     const expr = (text: string, condition = false) => {
       const js = this.expr(text, i, condition);
-      if (js.includes(`__len_${i}(`)) this.lenHelpers.add(i);
+      if (FUNC_CALL(i).test(js)) this.funcHelpers.add(i);
       return js;
     };
     switch (node.figure) {
@@ -341,7 +383,7 @@ class CodeGenerator {
           const name = JSON.stringify(v);
           const item = listItemTarget(v);
           // 輸入 成績[k]：跟計算積木一樣從第 1 項開始，超出範圍會提示
-          if (item && this.isList(item.list)) {
+          if (item && this.isVar(item.list)) {
             const list = JSON.stringify(item.list);
             code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), __inList(input_list, ${i}, ${list}));\n`;
           }
@@ -390,7 +432,8 @@ class CodeGenerator {
         const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${value});\n`
           : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${value});\n`
           : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
-          : this.assign(target, value, i);
+          : action == '清空' ? `__clear(${target}, ${name}, ${i});\n`
+          : this.assign(action == '替換' ? `${target}[${index}]` : target, value, i);
         this.checkSyntax(node, code);
         return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
       }
@@ -460,8 +503,11 @@ class CodeGenerator {
       start = r.next;
     }
     code += this.toCode(start).code;
-    // 每個用到 長度( ) 的積木各一個版本，錯誤時才知道是哪個積木
-    const helpers = [...this.lenHelpers].map(i => `function __len_${i}(v) { return __len(v, ${i}); }\n`).join('');
+    // 每個用到這些函式的積木各一個版本，錯誤時才知道是哪個積木
+    const helpers = [...this.funcHelpers].map(i =>
+      `function __len_${i}(v) { return __len(v, ${i}); }\n`
+      + `function __find_${i}(l, v) { return __find(l, v, ${i}); }\n`
+      + `function __has_${i}(l, v) { return __has(l, v, ${i}); }\n`).join('');
     return helpers + code;
   }
 }

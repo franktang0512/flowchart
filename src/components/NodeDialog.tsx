@@ -22,32 +22,49 @@ export interface DialogForm {
   varSelectOutputDisplay: 'inline-block' | 'none';
   /** 迴圈：顯示「達成某個條件」(while) 還是「執行完幾次」(for) 的輸入欄 */
   showWhile: boolean;
-  /** 計算積木：「設為」一般的設定；清單才有的「加入」（加到最後）、「插入」、「刪除」 */
+  /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
-  /** 計算積木「插入」「刪除」的第幾項 */
+  /** 計算積木「插入」「替換」「刪除」的第幾項 */
   rectIndex: string;
 }
 
+// 清單操作的名稱照 Scratch 的清單積木，下一堂改用 Scratch 時說法一樣
 const RECT_ACTIONS: [RectAction, () => string][] = [
   ['設為', () => t('設定變數', 'Set')],
-  ['加入', () => t('加到清單最後', 'Add to list')],
+  ['加入', () => t('添加', 'Add')],
   ['插入', () => t('插入', 'Insert')],
-  ['刪除', () => t('刪除', 'Remove')],
+  ['替換', () => t('替換', 'Replace')],
+  ['刪除', () => t('刪除第幾項', 'Delete item')],
+  ['清空', () => t('刪除所有項目', 'Delete all')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
   設為: () => t('將變數內的值設為...', 'Set a variable to...'),
-  加入: () => t('把值加到清單的最後面...', 'Add a value to the end of a list...'),
+  加入: () => t('把值添加到清單的最後面...', 'Add a value to the end of a list...'),
   插入: () => t('把值插到清單的第幾項，原本那項和後面的都往後移...', 'Put a value into a list. The items after it move back...'),
-  刪除: () => t('刪除清單的第幾項，後面的都往前移...', 'Remove one item from a list. The items after it move up...'),
+  替換: () => t('把清單的第幾項換成新的值...', 'Change one item of a list...'),
+  刪除: () => t('刪除清單的第幾項，後面的都往前移...', 'Delete one item from a list. The items after it move up...'),
+  清空: () => t('刪除清單的所有項目，清單會變成空的...', 'Delete all items. The list will be empty...'),
 };
 
-/** 值的輸入欄前面的字（刪除沒有值） */
-const RECT_VERB: Record<RectAction, () => string> = {
+/** 「第幾項」欄位前面的字（沒有這欄的是 null） */
+const RECT_INDEX: Record<RectAction, (() => string) | null> = {
+  設為: null,
+  加入: null,
+  插入: () => t('插到第', 'At item'),
+  替換: () => t('替換第', 'Item'),
+  刪除: () => t('刪除第', 'Delete item'),
+  清空: null,
+};
+
+/** 值的輸入欄前面的字（沒有值的是 null） */
+const RECT_VERB: Record<RectAction, (() => string) | null> = {
   設為: () => t('設為', 'to'),
-  加入: () => t('加入', 'add'),
+  加入: () => t('添加', 'add'),
   插入: () => t('插入', 'insert'),
-  刪除: () => '',
+  替換: () => t('換成', 'with'),
+  刪除: null,
+  清空: null,
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -229,7 +246,9 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
         </>
       );
       break;
-    case 'Rectangle':
+    case 'Rectangle': {
+      const indexLabel = RECT_INDEX[f.rectAction];
+      const verb = RECT_VERB[f.rectAction];
       body = (
         <>
           <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
@@ -239,16 +258,16 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
             ))}
           </p>
           {f.rectAction == '設為' ? t('變數：', 'Variable: ') : t('清單：', 'List: ')}<input className="var_select" id="var_select" style={{ width: '50%' }} value={f.varSelect} onChange={e => set({ varSelect: e.target.value })} />
-          {(f.rectAction == '插入' || f.rectAction == '刪除') && (
+          {indexLabel && (
             <>
-              <br /><br /> {f.rectAction == '插入' ? t('插在第', 'At item') : t('刪除第', 'Remove item')}{' '}
+              <br /><br /> {indexLabel()}{' '}
               <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
               {t('項', '')}
             </>
           )}
-          {f.rectAction != '刪除' && (
+          {verb && (
             <>
-              <br /><br /> {RECT_VERB[f.rectAction]()} {codeInput}{' '}
+              <br /><br /> {verb()} {codeInput}{' '}
               <br /><br />
               <p>{t('捨去進位？', 'Round?')}{' '}
                 {radio('', t('不需要', 'No'))}{' '}
@@ -262,6 +281,7 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
         </>
       );
       break;
+    }
     case 'link_tf':
       body = (
         <>

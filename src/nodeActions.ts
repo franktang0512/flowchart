@@ -19,24 +19,30 @@ const sharedConnectors = createConnectors();
 function rectangleText(vars: VarStore, f: DialogForm) {
   const target = f.varSelect ? ' ' + f.varSelect : '';
   let text = f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
+    : f.rectAction == '替換' ? `${target}[${f.rectIndex}] 設為 ${f.code}`
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
+    : f.rectAction == '清空' ? `${target} 刪除所有項目`
     : `${target} ${f.rectAction} ${f.code}`;
   const nodeVar = getCodeVar(vars, text);
   if (!nodeVar.includes(f.varSelect || '')) nodeVar.push(f.varSelect || '');
   // 刪除沒有值，不用捨去進位
-  if (f.rectAction != '刪除') text += ROUNDING_TEXT[f.radio] ?? '';
+  if (hasValue(f)) text += ROUNDING_TEXT[f.radio] ?? '';
   return { text, nodeVar };
 }
+
+/** 刪除第幾項、刪除所有項目不用填值 */
+const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空';
 
 function rectangleValid(vars: VarStore, f: DialogForm) {
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
   const list = f.varSelect.trim();
   if (!vars.type_var_list.array.includes(list)) {
-    alert(t(`「${list}」不是清單：只有型別是「清單」的變數才能加入、插入或刪除。`, `"${list}" is not a list. Only list variables can add, insert or remove.`));
+    alert(t(`「${list}」不是清單：只有型別是「清單」的變數才能添加、插入、替換或刪除。`, `"${list}" is not a list. Only list variables can add, insert, replace or delete.`));
     return false;
   }
-  if (f.rectAction != '加入' && !checkVar(vars, f.rectIndex, true)) return false;
-  return f.rectAction == '刪除' || checkVar(vars, f.code, true);
+  const needIndex = f.rectAction == '插入' || f.rectAction == '替換' || f.rectAction == '刪除';
+  if (needIndex && !checkVar(vars, f.rectIndex, true)) return false;
+  return !hasValue(f) || checkVar(vars, f.code, true);
 }
 
 /** 輸入/輸出積木：回傳積木文字，檢查沒過回傳 null */

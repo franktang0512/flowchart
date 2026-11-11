@@ -1,0 +1,44 @@
+{
+  "title": "找座號",
+  "question": "請輸入 5 位同學的英文名字存進清單（第 1 個是 1 號，第 2 個是 2 號……），再輸入一個名字，輸出他是幾號；名單裡沒有這個人就輸出 0。\n提示：可以像「最高分是幾號」一樣用迴圈一個一個找，也可以用 項目編號(名單, 名字)，它會直接告訴你是第幾項，找不到是 0。另外 包含(名單, 名字) 會告訴你名單裡有沒有這個人（真／假）。Scratch 也有一樣的積木。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "Amy Ben Cathy Dan Eva Cathy",
+      "output": "3",
+      "note": "Cathy 是第 3 個"
+    },
+    {
+      "input": "Amy Ben Cathy Dan Eva Amy",
+      "output": "1",
+      "note": "Amy 是第 1 個"
+    },
+    {
+      "input": "Amy Ben Cathy Dan Eva Zoe",
+      "output": "0",
+      "note": "名單裡沒有 Zoe，輸出 0"
+    }
+  ],
+  "en": {
+    "title": "Find the Number",
+    "question": "Input the names of 5 students into a list. (The first name is number 1, the second is number 2, ...) Then input one name. Output the number of that student. If the name is not on the list, output 0.\nTip: You can use a loop to check each name, like in \"Who Is the Top?\". Or use indexof(names, name). It tells you the item number. If it cannot find the name, it is 0. Also, contains(names, name) tells you if the name is on the list (Yes or No). Scratch has the same blocks.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "Amy Ben Cathy Dan Eva Cathy",
+        "output": "3",
+        "note": "Cathy is number 3"
+      },
+      {
+        "input": "Amy Ben Cathy Dan Eva Amy",
+        "output": "1",
+        "note": "Amy is number 1"
+      },
+      {
+        "input": "Amy Ben Cathy Dan Eva Zoe",
+        "output": "0",
+        "note": "Zoe is not on the list. Output 0"
+      }
+    ]
+  }
+}

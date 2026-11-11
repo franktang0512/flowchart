@@ -1,6 +1,6 @@
 {
   "title": "去掉最低分",
-  "question": "請輸入 5 個分數存進清單，找出最低分並把它從清單刪除（最低分不只一個時，只刪除最前面的那一個），再輸出剩下的清單，最後輸出剩下分數的平均（四捨五入）。\n提示：先用迴圈找出最低分是第幾項，再用「計算」積木的「刪除」。刪除後清單只剩 4 項。",
+  "question": "請輸入 5 個分數存進清單，找出最低分並把它從清單刪除（最低分不只一個時，只刪除最前面的那一個），再輸出剩下的清單，最後輸出剩下分數的平均（四捨五入）。\n提示：先用迴圈找出最低分是第幾項，再用「計算」積木的「刪除第幾項」。刪除後清單只剩 4 項。",
   "array": [],
   "test_case": [
     {
@@ -21,7 +21,7 @@
   ],
   "en": {
     "title": "Drop the Lowest",
-    "question": "Input 5 scores into a list. Find the lowest score and remove it from the list. (If two scores are the lowest, remove only the first one.) Output the list. Then output the average of the other scores (round the number).\nTip: Use a loop to find the item number of the lowest score. Then use \"Remove\" in the Math block. After that, the list has 4 items.",
+    "question": "Input 5 scores into a list. Find the lowest score and remove it from the list. (If two scores are the lowest, remove only the first one.) Output the list. Then output the average of the other scores (round the number).\nTip: Use a loop to find the item number of the lowest score. Then use \"Delete item\" in the Math block. After that, the list has 4 items.",
     "array": [],
     "test_case": [
       {

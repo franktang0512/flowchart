@@ -37,7 +37,8 @@ export const COURSES: Course[] = [
       { name: '認識清單', nameEn: 'Meet the list', questions: ['list/l1', 'list/l2'] },
       { name: '清單與迴圈', nameEn: 'Lists and loops', questions: ['list/l3', 'list/l4'] },
       { name: '插入與刪除', nameEn: 'Insert and remove', questions: ['list/l6', 'list/l7'] },
-      { name: '挑戰題', nameEn: 'Challenge', questions: ['list/l5'] },
+      { name: '文字也是一串字', nameEn: 'Text is a list of letters', questions: ['list/s1', 'list/s2'] },
+      { name: '挑戰題', nameEn: 'Challenge', questions: ['list/l5', 'list/l8'] },
     ],
   },
   {
