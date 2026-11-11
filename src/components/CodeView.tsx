@@ -11,7 +11,9 @@ import { toCpp } from '../engine/toCpp';
 import { getLang, t, useLang } from '../i18n';
 import { getTarget, targetName } from '../target';
 
-// Blockly 只有打開「看程式」時才從 CDN 載入（不放進打包檔，網站一開始比較快）；版本跟練習網頁一樣
+// Blockly 只有打開「看程式」時才從 CDN 載入（不放進打包檔，網站一開始比較快）；版本跟練習網頁一樣。
+// 用 Blockly 官方的 <script> 檔（掛在全域的 window.Blockly），不用 jsDelivr 的 +esm：
+// +esm 打包的內建積木（blocks）自己帶了一份 Blockly 核心，註冊到別的地方，載入 variables_set 等內建積木會失敗。
 const BLOCKLY = 'https://cdn.jsdelivr.net/npm/blockly@11.2.1';
 type BlocklyModule = any;
 interface Loaded {
@@ -20,30 +22,31 @@ interface Loaded {
 }
 let blocklyPromise: Promise<Loaded> | null = null;
 
-/** 依序試幾個網址，第一個載得到的就用 */
-async function importFirst(urls: string[]) {
-  for (const url of urls) {
-    try {
-      return await import(/* @vite-ignore */ url);
-    }
-    catch {
-      // 試下一個
-    }
-  }
-  return null;
+/** 載入一個 <script>，載完才繼續 */
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => resolve();
+    el.onerror = () => {
+      el.remove();
+      reject(new Error(t(`下載失敗：${src}`, `Could not download ${src}`)));
+    };
+    document.head.appendChild(el);
+  });
 }
 
 function loadBlockly(): Promise<Loaded> {
   blocklyPromise ??= (async () => {
-    const mod = await import(/* @vite-ignore */ `${BLOCKLY}/+esm`);
-    const Blockly = mod.default ?? mod;
-    let zh = null;
-    if (getLang() != 'en') {
-      // Blockly 內建積木的字用繁體中文；載入失敗就維持英文（Scratch 積木本來就是中文）
-      zh = await importFirst([`${BLOCKLY}/msg/zh-hant/+esm`, `${BLOCKLY}/msg/zh-hant.js/+esm`]);
-      if (zh) Blockly.setLocale(zh.default ?? zh);
+    const w = window as unknown as { Blockly?: BlocklyModule };
+    if (!w.Blockly) {
+      // 順序不能換：核心 → 內建積木 → 積木上的字（中文或英文；核心本身不含英文字）
+      await loadScript(`${BLOCKLY}/blockly_compressed.js`);
+      await loadScript(`${BLOCKLY}/blocks_compressed.js`);
+      await loadScript(`${BLOCKLY}/msg/${getLang() == 'en' ? 'en' : 'zh-hant'}.js`);
     }
-    return { Blockly, themes: defineBlocks(Blockly, zh != null) };
+    const Blockly = w.Blockly;
+    return { Blockly, themes: defineBlocks(Blockly, getLang() != 'en') };
   })();
   blocklyPromise.catch(() => { blocklyPromise = null; });
   return blocklyPromise;
@@ -121,7 +124,8 @@ function CppCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
 function BlocklyCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
   const { program, error } = programOf(diagram);
   const boxRef = useRef<HTMLDivElement>(null);
-  const [loadError, setLoadError] = useState(false);
+  /** 出錯的說明：下載不到 Blockly，或積木畫不出來（附上原因，才知道要修哪裡） */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<BlockMode>(() => {
     try {
       return localStorage.getItem(MODE_KEY) == 'blockly' ? 'blockly' : 'scratch';
@@ -146,18 +150,28 @@ function BlocklyCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
     if (!json) return;
     let workspace: { dispose(): void } | null = null;
     let cancelled = false;
+    setLoadError(null);
     loadBlockly().then(({ Blockly, themes }) => {
       if (cancelled || !boxRef.current) return;
-      // 只能看：readOnly 不能拖積木、沒有工具箱；可以拖動畫面、放大縮小
-      workspace = Blockly.inject(boxRef.current, {
-        readOnly: true,
-        renderer: mode == 'scratch' ? 'zelos' : 'geras',
-        theme: mode == 'scratch' ? themes.scratch : themes.blockly,
-        move: { scrollbars: true, drag: true, wheel: true },
-        zoom: { controls: true, startScale: 0.8 },
-      });
-      Blockly.serialization.workspaces.load(JSON.parse(json), workspace);
-    }).catch(() => setLoadError(true));
+      try {
+        // 只能看：readOnly 不能拖積木、沒有工具箱；可以拖動畫面、放大縮小
+        workspace = Blockly.inject(boxRef.current, {
+          readOnly: true,
+          renderer: mode == 'scratch' ? 'zelos' : 'geras',
+          theme: mode == 'scratch' ? themes.scratch : themes.blockly,
+          move: { scrollbars: true, drag: true, wheel: true },
+          zoom: { controls: true, startScale: 0.8 },
+        });
+        Blockly.serialization.workspaces.load(JSON.parse(json), workspace);
+      }
+      catch (e) {
+        console.error(e);
+        setLoadError(t('積木畫不出來：', 'Could not draw the blocks: ') + (e instanceof Error ? e.message : String(e)));
+      }
+    }, e => {
+      console.error(e);
+      setLoadError(blocklyLoadError() + (e instanceof Error ? `（${e.message}）` : ''));
+    });
     return () => {
       cancelled = true;
       workspace?.dispose();
@@ -165,7 +179,6 @@ function BlocklyCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
   }, [json, mode]);
 
   if (!program) return <p className="run_error">{error}</p>;
-  if (loadError) return <p className="run_error">{blocklyLoadError()}</p>;
   return (
     <>
       <div className="lang_toggle code_mode" role="group" aria-label={t('積木的樣子', 'Block style')}>
@@ -173,8 +186,9 @@ function BlocklyCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
           <button key={m} className={mode == m ? 'selected' : ''} aria-pressed={mode == m} onClick={() => pick(m)}>{name}</button>
         ))}
       </div>
+      {loadError && <p className="run_error">{loadError}</p>}
       {/* 換外觀時整個重建，Blockly 才不會留著上一個工作區 */}
-      <div key={mode} className="code_blockly" ref={boxRef} />
+      <div key={mode} className="code_blockly" ref={boxRef} style={loadError ? { display: 'none' } : undefined} />
     </>
   );
 }
