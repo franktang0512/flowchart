@@ -1,6 +1,8 @@
 // 程式學習目標：積木（Scratch / Blockly）或 C++。進入課程前在首頁選。
 // 兩者最大的差別是清單的位置：積木從第 1 項開始，C++ 的索引從 0 開始。
-// 網址加 ?target=cpp 或 ?target=blocks 可以直接指定（老師發給學生的連結用）。
+// 網址加 ?target=cpp 或 ?target=blocks 可以直接指定（老師發給學生的連結用），就不會問。
+// 沒指定的話，每次打開網站都會先問一次；選了之後只記在這個分頁（sessionStorage），
+// 重新整理、在課程之間切換都不用再選，關掉分頁下次再來會再問。
 import { useSyncExternalStore } from 'react';
 import { t } from './i18n';
 
@@ -17,7 +19,9 @@ function load(): Target | null {
     return fromUrl;
   }
   try {
-    const v = localStorage.getItem(KEY);
+    // 以前記在 localStorage（永遠不再問），清掉
+    localStorage.removeItem(KEY);
+    const v = sessionStorage.getItem(KEY);
     return isTarget(v) ? v : null;
   }
   catch {
@@ -27,10 +31,10 @@ function load(): Target | null {
 
 function save(target: Target) {
   try {
-    localStorage.setItem(KEY, target);
+    sessionStorage.setItem(KEY, target);
   }
   catch {
-    // 不能存也沒關係，只是下次打開要再選一次
+    // 不能存也沒關係，只是重新整理要再選一次
   }
 }
 
