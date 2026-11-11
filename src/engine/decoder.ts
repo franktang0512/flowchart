@@ -29,8 +29,10 @@ export interface VarStore {
   var_list: { name: string[]; value: string[] };
   /** grid：二維清單（只有學習目標是 C++ 時才有） */
   type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[] };
-  /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用，但不能存值進去） */
+  /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用） */
   params?: string[];
+  /** 參數不能存值進去（Scratch 的自訂積木參數不能改；Blockly、C++ 可以） */
+  paramsReadOnly?: boolean;
   /** 有回傳值的模組名稱：算式裡可以寫「名稱(引數)」 */
   calls?: string[];
 }
@@ -47,6 +49,7 @@ export function withParams(vars: VarStore, params: ParamInfo[]): VarStore {
       grid: vars.type_var_list.grid,
     },
     params: params.map(p => p.name),
+    paramsReadOnly: getTarget() == 'scratch',
     calls: vars.calls,
   };
 }
@@ -103,8 +106,8 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     type_var_list.number.includes(name) || type_var_list.text.includes(name) || type_var_list.array.includes(name) || type_var_list.grid.includes(name);
 
   if (!can_number) {
-    if (vars.params?.includes(str.trim())) {
-      alert(t(`「${str.trim()}」是模組的參數，只能拿來算，不能存值進去：要存結果請用變數表裡的變數。`, `"${str.trim()}" is a parameter of this module. You can use it, but you cannot change it. Use a variable from the variable table instead.`));
+    if (vars.paramsReadOnly && vars.params?.includes(str.trim())) {
+      alert(t(`「${str.trim()}」是模組的參數：Scratch 的參數只能拿來算，不能改。要存結果請用變數表裡的變數。`, `"${str.trim()}" is a parameter. In Scratch you can use it, but you cannot change it. Use a variable from the variable table instead.`));
       return false;
     }
     // 二維清單的一格：表[i][j]
@@ -789,6 +792,16 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
 
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');
+  // 變數跟模組或參數同名：流程圖上分不出是哪一個，請學生改名（建立模組時會擋，但之後才新增的變數要在這裡擋）
+  for (const m of modules) {
+    if (names.includes(m.info.name)) {
+      throw new FlowError(t(`變數表裡的「${m.info.name}」跟模組同名：請把變數或模組改一個名字。`, `The variable "${m.info.name}" has the same name as a module. Rename one of them.`));
+    }
+    const same = m.info.params.find(p => names.includes(p.name));
+    if (same) {
+      throw new FlowError(t(`變數表裡的「${same.name}」跟模組「${m.info.name}」的參數同名，流程圖上分不出是哪一個：請把變數或參數改一個名字。`, `The variable "${same.name}" has the same name as a parameter of "${m.info.name}". Rename one of them.`));
+    }
+  }
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
   let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\n';
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';

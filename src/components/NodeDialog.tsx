@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
-import type { ModuleInfo } from '../engine/modules';
+import type { ModuleInfo, ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { byTarget, itemWord } from '../target';
+import { byTarget, getTarget, itemWord } from '../target';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -135,6 +135,8 @@ export interface DialogRequest {
   onDismiss?: () => void;
   /** 在有回傳值的模組裡：計算積木可以選「回傳」 */
   canReturn?: boolean;
+  /** 在模組裡：這個模組的參數（「設定變數」「輸入到變數」的下拉選單也列出來） */
+  params?: ParamInfo[];
 }
 
 /** 變數表裡各型別的變數名稱，給下拉選單用 */
@@ -152,12 +154,18 @@ interface Props {
  * 選變數的下拉選單（像 Scratch 一樣用選的，不會打錯字），只列出一種類型的變數。
  * 舊作品裡填的值不在選項裡時，也放進選項，打開修改才不會被清掉。
  */
-function VarPicker({ id, value, onChange, names }: { id: string; value: string; onChange: (v: string) => void; names: string[] }) {
+function VarPicker({ id, value, onChange, names, params = [] }: { id: string; value: string; onChange: (v: string) => void; names: string[]; params?: string[] }) {
+  // 參數：Blockly、C++ 可以改，Scratch 不行（列出來但不能選，學生才知道參數也是一種變數）
+  const readOnly = getTarget() == 'scratch';
+  const all = [...names, ...params];
   return (
     <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
-      <option value="" disabled>{names.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
-      {value && !names.includes(value) && <option value={value}>{value}</option>}
+      <option value="" disabled>{all.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
+      {value && !all.includes(value) && <option value={value}>{value}</option>}
+      {params.length > 0 && names.length > 0 && <option disabled>{t('── 變數表（全域）──', '── Variables (global) ──')}</option>}
       {names.map(name => <option key={name} value={name}>{name}</option>)}
+      {params.length > 0 && <option disabled>{readOnly ? t('── 參數（Scratch 的參數不能改）──', '── Parameters (cannot change in Scratch) ──') : t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
+      {params.map(name => <option key={'p_' + name} value={name} disabled={readOnly}>{name}</option>)}
     </select>
   );
 }
@@ -205,6 +213,8 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
     return form;
   });
   const set = (patch: Partial<DialogForm>) => setF(prev => ({ ...prev, ...patch }));
+  /** 在模組裡：這個模組的參數（數字、文字都可以設定） */
+  const paramNames = (request.params ?? []).map(p => p.name);
 
   const yes = () => {
     if (request.onYes(f)) onClose();
@@ -273,6 +283,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                     <VarPicker
                       id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
                       names={f.ioTarget == '清單' ? varTypes.array : f.ioTarget == '二維清單' ? varTypes.grid : [...varTypes.number, ...varTypes.text]}
+                      params={f.ioTarget == '變數' ? paramNames : []}
                     />
                   </p>
                 )}
@@ -413,7 +424,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           {f.rectAction != '回傳' && (
             <>
               {f.rectAction == '設為' ? t('變數：', 'Variable: ') : f.rectAction == '建立' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction)} />
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction)} params={f.rectAction == '設為' ? paramNames : []} />
             </>
           )}
           {indexLabel && (

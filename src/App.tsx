@@ -315,6 +315,7 @@ export function App() {
       kind,
       initial,
       canReturn: returnsIn(d),
+      params: moduleOf(d)?.info.params,
       onYes: f => editMainNode(node, d, storeFor(d), f, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
@@ -456,6 +457,7 @@ export function App() {
     openDialog({
       kind: t as DialogRequest['kind'],
       canReturn: returnsIn(d),
+      params: moduleOf(d)?.info.params,
       onYes: f => addMainNode(t, d, storeFor(d), f, x, y, moduleInfos()),
       onNo: () => { d.pause = false; },
     });

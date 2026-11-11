@@ -89,7 +89,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
                 <option value="文字">{t('回傳文字', 'Returns text')}</option>
               </select>
             </p>
-            <p className="dialog_note">{t('有回傳值的模組：在模組裡用計算積木「回傳」，後面直接接「結束」；用的時候可以寫在算式裡，例如「答案 設為 找最大(x, y)」。參數只能拿來用、不能改。', 'With a return value: inside the module, use the Math block "Return", then go straight to "End". You can use it in math, like "answer = biggest(x, y)". Parameters can be used but not changed.')}</p>
+            <p className="dialog_note">{t('有回傳值的模組：在模組裡用計算積木「回傳」，後面直接接「結束」；用的時候可以寫在算式裡，例如「答案 設為 找最大(x, y)」。參數也是變數，在模組裡可以改，但只改到模組自己的那一份，不會影響外面。', 'With a return value: inside the module, use the Math block "Return", then go straight to "End". You can use it in math, like "answer = biggest(x, y)". Parameters are variables too. You can change them inside the module; it does not change anything outside.')}</p>
           </>
         )
         : <p className="dialog_note">{t('參數在模組裡只能拿來用、不能改。Scratch 的自訂積木不能回傳值，要把結果帶回主流程，請存到變數表裡的變數。', 'Inside the module you can use a parameter but not change it. Scratch My Blocks cannot return a value. To bring a result back, save it in a variable from the table.')}</p>}
