@@ -21,6 +21,8 @@ export interface DialogForm {
   varSelectOutputDisplay: 'block' | 'none';
   /** 迴圈：顯示「達成某個條件」(while) 還是「執行完幾次」(for) 的輸入欄 */
   showWhile: boolean;
+  /** 計算積木：「設為」一般的設定，或「加入」把值加到清單最後 */
+  rectAction: '設為' | '加入';
 }
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -44,6 +46,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   ioText: '變數：',
   varSelectOutputDisplay: 'none',
   showWhile: false,
+  rectAction: '設為',
 });
 
 export interface DialogRequest {
@@ -203,9 +206,13 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
     case 'Rectangle':
       body = (
         <>
-          <p id="hint">{t('將變數內的值設為...', 'Set a variable to...')}</p>{' '}
-          <br />{t('變數：', 'Variable: ')}<input className="var_select" id="var_select" style={{ width: '50%' }} value={f.varSelect} onChange={e => set({ varSelect: e.target.value })} />
-          <br /><br /> {t('設為', 'to')} {codeInput}{' '}
+          <p id="hint">{f.rectAction == '加入' ? t('把值加到清單的最後面...', 'Add a value to the end of a list...') : t('將變數內的值設為...', 'Set a variable to...')}</p>{' '}
+          <p className="rect_action">
+            <label><input type="radio" name="rect_action" checked={f.rectAction == '設為'} onChange={() => set({ rectAction: '設為' })} />{t('設定變數', 'Set')}</label>{' '}
+            <label><input type="radio" name="rect_action" checked={f.rectAction == '加入'} onChange={() => set({ rectAction: '加入' })} />{t('加到清單最後', 'Add to list')}</label>
+          </p>
+          {f.rectAction == '加入' ? t('清單：', 'List: ') : t('變數：', 'Variable: ')}<input className="var_select" id="var_select" style={{ width: '50%' }} value={f.varSelect} onChange={e => set({ varSelect: e.target.value })} />
+          <br /><br /> {f.rectAction == '加入' ? t('加入', 'add') : t('設為', 'to')} {codeInput}{' '}
           <br /><br />
           <p>{t('捨去進位？', 'Round?')}{' '}
             {radio('', t('不需要', 'No'))}{' '}

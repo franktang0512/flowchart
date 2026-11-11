@@ -31,6 +31,15 @@ export const COURSES: Course[] = [
     ],
   },
   {
+    id: 'list',
+    name: '清單', nameEn: 'Lists',
+    units: [
+      { name: '認識清單', nameEn: 'Meet the list', questions: ['list/l1', 'list/l2'] },
+      { name: '清單與迴圈', nameEn: 'Lists and loops', questions: ['list/l3', 'list/l4'] },
+      { name: '挑戰題', nameEn: 'Challenge', questions: ['list/l5'] },
+    ],
+  },
+  {
     id: 'nnjh',
     name: '暖暖高中', nameEn: 'Nuannuan High School',
     units: [

@@ -1,0 +1,44 @@
+{
+  "title": "最高分是幾號",
+  "question": "請輸入 1 號到 5 號同學的成績存進清單，輸出最高分的是幾號。如果最高分的人不只一個，輸出號碼最小的那位。\n提示：用一個變數記住「目前最高分是幾號」，一個一個跟 成績[i] 比。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "70 95 80 60 90",
+      "output": "2",
+      "note": "最高分 95 是 2 號"
+    },
+    {
+      "input": "100 90 80 70 60",
+      "output": "1",
+      "note": "最高分在第 1 個"
+    },
+    {
+      "input": "50 60 70 88 88",
+      "output": "4",
+      "note": "4 號和 5 號都是 88 分，輸出號碼小的 4"
+    }
+  ],
+  "en": {
+    "title": "Who Is the Top?",
+    "question": "Input the scores of student 1 to student 5 into a list. Output the number of the student with the top score. If two students have the top score, output the smaller number.\nTip: Make a variable for \"the top student so far\". Check each score[i] one by one.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "70 95 80 60 90",
+        "output": "2",
+        "note": "The top score is 95. It is student 2"
+      },
+      {
+        "input": "100 90 80 70 60",
+        "output": "1",
+        "note": "The top score is the first one"
+      },
+      {
+        "input": "50 60 70 88 88",
+        "output": "4",
+        "note": "Student 4 and 5 both have 88. Output the smaller number, 4"
+      }
+    ]
+  }
+}

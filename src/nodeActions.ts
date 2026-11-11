@@ -2,8 +2,10 @@
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
 import { checkVar, getCodeVar, type VarStore } from './engine/decoder';
+import { splitRectangle } from './engine/labels';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
+import { t } from './i18n';
 
 const ROUNDING_TEXT: Record<string, string> = {
   'Math.round': '(取四捨五入)',
@@ -13,17 +15,22 @@ const ROUNDING_TEXT: Record<string, string> = {
 
 const sharedConnectors = createConnectors();
 
-/** 計算積木：「 x 設為 運算式(取…)」以及它用到的變數 */
+/** 計算積木：「 x 設為 運算式(取…)」或「 清單 加入 運算式(取…)」，以及它用到的變數 */
 function rectangleText(vars: VarStore, f: DialogForm) {
-  let text = (f.varSelect ? ' ' + f.varSelect : '') + ' 設為 ' + f.code;
+  let text = (f.varSelect ? ' ' + f.varSelect : '') + ' ' + f.rectAction + ' ' + f.code;
   const nodeVar = getCodeVar(vars, text);
   if (!nodeVar.includes(f.varSelect || '')) nodeVar.push(f.varSelect || '');
   text += ROUNDING_TEXT[f.radio] ?? '';
   return { text, nodeVar };
 }
 
-const rectangleValid = (vars: VarStore, f: DialogForm) =>
-  checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
+function rectangleValid(vars: VarStore, f: DialogForm) {
+  if (f.rectAction == '加入' && !vars.type_var_list.array.includes(f.varSelect.trim())) {
+    alert(t(`「${f.varSelect.trim()}」不是清單：只有型別是「清單」的變數才能「加到清單最後」。`, `"${f.varSelect.trim()}" is not a list. Only list variables can use "Add to list".`));
+    return false;
+  }
+  return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
+}
 
 /** 輸入/輸出積木：回傳積木文字，檢查沒過回傳 null */
 function ioText(vars: VarStore, f: DialogForm): string | null {
@@ -144,14 +151,15 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
     case 'While_Loop':
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
     case 'Rectangle': {
-      const t = text.split(' 設為 ');
+      const { target, action, expr } = splitRectangle(text);
       return {
         kind: 'Rectangle',
         initial: {
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
-          varSelect: t[0] ? t[0].trim() : '',
-          code: (t[1] ?? '').split('(取')[0],
+          rectAction: action,
+          varSelect: target,
+          code: expr.split('(取')[0],
         },
       };
     }

@@ -5,11 +5,12 @@
 //   清單（從第 1 項開始） 成績[i]           → __at(成績, "成績", 積木編號, i)
 //                       成績[i] 設為 x     → __set(成績, "成績", 積木編號, i, x)
 //                       長度(成績)         → __len(...)
+//                       成績 加入 x        → __push(...)：把 x 加到清單最後
 //                       輸入 成績          → 把讀到的值加到清單最後
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
-import { displayLinkText, displayNodeText } from './labels';
+import { displayLinkText, displayNodeText, splitRectangle } from './labels';
 import type { FlowNode } from './node';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -142,6 +143,8 @@ const runtimeMessages = () => ({
   listToText: t('清單不能直接存進文字變數「{name}」。', 'A list cannot go into the text variable "{name}".'),
   wholeList: t('「{name}」是清單，要改其中一項請寫 {name}[第幾項]。', '"{name}" is a list. To change one item, write {name}[item number].'),
   notList: t('「{name}」不是清單，不能用 [第幾項]。', '"{name}" is not a list. You cannot use [ ].'),
+  notListPush: t('「{name}」不是清單，不能「加到清單最後」。', '"{name}" is not a list. You cannot add to it.'),
+  listInList: t('不能把整個清單加進清單「{name}」，請一次加一項。', 'You cannot add a whole list to "{name}". Add one item at a time.'),
   outOfRange: t('清單「{name}」只有 {len} 項，沒有第 {k} 項（清單從第 1 項開始）。', 'The list "{name}" has only {len} items. There is no item {k}. (Lists start at item 1.)'),
   emptyList: t('清單「{name}」是空的，沒有第 {k} 項。', 'The list "{name}" is empty. There is no item {k}.'),
   lenNotList: t('長度( ) 的括號裡要放清單。', 'Put a list inside length( ).'),
@@ -194,6 +197,11 @@ function __index(list, name, i, k) {
 }
 function __at(list, name, i, k) { return list[__index(list, name, i, k)]; }
 function __set(list, name, i, k, v) { list[__index(list, name, i, k)] = v; }
+function __push(list, name, i, v) {
+  if (!Array.isArray(list)) __err('notListPush', i, { name: name });
+  if (Array.isArray(v)) __err('listInList', i, { name: name });
+  list.push(v);
+}
 function __len(v, i) {
   if (!Array.isArray(v)) __err('lenNotList', i, {});
   return v.length;
@@ -354,9 +362,11 @@ class CodeGenerator {
         return { code, next: l.next };
       }
       case 'Rectangle': {
-        const [target, rest = ''] = node.text.split(' 設為 ');
+        const { target, action, expr: rest } = splitRectangle(node.text);
         const value = (node.data || '') + '(' + expr(rest.split('(取')[0]) + ')';
-        const code = this.assign(target.trim(), value, i);
+        const code = action == '加入'
+          ? `__push(${target}, ${JSON.stringify(target)}, ${i}, ${value});\n`
+          : this.assign(target, value, i);
         this.checkSyntax(node, code);
         return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
       }

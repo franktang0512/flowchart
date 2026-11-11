@@ -58,8 +58,6 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
         <select
           className="var_input" value={row.type}
           onChange={e => {
-            // 清單功能先關閉：就算用別的方式選到也不接受
-            if (e.target.value == '清單') return;
             const type = e.target.value as VarRow['type'];
             // 預設的初始值跟著型別換：數字是 0，文字是空的
             const init = type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
@@ -69,8 +67,7 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
         >
           <option value="數字">{t('數字', 'Number')}</option>
           <option value="文字">{t('文字', 'Text')}</option>
-          {/* 清單功能先關閉（程式都在，拿掉 disabled 就能用） */}
-          <option value="清單" disabled>{t('清單', 'List')}</option>
+          <option value="清單">{t('清單', 'List')}</option>
         </select>
       </td>
       <td>{row.type == '清單' ? <input className="var_input" disabled placeholder={t('空清單', 'Empty list')} /> : <input {...text('init')} />}</td>

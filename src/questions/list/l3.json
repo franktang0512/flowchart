@@ -1,0 +1,44 @@
+{
+  "title": "高於平均",
+  "question": "請輸入 5 位同學的成績存進清單，先算出平均，再依照原本的順序，把高於平均的成績一行一個輸出。\n提示：要用兩次迴圈。第一次算總分，第二次一個一個檢查 成績[i] 有沒有大於平均。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "60 70 80 90 100",
+      "output": "90\n100",
+      "note": "總分 400，平均 80，大於 80 的是 90、100"
+    },
+    {
+      "input": "50 50 50 50 100",
+      "output": "100",
+      "note": "平均 60，只有 100 大於平均"
+    },
+    {
+      "input": "85 60 90 75 40",
+      "output": "85\n90\n75",
+      "note": "平均 70，等於平均的不算；要照原本的順序輸出"
+    }
+  ],
+  "en": {
+    "title": "Above Average",
+    "question": "Input 5 test scores into a list. Find the average. Then output the scores that are bigger than the average. Keep the same order. One score on each line.\nTip: Use two loops. Loop 1: add up the scores. Loop 2: check each score[i]. Is it bigger than the average?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "60 70 80 90 100",
+        "output": "90\n100",
+        "note": "Total 400. Average 80. 90 and 100 are bigger than 80"
+      },
+      {
+        "input": "50 50 50 50 100",
+        "output": "100",
+        "note": "Average 60. Only 100 is bigger"
+      },
+      {
+        "input": "85 60 90 75 40",
+        "output": "85\n90\n75",
+        "note": "Average 70. Keep the same order"
+      }
+    ]
+  }
+}

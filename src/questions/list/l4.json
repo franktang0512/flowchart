@@ -1,0 +1,44 @@
+{
+  "title": "平方清單",
+  "question": "請輸入一個數字 n，把 1×1、2×2、…、n×n 依序加到清單的最後面，最後輸出整個清單。\n提示：「計算」積木選「加到清單最後」，就可以把算出來的值加進清單。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3",
+      "output": "1 4 9",
+      "note": "1×1=1、2×2=4、3×3=9"
+    },
+    {
+      "input": "5",
+      "output": "1 4 9 16 25",
+      "note": "加到 5×5=25"
+    },
+    {
+      "input": "1",
+      "output": "1",
+      "note": "n 是 1 時，清單裡只有 1 個數字"
+    }
+  ],
+  "en": {
+    "title": "Square List",
+    "question": "Input a number n. Put 1×1, 2×2, ... n×n at the end of a list, one by one. Then output the whole list.\nTip: In the Process block, choose \"Add to list\". It puts a value at the end of the list.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3",
+        "output": "1 4 9",
+        "note": "1×1=1, 2×2=4, 3×3=9"
+      },
+      {
+        "input": "5",
+        "output": "1 4 9 16 25",
+        "note": "Up to 5×5=25"
+      },
+      {
+        "input": "1",
+        "output": "1",
+        "note": "When n is 1, the list has only 1 number"
+      }
+    ]
+  }
+}

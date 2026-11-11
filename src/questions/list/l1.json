@@ -1,0 +1,44 @@
+{
+  "title": "存進清單",
+  "question": "請在變數表新增一個型別是「清單」的變數，用「輸入」積木輸入 3 個數字存進清單，最後輸出整個清單。\n提示：輸入積木選清單時，每輸入一次，數字就會加到清單的最後面。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 8 2",
+      "output": "5 8 2",
+      "note": "依序輸入 5、8、2，清單會是 [5, 8, 2]"
+    },
+    {
+      "input": "10 20 30",
+      "output": "10 20 30",
+      "note": "依序輸入 10、20、30"
+    },
+    {
+      "input": "7 7 1",
+      "output": "7 7 1",
+      "note": "清單裡可以有一樣的數字"
+    }
+  ],
+  "en": {
+    "title": "Save in a List",
+    "question": "Add a variable. Make its type \"List\". Use Input 3 times to put 3 numbers in the list. Then output the whole list.\nTip: When you input into a list, the number goes to the end of the list.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 8 2",
+        "output": "5 8 2",
+        "note": "Input 5, 8, 2. The list is [5, 8, 2]"
+      },
+      {
+        "input": "10 20 30",
+        "output": "10 20 30",
+        "note": "Input 10, 20, 30"
+      },
+      {
+        "input": "7 7 1",
+        "output": "7 7 1",
+        "note": "A list can have the same number two times"
+      }
+    ]
+  }
+}

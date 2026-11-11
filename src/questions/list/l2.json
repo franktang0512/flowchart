@@ -1,0 +1,44 @@
+{
+  "title": "倒著念",
+  "question": "請輸入 5 個數字存進清單，再從最後一個到第一個，一行輸出一個。\n提示：清單[1] 是第 1 個，清單[5] 是第 5 個。可以用一個變數 i 從 5 開始，每次減 1，輸出 清單[i]。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1 2 3 4 5",
+      "output": "5\n4\n3\n2\n1",
+      "note": "第 5 個先輸出，第 1 個最後輸出"
+    },
+    {
+      "input": "9 3 7 1 4",
+      "output": "4\n1\n7\n3\n9",
+      "note": "數字沒有排好順序也一樣倒過來"
+    },
+    {
+      "input": "6 6 8 8 0",
+      "output": "0\n8\n8\n6\n6",
+      "note": "有一樣的數字、也有 0"
+    }
+  ],
+  "en": {
+    "title": "Backward",
+    "question": "Input 5 numbers into a list. Then output them from the last one to the first one. One number on each line.\nTip: list[1] is the first item. list[5] is the fifth item. Make a variable i. Start at 5. Each time, output list[i] and take 1 away from i.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1 2 3 4 5",
+        "output": "5\n4\n3\n2\n1",
+        "note": "Item 5 comes first. Item 1 comes last"
+      },
+      {
+        "input": "9 3 7 1 4",
+        "output": "4\n1\n7\n3\n9",
+        "note": "The numbers are not in order. Just go backward"
+      },
+      {
+        "input": "6 6 8 8 0",
+        "output": "0\n8\n8\n6\n6",
+        "note": "Some numbers are the same. There is a 0"
+      }
+    ]
+  }
+}
