@@ -295,20 +295,12 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
     if (tops.length > 1) throw new BlockError(t('積木要接成一整串：有積木沒有接上。', 'All blocks must be in one stack. Some blocks are not connected.'));
     first = tops[0];
   }
-  let program = stmts(chain(first));
+  // 積木裡看到的每個積木都畫成流程圖的節點（包括最前面「變數設為 …」），學生看到的跟流程圖一樣
+  const program = stmts(chain(first));
 
-  // 最前面「把變數設成固定的值」「清空清單」的積木，當作變數表的初始值（toBlockly 就是這樣產生的）
-  const inits = new Map<string, string>();
-  while (program.length) {
-    const s = program[0];
-    if (s.kind != 'rect' || inits.has(s.target)) break;
-    if (s.action == '清空') inits.set(s.target, '');
-    else if (s.action == '設為' && !s.round && s.value && (s.value.t == 'num' || s.value.t == 'str')) inits.set(s.target, s.value.v);
-    else break;
-    program = program.slice(1);
-  }
-
-  // 變數表：原本就有的照原本的型別；新的看用法（清單積木 → 清單，存文字 → 文字，其他 → 數字）
+  // 變數表：原本就有的照原本的型別；新的看用法（清單積木 → 清單，存文字 → 文字，其他 → 數字）。
+  // 初始值一律用預設值（數字 0、文字空的）：toBlockly 把不是預設值的初始值寫成了最前面的積木，
+  // 現在那些積木變成流程圖上的節點，變數表再留著初始值的話，下次轉成積木會重複
   const known = new Map(current.map(v => [v.name, v]));
   const names = [...new Set([...(saved.variables ?? []).map(v => v.name), ...usedAsList])];
   const vars: VarInfo[] = names.map(name => {
@@ -316,8 +308,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
     const listType = (saved.variables ?? []).find(v => v.name == name)?.type == 'list' || usedAsList.has(name);
     const type: VarInfo['type'] = old?.type ?? (listType ? '清單' : usedAsText.has(name) ? '文字' : '數字');
     if (type == '清單') return { name, type, init: old?.type == '清單' ? old.init : '數字' };
-    const init = inits.get(name) ?? (old?.init ?? (type == '數字' ? '0' : ''));
-    return { name, type, init };
+    return { name, type, init: type == '數字' ? '0' : '' };
   });
   return { program, vars };
 }

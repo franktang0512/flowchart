@@ -188,10 +188,12 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode) 
   };
   const chain = (list: Stmt[]): Block | undefined => link(list.flatMap(stmt));
 
-  // 變數的初始值：積木沒有變數表，在最前面用「設定變數」放好；清單一開始是空的
-  const inits = varList.map(v => (v.type == '清單'
-    ? listEmpty(v.name)
-    : setVar(v.name, literal(v.type == '文字' ? v.init.trim().replace(/^(["'])(.*)\1$/s, '$2') : v.init.trim() || '0', v.type != '文字'))));
+  // 變數的初始值：積木沒有變數表，不是預設值（數字 0、空的文字）的才在最前面用「設定變數」放好；
+  // 清單一開始本來就是空的。積木改回流程圖時，這些積木會變成流程圖上的節點（見 fromBlockly）
+  const initValue = (v: VarInfo) => (v.type == '文字' ? v.init.trim().replace(/^(["'])(.*)\1$/s, '$2') : v.init.trim() || '0');
+  const inits = varList
+    .filter(v => v.type != '清單' && initValue(v) != (v.type == '文字' ? '' : '0'))
+    .map(v => setVar(v.name, literal(initValue(v), v.type != '文字')));
 
   const all = [...inits, ...program.flatMap(stmt)];
   // Scratch 的程式從「當綠旗被點擊」開始
