@@ -3,7 +3,8 @@
 import type { Anchor } from './anchor';
 import { connectorState, createConnectors, type Connector } from './connector';
 import type { FigureName } from './figures';
-import { Link, type Point } from './link';
+import { t } from '../i18n';
+import { Link, type LinkHandle, type Point } from './link';
 import { FlowNode } from './node';
 
 export type LinkLabelKind = 'link_tf' | 'link_for';
@@ -46,8 +47,10 @@ export interface SavedLink {
   anchorTo: number;
   text: string;
   mode: string;
-  /** 直角箭頭的折點位置 */
+  /** 直角箭頭的折點位置（舊版自動路線的拖曳點） */
   bends?: Point[];
+  /** 學生自己拉的折點 */
+  points?: Point[];
 }
 
 export interface DiagramData {
@@ -55,7 +58,7 @@ export interface DiagramData {
   links: SavedLink[];
 }
 
-type Dragging ='all' | 'newlink' | 'move' | 'anchor' | 'linkedit' | null | false;
+type Dragging ='all' | 'newlink' | 'move' | 'anchor' | 'linkedit' | 'linkpoint' | null | false;
 
 interface NodeToMove {
   index: number;
@@ -86,6 +89,11 @@ export class Diagram {
   pause = false;
   private nodesToMove: NodeToMove[] = [];
   private linksToMove: number[] = [];
+  /** 正在拖選取箭頭上的哪個點 */
+  private linkHandle: LinkHandle | null = null;
+  /** 拖整張圖時：開始的滑鼠位置、每條箭頭原本的折點 */
+  private allOrigin: Point = { x: 0, y: 0 };
+  private pointsAtStart: Point[][] = [];
 
   private readonly hooks: DiagramHooks;
   private readonly attached = new WeakSet<HTMLCanvasElement>();
@@ -178,6 +186,18 @@ export class Diagram {
     if (this.selNode != null && this.nodes[this.selNode] != null) {
       this.nodes[this.selNode]!.highlight(this.ctx);
     }
+    const selLink = this.selLink != null ? this.links[this.selLink] : null;
+    if (selLink) {
+      selLink.highlight(this.ctx);
+      // 告訴學生選到箭頭之後可以怎麼調整
+      this.ctx.save();
+      this.ctx.fillStyle = '#666';
+      this.ctx.font = '13px sans-serif';
+      this.ctx.textAlign = 'left';
+      this.ctx.textBaseline = 'top';
+      this.ctx.fillText(t('拖曳線上的點可以改變線的形狀；雙擊圓點可以刪掉它', 'Drag the dots to change the line. Double-click a round dot to remove it.'), 10, 10);
+      this.ctx.restore();
+    }
     if (this.stepHighlight != null) {
       this.nodes[this.stepHighlight]?.stepHighlight(this.ctx);
     }
@@ -196,6 +216,8 @@ export class Diagram {
       canvas.ondragstart = () => false;
       this.resizeObserver.observe(canvas);
     }
+    // 換到另一張畫布（例如第四步）時，不要還留著第三步選取的箭頭
+    this.selLink = null;
     // 舊版每次切換步驟都會重設畫布（同時清空畫面），這裡維持一樣
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
@@ -267,6 +289,7 @@ export class Diagram {
         anchorFrom: l.anchorFrom, anchorTo: l.anchorTo,
         text: l.text, mode: l.mode,
         bends: l.anchors.map(a => ({ x: a.x, y: a.y })),
+        points: l.points.map(p => ({ x: p.x, y: p.y })),
       });
     }
     return { nodes, links };
@@ -286,6 +309,10 @@ export class Diagram {
       // 直角箭頭被學生拖過的折點，數量對得上才套用
       if (s.bends?.length && s.bends.length == link.anchors.length) {
         s.bends.forEach((b, i) => { link.anchors[i].x = b.x; link.anchors[i].y = b.y; });
+        link.reSegment();
+      }
+      if (s.points?.length) {
+        link.points = s.points.map(p => ({ x: p.x, y: p.y }));
         link.reSegment();
       }
       this.links.push(link);
@@ -337,12 +364,22 @@ export class Diagram {
       this.dragging = 'newlink';
       return;
     }
+    // 已經選了箭頭：按在它的點上就開始拖（兩端在積木邊上，所以要比選積木先判斷）
+    const selLink = this.selLink != null ? this.links[this.selLink] : null;
+    const handle = selLink?.handleAt(mouseC) ?? null;
+    if (selLink && handle) {
+      this.linkHandle = handle.kind == 'mid' ? { kind: 'point', index: selLink.addPoint(handle.index) } : handle;
+      this.dragging = 'linkpoint';
+      this.draw();
+      return;
+    }
     if (this.selAnchor != null) {
       this.dragging = 'anchor';
       this.draw();
       return;
     }
     if (newselNode != null) {
+      this.selLink = null;
       this.selNode = newselNode;
       const sel = this.nodes[this.selNode]!;
       this.dragOrigin = { x: mouseC.x - sel.x, y: mouseC.y - sel.y };
@@ -372,8 +409,8 @@ export class Diagram {
       if (this.selAnchor == null) {
         // 取消選取
         this.selNode = null;
+        this.selLink = null;
         this.dragging = null;
-        this.draw();
         setTimeout(() => { this.pause = false; }, 10);
 
         // 點到箭頭？
@@ -381,12 +418,12 @@ export class Diagram {
           const link = this.links[index];
           if (link == null) continue;
           if (link.isOverLink(mouseC)) {
-            link.highlight(this.ctx);
             this.dragging = 'linkedit';
             this.selLink = index;
             break;
           }
         }
+        this.draw();
       }
       else {
         this.dragging = 'anchor';
@@ -409,6 +446,9 @@ export class Diagram {
         });
         link.reSegment();
       });
+      // 自己拉的折點也要跟著整張圖一起移動
+      this.allOrigin = mouseC;
+      this.pointsAtStart = this.links.map(link => (link ? link.points.map(p => ({ ...p })) : []));
     }
   };
 
@@ -422,16 +462,37 @@ export class Diagram {
           element.x = mouseC.x - n.elemDragOrigin.x;
           element.y = mouseC.y - n.elemDragOrigin.y;
         });
-        this.links.forEach(link => {
+        this.links.forEach((link, j) => {
           if (!link) return;
           link.anchors.forEach(anchor => {
             anchor.x = mouseC.x - anchor.dragOrigin.x;
             anchor.y = mouseC.y - anchor.dragOrigin.y;
           });
+          const dx = mouseC.x - this.allOrigin.x;
+          const dy = mouseC.y - this.allOrigin.y;
+          link.points = (this.pointsAtStart[j] ?? []).map(p => ({ x: p.x + dx, y: p.y + dy }));
           link.reSegment();
         });
         this.draw();
         break;
+      case 'linkpoint': {
+        const link = this.selLink != null ? this.links[this.selLink] : null;
+        const h = this.linkHandle;
+        if (!link || !h) break;
+        if (h.kind == 'point') link.movePoint(h.index, mouseC);
+        else if (h.kind == 'end') {
+          // 拖箭頭的一端：接到同一個積木上離滑鼠最近的那一邊
+          const node = this.nodes[h.which == 'from' ? link.from : link.to]!;
+          const nearest = node.connectors
+            .map((_, i) => ({ i, p: node.connectorCoords(i) }))
+            .reduce((a, b) => (Math.hypot(b.p.x - mouseC.x, b.p.y - mouseC.y) < Math.hypot(a.p.x - mouseC.x, a.p.y - mouseC.y) ? b : a));
+          if (h.which == 'from') link.anchorFrom = nearest.i;
+          else link.anchorTo = nearest.i;
+          link.reSegment();
+        }
+        this.draw();
+        break;
+      }
       case 'newlink': {
         this.draw();
         this.ctx.beginPath();
@@ -515,17 +576,8 @@ export class Diagram {
         else if (this.selLink != null) {
           const link = this.links[this.selLink];
           if (!link) break;
-          const i = link.isInsideAnchors(mouseC.x, mouseC.y);
-          if (i != null) {
-            this.selAnchor = i;
-            this.myCanvas.style.cursor = link.anchors[i].cursorClass;
-          }
-          else {
-            if (this.selAnchor != null) this.draw();
-            this.selAnchor = null;
-            this.dragging = null;
-            this.myCanvas.style.cursor = 'auto';
-          }
+          // 滑鼠移到箭頭上可以拖的點，游標變成「移動」
+          this.myCanvas.style.cursor = link.handleAt(mouseC) ? 'move' : 'auto';
         }
         else {
           this.hoverConnectors(mouseC);
@@ -604,6 +656,7 @@ export class Diagram {
       this.dragOrigin = { x: 0, y: 0 };
       this.selAnchor = null;
       this.selConnector = null;
+      this.linkHandle = null;
     }
   };
 
@@ -634,12 +687,20 @@ export class Diagram {
     }
   };
 
-  private dblclick = () => {
+  private dblclick = (ev: MouseEvent) => {
     if (this.selNode != null) {
       this.pause = true;
       this.hooks.editNode(this, this.selNode);
     }
     if (this.selLink != null) {
+      // 雙擊折點：刪掉它（不是改箭頭上的字）
+      const selLink = this.links[this.selLink];
+      const handle = selLink?.handleAt(this.mouseCoords(ev));
+      if (selLink && handle?.kind == 'point') {
+        selLink.removePoint(handle.index);
+        this.draw();
+        return;
+      }
       // 在箭頭文字的位置放一個小文字框直接改
       this.editText = true;
       const link = this.links[this.selLink];
