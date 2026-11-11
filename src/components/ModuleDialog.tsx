@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isName, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
+import { canReturn } from '../target';
 
 export interface ModuleRequest {
   /** 每次開對話框都不同，用來重設表單 */
@@ -32,6 +33,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
   useLang();
   const [name, setName] = useState(request.initial?.name ?? '');
   const [params, setParams] = useState<ParamInfo[]>(request.initial?.params.map(p => ({ ...p })) ?? []);
+  const [returns, setReturns] = useState<'' | '數字' | '文字'>(request.initial?.returns ?? '');
   const [problem, setProblem] = useState<string | null>(null);
 
   const setParam = (k: number, patch: Partial<ParamInfo>) => setParams(params.map((p, i) => (i == k ? { ...p, ...patch } : p)));
@@ -52,7 +54,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
       setProblem(why);
       return;
     }
-    request.onSave({ name: n, params: list });
+    request.onSave({ name: n, params: list, ...(returns && canReturn() ? { returns } : {}) });
     onClose();
   };
 
@@ -75,7 +77,22 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
         </p>
       ))}
       <p><button onClick={() => setParams([...params, { name: '', type: '數字' }])}>{t('＋ 加一個參數', '+ Add a parameter')}</button></p>
-      <p className="dialog_note">{t('參數在模組裡只能拿來用、不能改。要把結果帶回主流程，請存到變數表裡的變數。', 'Inside the module you can use a parameter but not change it. To bring a result back, save it in a variable from the table.')}</p>
+      {canReturn()
+        ? (
+          // Blockly、C++：可以回傳值（Scratch 的自訂積木不行，所以不出現）
+          <>
+            <p className="section_label">{t('回傳值', 'Return value')}</p>
+            <p className="module_param">
+              <select value={returns} onChange={e => setReturns(e.target.value as typeof returns)}>
+                <option value="">{t('沒有回傳值', 'No return value')}</option>
+                <option value="數字">{t('回傳數字', 'Returns a number')}</option>
+                <option value="文字">{t('回傳文字', 'Returns text')}</option>
+              </select>
+            </p>
+            <p className="dialog_note">{t('有回傳值的模組：在模組裡用計算積木「回傳」，後面直接接「結束」；用的時候可以寫在算式裡，例如「答案 設為 找最大(x, y)」。參數只能拿來用、不能改。', 'With a return value: inside the module, use the Math block "Return", then go straight to "End". You can use it in math, like "answer = biggest(x, y)". Parameters can be used but not changed.')}</p>
+          </>
+        )
+        : <p className="dialog_note">{t('參數在模組裡只能拿來用、不能改。Scratch 的自訂積木不能回傳值，要把結果帶回主流程，請存到變數表裡的變數。', 'Inside the module you can use a parameter but not change it. Scratch My Blocks cannot return a value. To bring a result back, save it in a variable from the table.')}</p>}
       {problem && <p className="run_error">{problem}</p>}
       <p>
         <button id="hint_yes" onClick={save}>{t('確認', 'OK')}</button>{' '}

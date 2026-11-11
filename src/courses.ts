@@ -2,7 +2,7 @@
 // 題目寫成 "資料夾/檔名"，對應 src/questions/資料夾/檔名.json，網址是 ?w=資料夾&h=檔名。
 // 要調整課程名稱、單元、題目順序、隱藏某題，都只要改這個檔案。
 import { link } from './i18n';
-import type { Target } from './target';
+import { isBlocks, type Target } from './target';
 
 export interface Unit {
   name: string;
@@ -16,10 +16,13 @@ export interface Course {
   name: string;
   nameEn: string;
   description?: string;
-  /** 只給某個學習目標看（例如題目提示寫的是從第 1 項開始）；沒寫就是兩種都適用 */
-  target?: Target;
+  /** 只給某個學習目標看（例如題目提示寫的是從第 1 項開始）；'blocks' 是 Scratch 和 Blockly 都可以；沒寫就是都適用 */
+  target?: Target | 'blocks';
   units: Unit[];
 }
+
+/** 這門課要不要列給這個學習目標 */
+export const courseFits = (c: Course, target: Target) => !c.target || c.target == target || (c.target == 'blocks' && isBlocks(target));
 
 export const COURSES: Course[] = [
   {

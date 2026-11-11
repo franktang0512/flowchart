@@ -41,6 +41,7 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     case 'var': return e.name;
     case 'raw': return e.text;
     case 'idx': return `${exprText(e.obj, cond, 9)}[${exprText(e.index, cond)}]`;
+    case 'fcall': return `${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     case 'neg': return `-${exprText(e.a, cond, 7)}`;
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
     case 'not': return wrap(`not ${exprText(e.a, cond, 7)}`, 2.5, parent);
@@ -66,7 +67,8 @@ interface End {
 }
 
 type Item =
-  | { kind: 'node'; node: FlowNode }
+  /** ret：「回傳」積木，直接接到最後的「結束」 */
+  | { kind: 'node'; node: FlowNode; ret?: boolean }
   | { kind: 'if'; dia: FlowNode; yes: Item[]; no: Item[] }
   | { kind: 'loop'; loop: FlowNode; body: Item[]; enter: string; exit: string };
 
@@ -106,6 +108,7 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
           刪除: ` ${s.target} 刪除第 ${k} 項`,
           清空: ` ${s.target} 刪除所有項目`,
           建立: ` ${s.target} 建立 ${k} 列 ${k2} 行`,
+          回傳: ` 回傳 ${v}`,
         }[s.action] + (ROUNDING_TEXT[s.round] ?? '');
         return { kind: 'node', node: node(text, 'Rectangle', s.round) };
       }
@@ -117,8 +120,12 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
         return { kind: 'loop', loop: node(exprText(s.cond, true), 'While_Loop'), body: items(s.body), enter: '假', exit: '真' };
       case 'call':
         return { kind: 'node', node: node(callText(s.name, s.args.map(a => exprText(a))), 'Function') };
+      case 'return':
+        return { kind: 'node', ret: true, node: node(` 回傳 ${exprText(s.value)}` + (ROUNDING_TEXT[s.round] ?? ''), 'Rectangle', s.round) };
     }
   };
+  /** 「回傳」積木：最後都接到「結束」 */
+  const returnEnds: End[] = [];
 
   // ---- 2. 算每一塊要多寬 ----
   const seqWidth = (list: Item[]) => Math.max(0, ...list.map(width));
@@ -179,7 +186,13 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
   const place = (it: Item, cx: number, y: number): { entry: FlowNode; ends: End[]; bottom: number } => {
     if (it.kind == 'node') {
       at(it.node, cx, y);
-      return { entry: it.node, ends: [{ from: it.node, conn: BOTTOM, label: '', route: fromBottom(it.node) }], bottom: y + it.node.h };
+      const out: End = { from: it.node, conn: BOTTOM, label: '', route: fromBottom(it.node) };
+      // 回傳：不接下一個積木，最後接到「結束」
+      if (it.ret) {
+        returnEnds.push(out);
+        return { entry: it.node, ends: [], bottom: y + it.node.h };
+      }
+      return { entry: it.node, ends: [out], bottom: y + it.node.h };
     }
 
     if (it.kind == 'if') {
@@ -235,7 +248,7 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
   if (r.entry) {
     connect(startEnds, r.entry);
     at(end, cx, r.bottom + GAP_Y);
-    connect(r.ends, end);
+    connect([...r.ends, ...returnEnds], end);
   }
   else {
     at(end, cx, 30 + start.h + GAP_Y);

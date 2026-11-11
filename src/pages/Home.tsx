@@ -1,7 +1,7 @@
 // 首頁：選學習目標（積木或 C++）→ 選課程 → 看這門課的題目 → 點題目進入學習單
 import { useEffect, useState } from 'react';
 import { LangToggle } from '../components/LangToggle';
-import { COURSES, questionHref, type Course } from '../courses';
+import { COURSES, courseFits, questionHref, type Course } from '../courses';
 import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
 import { setTarget, targetName, useTarget, type Target } from '../target';
@@ -36,19 +36,21 @@ const questionCount = (c: Course) => c.units.reduce((n, u) => n + u.questions.le
 const courseName = (c: { name: string; nameEn: string }) => t(c.name, c.nameEn);
 
 /** 學習目標的選項：名稱、說明、清單從哪裡開始；沒有 target 的是還在準備、先不能選的 */
+// 還不能選的（Python）放最後
 const TARGET_CHOICES: { key: string; target?: Target; name: () => string; desc: () => string; index: () => string }[] = [
   {
-    key: 'blocks',
-    target: 'blocks',
-    name: () => targetName('blocks'),
-    desc: () => t('Scratch、Blockly 這類積木程式', 'Block coding, like Scratch and Blockly'),
+    key: 'scratch',
+    target: 'scratch',
+    name: () => targetName('scratch'),
+    desc: () => t('Scratch 積木：自訂積木沒有回傳值', 'Scratch blocks: My Blocks have no return value'),
     index: () => t('清單從第 1 項開始', 'Lists start at item 1'),
   },
   {
-    key: 'python',
-    name: () => 'Python',
-    desc: () => t('串列（list）等 Python 寫法', 'Python lists'),
-    index: () => t('準備中', 'Coming soon'),
+    key: 'blockly',
+    target: 'blockly',
+    name: () => targetName('blockly'),
+    desc: () => t('Blockly 積木：函式可以回傳值', 'Blockly blocks: functions can return a value'),
+    index: () => t('清單從第 1 項開始', 'Lists start at item 1'),
   },
   {
     key: 'cpp',
@@ -56,6 +58,12 @@ const TARGET_CHOICES: { key: string; target?: Target; name: () => string; desc: 
     name: () => targetName('cpp'),
     desc: () => t('陣列、vector 等 C++ 寫法', 'C++ arrays and vectors'),
     index: () => t('索引從 0 開始', 'Index starts at 0'),
+  },
+  {
+    key: 'python',
+    name: () => 'Python',
+    desc: () => t('串列（list）等 Python 寫法', 'Python lists'),
+    index: () => t('準備中', 'Coming soon'),
   },
 ];
 
@@ -107,7 +115,7 @@ export function CourseList() {
         <span className="muted target_hint">（{targetName(target)}：{TARGET_CHOICES.find(c => c.target == target)!.index()}）</span>
       </h4>
       <div className="home_courses">
-        {COURSES.filter(c => !c.target || c.target == target).map(c => (
+        {COURSES.filter(c => courseFits(c, target)).map(c => (
           <a key={c.id} className="home_card" href={link(`?course=${encodeURIComponent(c.id)}`)}>
             <div className="home_card_title">{courseName(c)}</div>
             {c.description && <div className="home_card_desc">{c.description}</div>}

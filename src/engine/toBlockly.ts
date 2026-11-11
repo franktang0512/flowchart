@@ -13,7 +13,7 @@ type Block = {
   fields?: Record<string, unknown>;
   inputs?: Record<string, { block: Block }>;
   next?: { block: Block };
-  extraState?: Record<string, unknown>;
+  extraState?: Record<string, unknown> | string;
   x?: number;
   y?: number;
 };
@@ -36,7 +36,7 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
   const scratch = mode == 'scratch';
   const varId = (name: string) => 'var_' + name;
   const isList = (name: string) => vars.get(name)?.type == '清單';
-  const isText = (e: Expr) => exprType(e, vars) == 'str';
+  const isText = (e: Expr) => exprType(e, vars, modules) == 'str';
   const input = (block: Block) => ({ block });
   const field = (name: string) => ({ id: varId(name) });
 
@@ -60,6 +60,12 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       case 'var':
         if (scratch && params.has(e.name)) return { type: 'scratch_proc_arg', fields: { NAME: e.name } };
         return getVar(e.name);
+      case 'fcall': {
+        // 有回傳值的函式（只有 Blockly；Scratch 的自訂積木不能回傳，「看程式」會先擋下來）
+        const m = modules.find(x => x.name == e.name);
+        const names = m ? m.params.map(p => p.name) : e.args.map((_, k) => 'x' + (k + 1));
+        return { type: 'procedures_callreturn', extraState: { name: e.name, params: names }, inputs: Object.fromEntries(e.args.map((a, k) => ['ARG' + k, input(expr(a))])) };
+      }
       case 'idx': {
         const list = listName(e.obj);
         if (scratch) {
@@ -78,7 +84,7 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       case 'not': return { type: 'logic_negate', inputs: { BOOL: input(expr(e.a)) } };
       case 'call': return call(e.fn, e.args);
       case 'bin': {
-        if (e.op == '+' && exprType(e, vars) == 'str') return join(joinParts(e));
+        if (e.op == '+' && exprType(e, vars, modules) == 'str') return join(joinParts(e));
         if (ARITH[e.op]) return { type: scratch ? 'scratch_math_arithmetic' : 'math_arithmetic', fields: { OP: ARITH[e.op] }, inputs: { A: input(expr(e.a)), B: input(expr(e.b)) } };
         if (e.op == '%') return { type: 'math_modulo', inputs: { DIVIDEND: input(expr(e.a)), DIVISOR: input(expr(e.b)) } };
         if (COMPARE[e.op]) return { type: scratch ? 'scratch_logic_compare' : 'logic_compare', fields: { OP: COMPARE[e.op] }, inputs: { A: input(expr(e.a)), B: input(expr(e.b)) } };
@@ -115,7 +121,7 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
     }
     return { type: 'text_join', extraState: { itemCount: parts.length }, inputs: Object.fromEntries(parts.map((p, i) => ['ADD' + i, input(expr(p))])) };
   };
-  const joinParts = (e: Expr): Expr[] => (e.t == 'bin' && e.op == '+' && exprType(e, vars) == 'str' ? [...joinParts(e.a), ...joinParts(e.b)] : [e]);
+  const joinParts = (e: Expr): Expr[] => (e.t == 'bin' && e.op == '+' && exprType(e, vars, modules) == 'str' ? [...joinParts(e.a), ...joinParts(e.b)] : [e]);
   const rounded = (round: string, block: Block): Block => (ROUND[round] ? { type: 'math_round', fields: { OP: ROUND[round] }, inputs: { NUM: input(block) } } : block);
 
   // ---- 清單的操作 ----
@@ -195,6 +201,12 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
         const inputs = Object.fromEntries(s.args.map((a, k) => ['ARG' + k, input(expr(a))]));
         return [{ type: scratch ? 'scratch_proc_call' : 'procedures_callnoreturn', extraState: { name: s.name, params: names }, inputs }];
       }
+      case 'return':
+        // 回傳在判斷裡面：Blockly 的「如果 成立 則回傳」積木（條件放「真」）；放在最後的回傳見下面 defs
+        return [{
+          type: 'procedures_ifreturn', extraState: '<mutation value="1"></mutation>',
+          inputs: { CONDITION: input({ type: 'logic_boolean', fields: { BOOL: 'TRUE' } }), VALUE: input(rounded(s.round, expr(s.value))) },
+        }];
     }
   };
 
@@ -221,15 +233,22 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
   // 模組：Scratch 是「定義」帽子積木，Blockly 是「函式」積木；排在主程式右邊
   const defs = modules.map((m, k): Block => {
     enter(m);
-    const body = chain(m.body);
     const at = { x: 20 + 460 * (k + 1), y: 20 };
     if (scratch) {
+      const body = chain(m.body);
       return { type: 'scratch_proc_def', extraState: { name: m.name, params: m.params }, ...(body ? { next: { block: body } } : {}), ...at };
     }
+    // 有回傳值：最後一步是「回傳」的話，放進函式積木下面的「回傳」格子
+    const last = m.body[m.body.length - 1];
+    const tail = m.returns && last?.kind == 'return' ? last : null;
+    const body = chain(tail ? m.body.slice(0, -1) : m.body);
+    const inputs: Record<string, { block: Block }> = {};
+    if (body) inputs.STACK = input(body);
+    if (tail) inputs.RETURN = input(rounded(tail.round, expr(tail.value)));
     return {
-      type: 'procedures_defnoreturn', fields: { NAME: m.name },
+      type: m.returns ? 'procedures_defreturn' : 'procedures_defnoreturn', fields: { NAME: m.name },
       extraState: { params: m.params.map(p => ({ name: p.name, id: varId(p.name) })) },
-      ...(body ? { inputs: { STACK: input(body) } } : {}), ...at,
+      inputs, ...at,
     };
   });
   enter(null);

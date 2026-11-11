@@ -26,6 +26,7 @@ function rectangleText(vars: VarStore, f: DialogForm) {
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
     : f.rectAction == '清空' ? `${target} 刪除所有項目`
     : f.rectAction == '建立' ? `${target} 建立 ${f.rectIndex.trim()} 列 ${f.rectIndex2.trim()} 行`
+    : f.rectAction == '回傳' ? ` 回傳 ${f.code}`
     : `${target} ${f.rectAction} ${f.code}`;
   const nodeVar = getCodeVar(vars, text);
   if (!nodeVar.includes(f.varSelect || '')) nodeVar.push(f.varSelect || '');
@@ -39,6 +40,7 @@ const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != 
 
 function rectangleValid(vars: VarStore, f: DialogForm) {
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
+  if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
   const list = f.varSelect.trim();
   // 二維清單：建立（幾列幾行）、替換一格（第幾列第幾行）
   if (vars.type_var_list.grid.includes(list) && (f.rectAction == '建立' || f.rectAction == '替換')) {

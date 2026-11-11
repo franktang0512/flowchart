@@ -20,11 +20,14 @@ interface Props {
   /** 學生在第二步填的測資：[輸入, 輸出, 測試重點] × 3 */
   cases: string[];
   varNames: string[];
-  /** 有模組時：畫布上現在是哪一張流程圖（主程式或某個模組） */
+  /** 有模組時：畫布上現在是哪一張流程圖（主流程或某個模組） */
   sheetName: string;
+  /** 在模組裡時：是從哪一張流程圖執行進來的（左邊再放一張畫布，標出執行模組的那個積木）；不在模組裡是 null */
+  callerName: string | null;
+  callerCanvasRef: Ref<HTMLCanvasElement>;
 }
 
-export function RunArea({ visible, canvasRef, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName }: Props) {
+export function RunArea({ visible, canvasRef, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName, callerName, callerCanvasRef }: Props) {
   useLang();
   const total = run?.totalStep ?? 0;
   const output = run?.output[step] ?? '';
@@ -42,9 +45,19 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
           <h5 className="card_title" style={{ margin: 0 }}><span className="step_badge">4</span>{t('測試執行並除錯', 'Run and Check')}</h5>
           {sheetName && <span className="run_sheet">{t('現在在', 'Now in')}：{sheetName}</span>}
         </div>
-        <div className="canvas_body">
-          <div className="canvas_wrap">
-            <canvas id="my_canvas_show" ref={canvasRef}></canvas>
+        {/* 在模組裡：左邊是執行進來的地方（標出執行模組的積木），右邊是正在執行的模組 */}
+        <div className={'canvas_body run_split' + (callerName ? ' split' : '')}>
+          <div className="run_pane run_caller" style={{ display: callerName ? undefined : 'none' }}>
+            <span className="run_pane_title">{t('從這裡執行進來：', 'Called from: ')}{callerName}</span>
+            <div className="canvas_wrap">
+              <canvas id="my_canvas_caller" ref={callerCanvasRef}></canvas>
+            </div>
+          </div>
+          <div className="run_pane">
+            {callerName && <span className="run_pane_title">{t('正在執行：', 'Running: ')}{sheetName}</span>}
+            <div className="canvas_wrap">
+              <canvas id="my_canvas_show" ref={canvasRef}></canvas>
+            </div>
           </div>
         </div>
       </div>
@@ -102,7 +115,7 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
         </div>
 
         <div className="card">
-          <p className="section_label" style={{ marginTop: 0 }}>{t('變數', 'Variables')}</p>
+          <p className="section_label" style={{ marginTop: 0 }}>{callerName ? t('全域變數（變數表，主流程和模組都能用）', 'Global variables (the variable table)') : t('變數', 'Variables')}</p>
           <div id="variableTable" className="var_boxes">
             {values && varNames.map(name => {
               const v = values[name];
@@ -117,14 +130,22 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
                 </div>
               );
             })}
-            {/* 在模組裡：參數的值（只有執行到模組裡才有） */}
-            {values && Object.keys(values).filter(name => !varNames.includes(name)).map(name => (
-              <div key={'param_' + name} className="var_box is_param">
-                <span className="var_box_name">{name}<small>{t('（參數）', ' (parameter)')}</small></span>
-                <span className="var_box_value">{String(values[name])}</span>
-              </div>
-            ))}
           </div>
+          {/* 在模組裡：這個模組自己的（參數），只有執行到模組裡才有，跟全域變數分開 */}
+          {values && callerName && (
+            <div className="run_module_vars">
+              <p className="section_label">{sheetName}{t(' 的參數（只有這個模組裡有）', ': parameters (only in this module)')}</p>
+              <div className="var_boxes">
+                {Object.keys(values).filter(name => !varNames.includes(name)).map(name => (
+                  <div key={'param_' + name} className="var_box is_param">
+                    <span className="var_box_name">{name}</span>
+                    <span className="var_box_value">{String(values[name])}</span>
+                  </div>
+                ))}
+                {Object.keys(values).every(name => varNames.includes(name)) && <span className="muted">{t('（沒有參數）', '(no parameters)')}</span>}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

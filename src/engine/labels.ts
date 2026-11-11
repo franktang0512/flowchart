@@ -14,7 +14,7 @@ const ROUNDING: [string, string][] = [
  * 計算積木做的事：「設為」一般的設定；清單才有的（名稱對應 Scratch 的清單積木）
  * 「加入」添加到最後、「插入」、「替換」第幾項、「刪除」第幾項、「清空」刪除所有項目
  */
-export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立';
+export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立' | '回傳';
 
 /**
  * 「名稱[a]」「名稱[a][b]」拆成名稱和中括號裡的東西（中括號裡還有中括號也沒關係，例如 表[a[1]][b]）；
@@ -50,7 +50,10 @@ export function splitTarget(s: string): { name: string; indexes: string[] } | nu
  *   二維清單（C++）：「 表 建立 r 列 c 行」（設定大小，每格都是 0 或空的文字）「 表[i][j] 設為 運算式」（替換一格，index2 是第二個位置）
  */
 export function splitRectangle(text: string): { target: string; action: RectAction; index: string; index2: string; expr: string } {
-  let m = /^(.*?) 在第 (.*?) 項插入 (.*)$/s.exec(text);
+  // 模組的回傳值：「 回傳 運算式」（後面一定直接接「結束」）
+  let m = /^\s*回傳 (.*)$/s.exec(text);
+  if (m) return { target: '', action: '回傳', index: '', index2: '', expr: m[1] };
+  m = /^(.*?) 在第 (.*?) 項插入 (.*)$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '插入', index: m[2].trim(), index2: '', expr: m[3] };
   m = /^(.*?) 刪除所有項目$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '清空', index: '', index2: '', expr: '' };
@@ -81,6 +84,7 @@ function rectangleLabel(text: string, en: boolean): string {
   // 二維清單（只有 C++ 用）：照 C++ 的寫法
   if (action == '替換' && index2) return en ? `${target}[${index}][${index2}] = ${value}` : text;
   if (action == '建立') return en ? `make ${target} ${index} rows × ${index2} columns` : `${target} 建立 ${index} 列 × ${index2} 行`;
+  if (action == '回傳') return en ? `return ${value}` : `回傳 ${value}`;
   switch (action) {
     case '加入': return en ? `add ${value} to ${target}` : `添加 ${value} 到 ${target}`;
     case '插入': return en ? `insert ${value} at ${itemWord(index)} of ${target}` : `插入 ${value} 到 ${target} 的${itemWord(index)}`;

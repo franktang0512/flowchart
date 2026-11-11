@@ -170,7 +170,13 @@ export function App() {
   const currentDiagram = () => (sheetRef.current == 0 ? main : moduleOf2(sheetRef.current)?.diagram ?? main);
   const moduleOf2 = (id: number) => modulesRef.current.find(m => m.id == id);
   /** 在這張流程圖裡可以用的變數：模組裡還可以用它的參數 */
-  const storeFor = (d: Diagram) => withParams(varStore, moduleOf(d)?.info.params ?? []);
+  const storeFor = (d: Diagram) => ({
+    ...withParams(varStore, moduleOf(d)?.info.params ?? []),
+    // 有回傳值的模組可以寫在算式裡
+    calls: modulesRef.current.filter(m => m.info.returns).map(m => m.info.name),
+  });
+  /** 這張流程圖是有回傳值的模組嗎（計算積木才有「回傳」） */
+  const returnsIn = (d: Diagram) => !!moduleOf(d)?.info.returns;
 
   /** 換到另一張流程圖（第三步畫布上方的分頁） */
   const showSheet = (id: number) => {
@@ -308,6 +314,7 @@ export function App() {
     openDialog({
       kind,
       initial,
+      canReturn: returnsIn(d),
       onYes: f => editMainNode(node, d, storeFor(d), f, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
@@ -402,6 +409,13 @@ export function App() {
     }
   }, [page, pageNonce]);
 
+  /** 第幾張流程圖的名字：主流程、模組：xxx */
+  const sheetLabel = (sheet: number) => (sheet == 0 ? t('主流程', 'Main flow') : t('模組：', 'Module: ') + (modulesRef.current[sheet - 1]?.info.name ?? ''));
+  // 這一步在模組裡的話，是從哪個積木執行進來的（一層一層的最後一個）
+  const callStack = run?.stack[Math.min(step, (run?.stack.length ?? 1) - 1)] ?? [];
+  const caller = callStack.length ? { id: callStack[callStack.length - 1], depth: callStack.length } : null;
+  const callerCanvasRef = useRef<HTMLCanvasElement>(null);
+
   // 逐步執行：標出目前執行到的積木；執行到模組裡時，畫布換成那個模組的流程圖
   useLayoutEffect(() => {
     if (page != 3) return;
@@ -423,7 +437,12 @@ export function App() {
     }
     d.stepHighlight = where.node;
     d.draw();
-    setRunSheetName(where.sheet == 0 ? t('主流程', 'Main flow') : t('模組：', 'Module: ') + (modulesRef.current[where.sheet - 1]?.info.name ?? ''));
+    setRunSheetName(sheetLabel(where.sheet));
+    // 在模組裡：左邊畫出執行進來的那張流程圖，標出執行模組的積木
+    if (caller && callerCanvasRef.current) {
+      const c = splitId(caller.id);
+      (diagrams[c.sheet] ?? main).drawOn(callerCanvasRef.current, c.node);
+    }
   }, [run, runError, step, page, lang]);
 
   // ---------------- 畫布：點一下新增積木 ----------------
@@ -436,6 +455,7 @@ export function App() {
     const { x, y } = myMouse.current;
     openDialog({
       kind: t as DialogRequest['kind'],
+      canReturn: returnsIn(d),
       onYes: f => addMainNode(t, d, storeFor(d), f, x, y, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
@@ -473,7 +493,7 @@ export function App() {
     buildFlowchart(main, result.program, varStore);
     // 積木裡的自訂積木／函式 → 模組（同名的沿用原本的分頁，積木裡沒有的就刪掉）
     replaceModules(result.modules.map(m => ({
-      info: { name: m.name, params: m.params },
+      info: { name: m.name, params: m.params, ...(m.returns ? { returns: m.returns } : {}) },
       fill: d => buildFlowchart(d, m.body, withParams(varStore, m.params)),
     })));
     setCodeOpen(false);
@@ -574,6 +594,7 @@ export function App() {
       info: {
         name: String(m.name ?? ''),
         params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字' })),
+        ...(m.returns == '數字' || m.returns == '文字' ? { returns: m.returns } : {}),
       },
       fill: d => d.loadData(m.flowchart),
     })));
@@ -792,6 +813,7 @@ export function App() {
                   <span>
                     {t('定義', 'Define')} <b>{m.info.name}</b>
                     {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
+                    {m.info.returns && <>{t('，回傳', ', returns ')}{m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
                   </span>
                   <span className="muted">{t('從「開始」做到「結束」，做完回到執行它的地方', 'Runs from Start to End, then goes back to where it was run')}</span>
                   <button onClick={() => editModule(m)}>{t('修改名稱、參數', 'Edit name, parameters')}</button>
@@ -825,6 +847,8 @@ export function App() {
           cases={cases}
           varNames={varStore.var_list.name}
           sheetName={modules.length ? runSheetName : ''}
+          callerName={caller ? sheetLabel(splitId(caller.id).sheet) + (caller.depth > 1 ? t(`（第 ${caller.depth} 層）`, ` (level ${caller.depth})`) : '') : null}
+          callerCanvasRef={callerCanvasRef}
         />
       </div>
 

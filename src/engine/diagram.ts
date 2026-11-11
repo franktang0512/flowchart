@@ -247,6 +247,29 @@ export class Diagram {
     return selIndex;
   }
 
+  /**
+   * 把流程圖畫到另一個畫布上（只是畫，不能拖），標出 highlight 這個積木；
+   * 第四步左邊「從哪裡執行進來的」用（遞迴時兩邊是同一張流程圖，所以不能用 init 換畫布）
+   */
+  drawOn(canvas: HTMLCanvasElement, highlight: number | null) {
+    const saved = { ctx: this.ctx, canvas: this.myCanvas, step: this.stepHighlight, node: this.selNode, link: this.selLink };
+    this.myCanvas = canvas;
+    this.ctx = canvas.getContext('2d')!;
+    if (canvas.width != canvas.clientWidth || canvas.height != canvas.clientHeight) {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+    this.stepHighlight = highlight;
+    this.selNode = null;
+    this.selLink = null;
+    this.draw();
+    this.ctx = saved.ctx;
+    this.myCanvas = saved.canvas;
+    this.stepHighlight = saved.step;
+    this.selNode = saved.node;
+    this.selLink = saved.link;
+  }
+
   /** 把流程圖畫成圖片（只裁出有東西的範圍，白底、不含選取框），交作業列印用；沒有積木時回傳 null */
   toImage(): string | null {
     const nodes = this.nodes.filter((n): n is FlowNode => n != null);

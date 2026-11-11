@@ -27,13 +27,20 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   const doubles = findDoubles([program, ...modules.map(m => m.body)], varList);
   /** 數字參數有沒有被傳過小數（有的話用 double） */
   const paramDouble = new Set<string>();
+  /** 回傳數字的模組，回傳值會不會有小數（有的話回傳 double） */
+  const returnDouble = new Set<string>();
+  /** 傳給模組的值：文字參數傳數字進去要先變成文字 */
+  const argCode = (name: string, a: Expr, k: number) => {
+    const p = modules.find(x => x.name == name)?.params[k];
+    return p?.type == '文字' && typeOf(a) != 'str' ? strPart(a, false) : expr(a);
+  };
   // 用到哪些東西：最後只 #include 有用到的
   const uses = { indexOf: false, inputNumber: false, inputText: false, cmath: false, string: false };
 
   /** 數字變數是 int 還是 double */
   const numType = (name: string) => (doubles.has(name) ? 'double' : 'int');
   const elemType = (list: string) => (vars.get(list)?.init == '文字' ? 'string' : 'int');
-  const typeOf = (e: Expr): ExprType => exprType(e, vars);
+  const typeOf = (e: Expr): ExprType => exprType(e, vars, modules);
   const paramOf = (name: string) => (current as ModuleProgram | null)?.params.find(p => p.name == name);
   /** 運算式是不是整數（決定 / 要不要先轉成小數） */
   const isInt = (e: Expr): boolean => {
@@ -49,6 +56,10 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         if (e.obj.t == 'var') return vars.get(e.obj.name)?.type == '清單' && elemType(e.obj.name) == 'int';
         return e.obj.t == 'idx' && e.obj.obj.t == 'var' && vars.get(e.obj.obj.name)?.type == '二維清單' && elemType(e.obj.obj.name) == 'int';
       case 'call': return true;
+      case 'fcall': {
+        const m = modules.find(x => x.name == e.name);
+        return m?.returns == '數字' && !returnDouble.has(m.name);
+      }
       case 'neg': return isInt(e.a);
       case 'bin': return ['+', '-', '*', '%'].includes(e.op) && isInt(e.a) && isInt(e.b);
       default: return false;
@@ -63,6 +74,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'var': return e.name;
       case 'raw': return `/* ${e.text} */`;
       case 'idx': return `${expr(e.obj, 9)}[${expr(e.index)}]`;
+      case 'fcall': return `${e.name}(${e.args.map((a, k) => argCode(e.name, a, k)).join(', ')})`;
       case 'neg': return `-${expr(e.a, 7)}`;
       case 'not': return `!${expr(e.a, 7)}`;
       case 'call': {
@@ -123,7 +135,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   };
 
   /** 輸出：文字用 + 接起來的，改成一段一段 << */
-  const outputParts = (e: Expr): Expr[] => (e.t == 'bin' && e.op == '+' && exprType(e, vars) == 'str' ? [...outputParts(e.a), ...outputParts(e.b)] : [e]);
+  const outputParts = (e: Expr): Expr[] => (e.t == 'bin' && e.op == '+' && exprType(e, vars, modules) == 'str' ? [...outputParts(e.a), ...outputParts(e.b)] : [e]);
 
   const lines: string[] = [];
   const emit = (depth: number, line: string) => lines.push(INDENT.repeat(depth) + line);
@@ -232,36 +244,65 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         stmts(s.body, depth + 1);
         emit(depth, '}');
         break;
-      case 'call': {
-        const m = modules.find(x => x.name == s.name);
-        const args = s.args.map((a, k) => {
-          // 文字參數傳數字進去：先變成文字
-          if (m?.params[k]?.type == '文字' && typeOf(a) != 'str') return strPart(a, false);
-          return expr(a);
-        });
-        emit(depth, `${s.name}(${args.join(', ')});`);
+      case 'call':
+        emit(depth, `${s.name}(${s.args.map((a, k) => argCode(s.name, a, k)).join(', ')});`);
+        break;
+      case 'return': {
+        // 回傳文字的模組回傳數字：先變成文字
+        const value = rounded(s.round, expr(s.value));
+        const toText = (current as ModuleProgram | null)?.returns == '文字' && typeOf(s.value) == 'num';
+        if (toText) uses.string = true;
+        emit(depth, `return ${toText ? `to_string(${value})` : value};`);
         break;
       }
     }
   };
 
-  // 先看每個模組的數字參數有沒有被傳過小數（模組裡又傳給別的模組的，要多看幾次）
-  const findParamDoubles = (list: Stmt[]) => list.forEach(s => {
-    if (s.kind == 'call') {
-      const m = modules.find(x => x.name == s.name);
-      m?.params.forEach((p, k) => {
-        if (p.type == '數字' && s.args[k] && !isInt(s.args[k])) paramDouble.add(paramKey(m.name, p.name));
-      });
+  // 每個運算式（含裡面的）都看一次
+  const visitExpr = (e: Expr | undefined, f: (e: Expr) => void) => {
+    if (!e) return;
+    f(e);
+    switch (e.t) {
+      case 'idx': visitExpr(e.obj, f); visitExpr(e.index, f); break;
+      case 'call': case 'fcall': e.args.forEach(a => visitExpr(a, f)); break;
+      case 'bin': visitExpr(e.a, f); visitExpr(e.b, f); break;
+      case 'not': case 'neg': visitExpr(e.a, f); break;
     }
-    if (s.kind == 'if') { findParamDoubles(s.yes); findParamDoubles(s.no); }
-    if (s.kind == 'repeat' || s.kind == 'until') findParamDoubles(s.body);
+  };
+  const exprsOf = (s: Stmt): Expr[] => {
+    switch (s.kind) {
+      case 'input': return [s.index, s.index2].filter((x): x is Expr => !!x);
+      case 'output': return [s.value];
+      case 'rect': return [s.index, s.index2, s.value].filter((x): x is Expr => !!x);
+      case 'if': return [s.cond];
+      case 'repeat': return [s.times];
+      case 'until': return [s.cond];
+      case 'call': return s.args;
+      case 'return': return [s.value];
+    }
+  };
+  /** 模組裡的每個步驟（包括判斷、迴圈裡面的） */
+  const eachStmt = (list: Stmt[], f: (s: Stmt) => void) => list.forEach(s => {
+    f(s);
+    if (s.kind == 'if') { eachStmt(s.yes, f); eachStmt(s.no, f); }
+    if (s.kind == 'repeat' || s.kind == 'until') eachStmt(s.body, f);
+  });
+  // 先看每個模組的數字參數有沒有被傳過小數、回傳值會不會有小數（模組之間互相用的，要多看幾次）
+  const findDoubleTypes = (list: Stmt[]) => eachStmt(list, s => {
+    const args = (name: string, list: Expr[]) => modules.find(x => x.name == name)?.params.forEach((p, k) => {
+      if (p.type == '數字' && list[k] && !isInt(list[k])) paramDouble.add(paramKey(name, p.name));
+    });
+    if (s.kind == 'call') args(s.name, s.args);
+    exprsOf(s).forEach(e => visitExpr(e, x => { if (x.t == 'fcall') args(x.name, x.args); }));
+    const m = current as ModuleProgram | null;
+    if (s.kind == 'return' && m?.returns == '數字' && !s.round && !isInt(s.value)) returnDouble.add(m.name);
   });
   for (let pass = 0; pass < 3; pass++) {
     enter(null);
-    findParamDoubles(program);
+    findDoubleTypes(program);
     for (const m of modules) {
       enter(m);
-      findParamDoubles(m.body);
+      findDoubleTypes(m.body);
     }
   }
 
@@ -270,10 +311,13 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   stmts(program, 1);
   const body = lines.splice(0);
   const paramCode = (m: ModuleProgram) => m.params.map(p => `${p.type == '文字' ? 'string' : paramDouble.has(paramKey(m.name, p.name)) ? 'double' : 'int'} ${p.name}`).join(', ');
+  /** 函式的回傳型別：沒有回傳值是 void */
+  const retType = (m: ModuleProgram) => (m.returns == '文字' ? 'string' : m.returns == '數字' ? (returnDouble.has(m.name) ? 'double' : 'int') : 'void');
   const functions = modules.flatMap(m => {
     enter(m);
     stmts(m.body, 1);
-    return [`void ${m.name}(${paramCode(m)}) {`, ...lines.splice(0), '}', ''];
+    if (m.returns == '文字') uses.string = true;
+    return [`${retType(m)} ${m.name}(${paramCode(m)}) {`, ...lines.splice(0), '}', ''];
   });
   enter(null);
   if (modules.some(m => m.params.some(p => p.type == '文字'))) uses.string = true;
@@ -316,7 +360,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   if (shared) {
     const globalsPart = decls.length ? ['// ' + t('變數表的變數：主程式和模組都會用到，所以放在 main 外面', 'Variables from the table: main and the modules all use them, so they are outside main'), ...decls, ''] : [];
     // 模組之間互相執行時，要先宣告才能用
-    const protos = modules.length > 1 ? [...modules.map(m => `void ${m.name}(${paramCode(m)});`), ''] : [];
+    const protos = modules.length > 1 ? [...modules.map(m => `${retType(m)} ${m.name}(${paramCode(m)});`), ''] : [];
     return [...head, ...globalsPart, ...protos, ...functions, 'int main() {', ...body, `${INDENT}return 0;`, '}', ''].join('\n');
   }
   return [...head, 'int main() {', ...decls, ...(decls.length ? [''] : []), ...body, `${INDENT}return 0;`, '}', ''].join('\n');

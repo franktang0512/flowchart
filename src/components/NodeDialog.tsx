@@ -50,6 +50,8 @@ const RECT_ACTIONS: [RectAction, () => string][] = [
   ['清空', () => t('刪除所有項目', 'Delete all')],
   // 只有變數表裡有二維清單（C++）時才出現
   ['建立', () => t('建立二維清單', 'Make 2D list')],
+  // 只有在有回傳值的模組裡才出現
+  ['回傳', () => t('回傳', 'Return')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
@@ -60,6 +62,7 @@ const RECT_HINT: Record<RectAction, () => string> = {
   刪除: () => t(`刪除清單的${byTarget('第幾項', '某個索引')}，後面的都往前移...`, 'Delete one item from a list. The items after it move up...'),
   清空: () => t('刪除清單的所有項目，清單會變成空的...', 'Delete all items. The list will be empty...'),
   建立: () => t('設定二維清單有幾列、幾行，每一格先放 0（裝文字的放空的文字）...', 'Set how many rows and columns. Every cell starts as 0 (or empty text)...'),
+  回傳: () => t('把這個值交回給執行模組的地方，然後離開模組（後面直接接「結束」）...', 'Give this value back and leave the module (go straight to "End")...'),
 };
 
 /** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
@@ -71,6 +74,7 @@ const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   刪除: () => byTarget(t('刪除第', 'Delete item'), t('刪除索引', 'Delete index')),
   清空: null,
   建立: () => t('列數', 'Rows'),
+  回傳: null,
 };
 
 /** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
@@ -85,6 +89,7 @@ const RECT_VERB: Record<RectAction, (() => string) | null> = {
   刪除: null,
   清空: null,
   建立: null,
+  回傳: () => t('回傳', 'return'),
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -128,6 +133,8 @@ export interface DialogRequest {
   onNo?: () => void;
   /** 按 Esc 關掉 */
   onDismiss?: () => void;
+  /** 在有回傳值的模組裡：計算積木可以選「回傳」 */
+  canReturn?: boolean;
 }
 
 /** 變數表裡各型別的變數名稱，給下拉選單用 */
@@ -395,7 +402,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
         <>
           <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
           <p className="rect_action">
-            {RECT_ACTIONS.filter(([action]) => action != '建立' || varTypes.grid.length > 0).map(([action, label]) => (
+            {RECT_ACTIONS.filter(([action]) => (action != '建立' || varTypes.grid.length > 0) && (action != '回傳' || request.canReturn || f.rectAction == '回傳')).map(([action, label]) => (
               <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({
                 rectAction: action,
                 // 換到另一種動作時，原本選的變數不能用就清掉
@@ -403,8 +410,12 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               })} />{label()}</label>
             ))}
           </p>
-          {f.rectAction == '設為' ? t('變數：', 'Variable: ') : f.rectAction == '建立' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
-          <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction)} />
+          {f.rectAction != '回傳' && (
+            <>
+              {f.rectAction == '設為' ? t('變數：', 'Variable: ') : f.rectAction == '建立' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction)} />
+            </>
+          )}
           {indexLabel && (
             <>
               <br /><br /> {indexLabel()}{' '}

@@ -162,12 +162,18 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
         throw new BlockError(t('「四捨五入」只能放在「設為」積木的最外面（整個值四捨五入）。', '"Round" can only be the whole value of a "set" block.'));
       case 'event_answer':
         throw new BlockError(t('「詢問的答案」要放在「詢問並等待」的下一個積木裡，直接存到變數或清單。', 'Put "answer" in the block right after "ask and wait", and save it to a variable or list.'));
+      case 'procedures_callreturn': {
+        // 有回傳值的函式寫在算式裡（Blockly）
+        if (scratch) throw returnError();
+        const c = callStmt(b) as Extract<Stmt, { kind: 'call' }>;
+        return { t: 'fcall', name: c.name, args: c.args };
+      }
       default:
         if (RETURN_BLOCKS.has(b.type)) throw returnError();
         throw new BlockError(t(`流程圖沒有「${nameOf(b.type)}」這種積木。`, `The flowchart has no "${nameOf(b.type)}" block.`));
     }
   };
-  const returnError = () => new BlockError(t('流程圖的模組不會回傳值：請用「沒有回傳值」的函式，要帶回去的結果存到變數裡。', 'Flowchart modules do not return a value. Use a function with no return, and save the result in a variable.'));
+  const returnError = () => new BlockError(t('Scratch 的自訂積木不會回傳值：請用「沒有回傳值」的函式，要帶回去的結果存到變數裡。', 'Scratch My Blocks do not return a value. Use a function with no return, and save the result in a variable.'));
 
   /** 執行自訂積木／函式：名稱在 extraState，引數在 ARG0、ARG1… */
   const callStmt = (b: Json): Stmt => {
@@ -202,6 +208,14 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
         out.push(input);
         i++;
         continue;
+      }
+      // Blockly 的「如果 條件 則回傳 值」：條件成立就回傳（離開函式），不成立才做後面的積木
+      if (b.type == 'procedures_ifreturn' && !scratch) {
+        const cond = need(b, 'CONDITION');
+        const ret: Stmt = { kind: 'return', ...valueWithRound(need(b, 'VALUE')) };
+        if (cond.type == 'logic_boolean' && field(cond, 'BOOL') == 'TRUE') out.push(ret);
+        else out.push({ kind: 'if', cond: expr(cond), yes: [ret], no: stmts(list.slice(i + 1)) });
+        return out;
       }
       out.push(...stmt(b));
     }
@@ -307,6 +321,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
         throw new BlockError(t('「當綠旗被點擊」只能有一個，而且要放在最上面。', 'There can be only one "when flag clicked", at the top.'));
       case 'scratch_proc_def':
       case 'procedures_defnoreturn':
+      case 'procedures_defreturn':
         throw new BlockError(t('「定義」積木（函式）要自己放一串，不能接在別的積木下面。', 'A "define" block (function) must be on its own, not under other blocks.'));
       default:
         if (RETURN_BLOCKS.has(b.type)) throw returnError();
@@ -316,9 +331,10 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
 
   // ---------------- 從哪裡開始 ----------------
   const allTops = saved.blocks?.blocks ?? [];
-  if (allTops.some(b => RETURN_BLOCKS.has(b.type))) throw returnError();
+  // Scratch 不能回傳；Blockly 可以（有回傳值的函式）
+  if (scratch && allTops.some(b => RETURN_BLOCKS.has(b.type))) throw returnError();
   // 自訂積木／函式的定義各自一串，其他的是主程式
-  const isDef = (b: Json) => b.type == 'scratch_proc_def' || b.type == 'procedures_defnoreturn';
+  const isDef = (b: Json) => b.type == 'scratch_proc_def' || b.type == 'procedures_defnoreturn' || b.type == 'procedures_defreturn';
   const defBlocks = allTops.filter(isDef);
   const tops = allTops.filter(b => !isDef(b));
   let first: Json | undefined;
@@ -343,7 +359,10 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
     const raw = (b.extraState?.params ?? []) as ({ name: string } | string)[];
     const names = raw.map(p => (typeof p == 'string' ? p : p.name));
     const list = scratch ? chain(b.next?.block) : chain(b.inputs?.STACK?.block);
-    return { name, names, list };
+    // 有回傳值的函式：最下面「回傳」格子裡的值
+    const returns = b.type == 'procedures_defreturn';
+    const tail = returns ? inputBlock(b, 'RETURN') : undefined;
+    return { name, names, list, returns, tail };
   });
   const seen = new Set<string>();
   for (const d of defs) {
@@ -351,7 +370,14 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
     if (seen.has(d.name)) throw new BlockError(t(`有兩個都叫「${d.name}」的積木（函式）。`, `Two blocks (functions) are both called "${d.name}".`));
     seen.add(d.name);
   }
-  const modules: ModuleProgram[] = defs.map(d => ({ name: d.name, params: [], body: stmts(d.list) }));
+  const modules: ModuleProgram[] = defs.map(d => {
+    const body = stmts(d.list);
+    if (d.tail) body.push({ kind: 'return', ...valueWithRound(d.tail) });
+    // 回傳值的型別：原本的模組有的照原本，新的預設數字（回傳的是文字就是文字）
+    const old = knownModules.get(d.name);
+    const returns = d.returns ? old?.returns ?? (d.tail && expr(d.tail).t == 'str' ? '文字' : '數字') : undefined;
+    return { name: d.name, params: [], body, ...(returns ? { returns } : {}) };
+  });
   // 執行的自訂積木要有定義，參數個數也要一樣
   for (const [name, calls] of callArgs) {
     const d = defs.find(x => x.name == name);

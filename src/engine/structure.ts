@@ -25,7 +25,9 @@ export type Stmt =
   /** 條件迴圈：重複直到條件成立 */
   | { kind: 'until'; cond: Expr; body: Stmt[] }
   /** 執行模組（見 modules.ts） */
-  | { kind: 'call'; name: string; args: Expr[] };
+  | { kind: 'call'; name: string; args: Expr[] }
+  /** 模組回傳值（流程圖上後面直接接「結束」） */
+  | { kind: 'return'; value: Expr; round: string };
 
 /** 一個模組：名稱、參數、裡面的步驟 */
 export interface ModuleProgram extends ModuleInfo {
@@ -167,6 +169,7 @@ function rectStmt(text: string): Stmt {
     }
   }
   const { target, action, index, index2, expr } = splitRectangle(rest);
+  if (action == '回傳') return { kind: 'return', value: parseExpr(expr), round };
   return {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,
@@ -186,6 +189,8 @@ export type Expr =
   | { t: 'idx'; obj: Expr; index: Expr }
   /** 長度( )、項目編號( )、包含( ) */
   | { t: 'call'; fn: 'len' | 'find' | 'has'; args: Expr[] }
+  /** 有回傳值的模組：找最大(x, y) */
+  | { t: 'fcall'; name: string; args: Expr[] }
   /** + - * / % 、比較（== != < <= > >=）、and or */
   | { t: 'bin'; op: string; a: Expr; b: Expr }
   | { t: 'not'; a: Expr }
@@ -293,7 +298,7 @@ class Parser {
     }
     if (tk.type == 'name') {
       const fn = Object.prototype.hasOwnProperty.call(CALLS, tk.text) ? CALLS[tk.text] : undefined;
-      if (fn && this.is('(')) {
+      if (this.is('(')) {
         this.take();
         const args: Expr[] = [];
         if (!this.is(')')) {
@@ -301,7 +306,8 @@ class Parser {
           while (this.is(',')) { this.take(); args.push(this.or()); }
         }
         this.expect(')');
-        return { t: 'call', fn, args };
+        // 其他名稱後面接 ( )：有回傳值的模組
+        return fn ? { t: 'call', fn, args } : { t: 'fcall', name: tk.text, args };
       }
       return { t: 'var', name: tk.text };
     }
@@ -322,8 +328,9 @@ export interface VarInfo {
 /** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用） */
 export type ExprType = 'num' | 'str' | 'char' | 'bool' | 'list';
 
-export function exprType(e: Expr, vars: Map<string, VarInfo>): ExprType {
+export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInfo[] = []): ExprType {
   switch (e.t) {
+    case 'fcall': return modules.find(m => m.name == e.name)?.returns == '文字' ? 'str' : 'num';
     case 'num': return 'num';
     case 'str': return 'str';
     case 'var': {
@@ -331,7 +338,7 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>): ExprType {
       return v?.type == '清單' || v?.type == '二維清單' ? 'list' : v?.type == '文字' ? 'str' : 'num';
     }
     case 'idx': {
-      const o = exprType(e.obj, vars);
+      const o = exprType(e.obj, vars, modules);
       if (o == 'str') return 'char';
       if (e.obj.t == 'var') {
         const v = vars.get(e.obj.name);
@@ -347,7 +354,7 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>): ExprType {
     case 'bin':
       if (['==', '!=', '<', '<=', '>', '>=', 'and', 'or'].includes(e.op)) return 'bool';
       if (e.op == '+') {
-        const a = exprType(e.a, vars), b = exprType(e.b, vars);
+        const a = exprType(e.a, vars, modules), b = exprType(e.b, vars, modules);
         if (a == 'str' || b == 'str' || (a == 'char' && b == 'char')) return 'str';
       }
       return 'num';

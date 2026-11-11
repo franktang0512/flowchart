@@ -14,6 +14,12 @@ export interface ParamInfo {
 export interface ModuleInfo {
   name: string;
   params: ParamInfo[];
+  /**
+   * 回傳值的型別；沒有就是不回傳（Scratch 只能這樣）。
+   * 有回傳值的模組（Blockly、C++）：模組裡用計算積木「回傳 值」，後面直接接「結束」；
+   * 用的地方可以寫在算式裡，例如「答案 設為 找最大(x, y)」
+   */
+  returns?: '數字' | '文字';
 }
 
 /** 執行、轉程式時用：模組的資料加上它的流程圖 */

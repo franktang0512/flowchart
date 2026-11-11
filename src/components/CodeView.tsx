@@ -54,7 +54,6 @@ function loadBlockly(): Promise<Loaded> {
   return blocklyPromise;
 }
 
-const BLOCK_MODES: [BlockMode, string][] = [['scratch', 'Scratch'], ['blockly', 'Blockly']];
 const BLOCKLY_LAYER = 'blockly_layer';
 
 interface Props {
@@ -93,7 +92,7 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
       </div>
       {open && (target == 'cpp'
         ? <CppCode diagram={diagram} vars={vars()} modules={modules()} />
-        : <BlocklyCode diagram={diagram} vars={vars()} modules={modules()} onApply={onApply} />)}
+        : <BlocklyCode mode={target} diagram={diagram} vars={vars()} modules={modules()} onApply={onApply} />)}
       {/* Blockly 的輸入框、下拉選單放這裡：蓋滿整個畫面、不擋滑鼠（見 .blockly_layer） */}
       <div id={BLOCKLY_LAYER} className="blockly_layer" />
     </dialog>
@@ -138,22 +137,19 @@ const emptyBlocks = (mode: BlockMode) => ({
   blocks: { languageVersion: 0, blocks: mode == 'scratch' ? [{ type: 'event_whenflagclicked', x: 20, y: 20 }] : [] },
 });
 
-function BlocklyCode({ diagram, vars, modules, onApply }: { diagram: Diagram; vars: VarInfo[]; modules: ModuleSource[]; onApply: (result: FromBlocks) => void }) {
+/** 積木：學習目標是 Scratch 就只畫 Scratch，是 Blockly 就只畫 Blockly（兩種能做的事不一樣，例如回傳值） */
+function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMode; diagram: Diagram; vars: VarInfo[]; modules: ModuleSource[]; onApply: (result: FromBlocks) => void }) {
   const { program, modules: mods, error } = programOf(diagram, modules);
   const infos = modules.map(m => m.info);
   const boxRef = useRef<HTMLDivElement>(null);
   /** 出錯的說明：下載不到 Blockly，或積木畫不出來（附上原因，才知道要修哪裡） */
   const [loadError, setLoadError] = useState<string | null>(null);
-  // 每次打開都從 Scratch 開始（不記上次選的）
-  const [mode, setMode] = useState<BlockMode>('scratch');
   /** 編輯模式：可以拖積木修改，改好按「套用到流程圖」 */
   const [editing, setEditing] = useState(false);
   /** 套用時積木有問題的說明 */
   const [applyError, setApplyError] = useState<string | null>(null);
-  /** 編輯中換外觀時，改到一半的積木轉成另一種外觀的樣子（沒有的話就從流程圖產生） */
-  const [draft, setDraft] = useState<string | null>(null);
   const live = useRef<{ Blockly: BlocklyModule; workspace: BlocklyModule } | null>(null);
-  const json = editing && draft ? draft : program ? JSON.stringify(toBlockly(program, vars, mode, mods)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
+  const json = program ? JSON.stringify(toBlockly(program, vars, mode, mods)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
 
   useEffect(() => {
     if (!json) return;
@@ -199,27 +195,7 @@ function BlocklyCode({ diagram, vars, modules, onApply }: { diagram: Diagram; va
     };
   }, [json, mode, editing]);
 
-  /** 換外觀：編輯中就把改到一半的積木轉成另一種外觀，不用先套用到流程圖 */
-  const switchMode = (next: BlockMode) => {
-    if (next == mode) return;
-    const ws = live.current;
-    if (editing && ws) {
-      try {
-        const result = fromBlockly(ws.Blockly.serialization.workspaces.save(ws.workspace), mode, vars, infos);
-        setDraft(JSON.stringify(toBlockly(result.program, result.vars, next, result.modules)));
-      }
-      catch (e) {
-        if (!(e instanceof BlockError)) throw e;
-        setApplyError(t('積木有問題，先改好才能換外觀：', 'Fix the blocks before switching style: ') + e.message);
-        return;
-      }
-    }
-    setMode(next);
-  };
-  const stopEditing = () => {
-    setEditing(false);
-    setDraft(null);
-  };
+  const stopEditing = () => setEditing(false);
 
   /** 改好的積木 → 流程圖 */
   const apply = () => {
@@ -241,6 +217,10 @@ function BlocklyCode({ diagram, vars, modules, onApply }: { diagram: Diagram; va
   if (vars.some(v => v.type == '二維清單')) {
     return <p className="run_error">{t('Scratch / Blockly 沒有二維清單：用到二維清單的流程圖，請把學習目標換成 C++ 再看程式。', 'Scratch / Blockly have no 2D lists. To see this flowchart as code, change the learning goal to C++.')}</p>;
   }
+  // Scratch 的自訂積木不能回傳值
+  if (mode == 'scratch' && modules.some(m => m.info.returns)) {
+    return <p className="run_error">{t('Scratch 的自訂積木不能回傳值：有回傳值的模組，請把學習目標換成 Blockly 或 C++ 再看程式。', 'Scratch My Blocks cannot return a value. To see modules with a return value, change the learning goal to Blockly or C++.')}</p>;
+  }
   if (!program && !editing) {
     return (
       <>
@@ -252,12 +232,6 @@ function BlocklyCode({ diagram, vars, modules, onApply }: { diagram: Diagram; va
   return (
     <>
       <div className="code_toolbar">
-        <div className="lang_toggle code_mode" role="group" aria-label={t('積木的樣子', 'Block style')}>
-          {BLOCK_MODES.map(([m, name]) => (
-            // 編輯中也能換：改到一半的積木會轉成另一種外觀
-            <button key={m} className={mode == m ? 'selected' : ''} aria-pressed={mode == m} onClick={() => switchMode(m)}>{name}</button>
-          ))}
-        </div>
         {editing
           ? (
             <>

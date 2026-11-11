@@ -31,6 +31,8 @@ export interface VarStore {
   type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[] };
   /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用，但不能存值進去） */
   params?: string[];
+  /** 有回傳值的模組名稱：算式裡可以寫「名稱(引數)」 */
+  calls?: string[];
 }
 
 /** 模組裡用的變數清單：變數表的變數，再加上這個模組的參數 */
@@ -45,6 +47,7 @@ export function withParams(vars: VarStore, params: ParamInfo[]): VarStore {
       grid: vars.type_var_list.grid,
     },
     params: params.map(p => p.name),
+    calls: vars.calls,
   };
 }
 
@@ -131,7 +134,7 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     return false;
   }
   for (const tk of tokenize(str)) {
-    if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || isFunc(tk.text)) continue;
+    if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || isFunc(tk.text) || vars.calls?.includes(tk.text)) continue;
     alert(t(`「${tk.text}」沒有定義：請先在變數表新增這個變數。如果是文字，要用 "雙引號" 括起來。`, `"${tk.text}" is not a variable yet. Add it to the variable table first. For words, use "quotes".`));
     return false;
   }
@@ -243,6 +246,8 @@ const runtimeMessages = () => ({
   gridCol: t('二維清單「{name}」每列有 {len} 行，行的索引只能是 0 到 {max}，沒有索引 {k}。', 'The 2D list "{name}" has {len} columns. The column index must be 0 to {max}. There is no column {k}.'),
   gridSize: t('二維清單「{name}」的列數和行數要是 0 以上的整數，現在是 {r} 列 {c} 行。', 'The rows and columns of "{name}" must be whole numbers 0 or more. Now it is {r} × {c}.'),
   notGrid: t('「{name}」不是二維清單，不能用 [列][行]。', '"{name}" is not a 2D list. You cannot use [row][column].'),
+  noReturn: t('模組「{name}」要回傳值，可是這次走到「結束」都沒有經過「回傳」：每一條路在「結束」前都要有「回傳」。', 'The module "{name}" must return a value, but it reached "End" without "Return". Every path needs a "Return" before "End".'),
+  argCount: t('執行模組「{name}」時給了 {got} 個值，可是它有 {n} 個參數。', 'The module "{name}" got {got} values, but it has {n} parameters.'),
   tooDeep: t('模組一直執行自己（或互相執行）停不下來：檢查模組裡是不是在某個時候就不再執行自己。', 'A module keeps running itself and never stops. Check that it stops at some point.'),
 });
 
@@ -461,6 +466,13 @@ class CodeGenerator {
       else if (t.type == 'name' && isFunc(t.text) && !this.isVar(t.text) && tokens[k + 1]?.text == '(') {
         piece = FUNCTIONS[t.text];
       }
+      // 有回傳值的模組寫在算式裡：找最大(x, y) → __mod2(x, y)
+      else if (t.type == 'name' && !this.isVar(t.text) && tokens[k + 1]?.text == '(' && this.modules.some(m => m.name == t.text && m.returns)) {
+        // 每個積木一個版本（__mod2_at7），執行時才記得是哪個積木執行了模組（第四步左邊標出來）
+        const k = this.modules.findIndex(m => m.name == t.text) + 1;
+        this.callHelpers.add(`${k}:${i}`);
+        piece = `__mod${k}_at${i}`;
+      }
       else if (t.text == '[') {
         if (secondBracket) {
           // 表[a][b] 的第二個 [：前面已經寫了「, (」
@@ -534,11 +546,19 @@ class CodeGenerator {
       case 'Circle':
         if (this.sheet > 0) {
           // 模組：一個 JavaScript 函式，參數就是模組的參數；一直執行自己停不下來時要提醒
+          const m = this.modules[this.sheet - 1];
+          const name = JSON.stringify(m.name);
           if (node.text == '開始') {
-            const head = `function __mod${this.sheet}(${this.params.map(p => p.name).join(', ')}){\n`;
+            const head = `function __mod${this.sheet}(${this.params.map(p => p.name).join(', ')}){\n`
+              + `if (arguments.length != ${this.params.length}) __err('argCount', ${i}, { name: ${name}, got: arguments.length, n: ${this.params.length} });\n`
+              // 傳進來的值照參數的型別檢查
+              + this.params.map(p => `${p.name} = ${p.type == '文字' ? '__text' : '__num'}(${p.name}, ${i}, ${JSON.stringify(p.name)});\n`).join('')
+              + 'var __ret;\n';
             return { code: head + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
           }
-          return { code: 'total_step ++;\n' + update + '__depth--;\n}\n', next: undefined };
+          // 有回傳值的模組：走到結束時一定要已經「回傳」過
+          const check = m.returns ? `if (__ret === undefined) __err('noReturn', ${i}, { name: ${name} });\n` : '';
+          return { code: 'total_step ++;\n' + update + check + '__depth--;\nreturn __ret;\n}\n', next: undefined };
         }
         if (node.text == '開始') {
           return { code: 'function flowchart_code(){\n' + update, next: this.nextOf(node) };
@@ -555,8 +575,9 @@ class CodeGenerator {
         if (call.args.length != m.params.length) {
           this.fail(t(`${label(node)} 的參數個數不對：模組「${m.name}」要 ${m.params.length} 個參數。請雙擊這個積木重新填。`, `${label(node)} has the wrong number of values. The module "${m.name}" needs ${m.params.length}. Double-click the block to fix it.`), node);
         }
-        const args = m.params.map((p, a) => `${p.type == '文字' ? '__text' : '__num'}((${expr(call.args[a])}), ${i}, ${JSON.stringify(p.name)})`);
-        const code = `__mod${k + 1}(${args.join(', ')});\n`;
+        // 型別在模組的「開始」檢查；有回傳值也沒關係，不用就丟掉
+        // __stack 記住現在是從哪個積木執行進來的（第四步左邊標出來）
+        const code = `__stack.push(${i});\n__mod${k + 1}(${call.args.map(a => `(${expr(a)})`).join(', ')});\n__stack.pop();\n`;
         this.checkSyntax(node, code);
         return { code: 'total_step ++;\n' + update + code, next: this.nextOf(node) };
       }
@@ -629,6 +650,18 @@ class CodeGenerator {
       case 'Rectangle': {
         const { target, action, index, index2, expr: rest } = splitRectangle(node.text);
         const value = (node.data || '') + '(' + expr(rest.split('(取')[0]) + ')';
+        if (action == '回傳') {
+          // 回傳：只能在有回傳值的模組裡，而且後面直接接「結束」（回傳完就離開模組）
+          const m = this.modules[this.sheet - 1];
+          if (!m?.returns) this.fail(t(`${label(node)}：只有「有回傳值」的模組裡才能用「回傳」。`, `${label(node)}: "Return" can only be used in a module that returns a value.`), node);
+          const next = this.nextOf(node);
+          if (next && !(next.figure == 'Circle' && next.text == '結束')) {
+            this.fail(t(`${label(node)} 後面要直接接「結束」：回傳之後就離開模組，後面的積木不會做。`, `${label(node)} must go straight to "End". After returning, the module stops.`), node);
+          }
+          const code = `__ret = ${m.returns == '文字' ? '__text' : '__num'}(${value}, ${i}, ${JSON.stringify(t('回傳值', 'return value'))});\n`;
+          this.checkSyntax(node, code);
+          return { code: code + 'total_step ++;' + update, next };
+        }
         const name = JSON.stringify(target);
         const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${value});\n`
           : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${value});\n`
@@ -710,9 +743,17 @@ class CodeGenerator {
     const helpers = [...this.funcHelpers].map(i =>
       `function __len_${i}(v) { return __len(v, ${i}); }\n`
       + `function __find_${i}(l, v) { return __find(l, v, ${i}); }\n`
-      + `function __has_${i}(l, v) { return __has(l, v, ${i}); }\n`).join('');
+      + `function __has_${i}(l, v) { return __has(l, v, ${i}); }\n`).join('')
+      // 算式裡執行有回傳值的模組
+      + [...this.callHelpers].map(key => {
+        const [k, i] = key.split(':');
+        return `function __mod${k}_at${i}() { __stack.push(${i}); var r = __mod${k}.apply(null, arguments); __stack.pop(); return r; }\n`;
+      }).join('');
     return helpers + code;
   }
+
+  /** 算式裡執行模組的積木：「模組編號:積木編號」 */
+  private callHelpers = new Set<string>();
 }
 
 export interface RunResult {
@@ -723,6 +764,8 @@ export interface RunResult {
   var: Record<string, unknown>[];
   /** 每一步為止的輸出 */
   output: string[];
+  /** 每一步在模組裡的話：是從哪些積木一層一層執行進來的（最後一個是最近的那一層）；在主流程是空的 */
+  stack: number[][];
   /** 執行到一半出錯：前面的步驟照樣保留，最後一步之後就是這個錯誤 */
   error?: FlowError;
 }
@@ -747,7 +790,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
-  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\n';
+  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\n';
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
   code += runtime();
   for (const name of names) {
@@ -755,7 +798,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     if (!syntaxOk(decl)) throw new FlowError(t(`變數名稱「${name}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${name}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
     code += decl;
   }
-  code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\n}\n';
+  code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
   const infos = modules.map(m => m.info);
   code += new CodeGenerator(diagram, vars, names, 0, infos).program();
   // 模組：每個模組一個函式（__mod1、__mod2…）
@@ -764,7 +807,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   });
   // 執行到一半出錯時，保留出錯前的每一步，學生才看得到變數是怎麼變的
   code += 'var __error = null;\ntry { flowchart_code(); } catch (e) { __error = e; }\n';
-  code += 'return {totalStep: total_step, step: step_list.step, var: step_list.var, output: step_list.output, error: __error};\n';
+  code += 'return {totalStep: total_step, step: step_list.step, var: step_list.var, output: step_list.output, stack: step_list.stack, error: __error};\n';
 
   console.log('code = \n', code);
   const diagrams = [diagram, ...modules.map(m => m.diagram)];

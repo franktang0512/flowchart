@@ -1167,3 +1167,33 @@ input, textarea, select, button {
     font-size: 0.85rem;
     white-space: nowrap;
 }
+
+/* ---------- 第四步：在模組裡時，左右兩張流程圖（從哪裡執行進來／正在執行的模組） ---------- */
+.run_split {
+    gap: 8px;
+}
+.run_pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.run_pane .canvas_wrap {
+    flex: 1;
+}
+.run_pane_title {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+.run_caller .canvas_wrap {
+    opacity: 0.85;
+}
+.run_module_vars {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+}
+.run_module_vars .section_label {
+    color: #c0244a;
+}
