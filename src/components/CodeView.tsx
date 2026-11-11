@@ -144,8 +144,10 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
   const [editing, setEditing] = useState(false);
   /** 套用時積木有問題的說明 */
   const [applyError, setApplyError] = useState<string | null>(null);
+  /** 編輯中換外觀時，改到一半的積木轉成另一種外觀的樣子（沒有的話就從流程圖產生） */
+  const [draft, setDraft] = useState<string | null>(null);
   const live = useRef<{ Blockly: BlocklyModule; workspace: BlocklyModule } | null>(null);
-  const json = program ? JSON.stringify(toBlockly(program, vars, mode)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
+  const json = editing && draft ? draft : program ? JSON.stringify(toBlockly(program, vars, mode)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
 
   useEffect(() => {
     if (!json) return;
@@ -189,6 +191,28 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
     };
   }, [json, mode, editing]);
 
+  /** 換外觀：編輯中就把改到一半的積木轉成另一種外觀，不用先套用到流程圖 */
+  const switchMode = (next: BlockMode) => {
+    if (next == mode) return;
+    const ws = live.current;
+    if (editing && ws) {
+      try {
+        const result = fromBlockly(ws.Blockly.serialization.workspaces.save(ws.workspace), mode, vars);
+        setDraft(JSON.stringify(toBlockly(result.program, result.vars, next)));
+      }
+      catch (e) {
+        if (!(e instanceof BlockError)) throw e;
+        setApplyError(t('積木有問題，先改好才能換外觀：', 'Fix the blocks before switching style: ') + e.message);
+        return;
+      }
+    }
+    setMode(next);
+  };
+  const stopEditing = () => {
+    setEditing(false);
+    setDraft(null);
+  };
+
   /** 改好的積木 → 流程圖 */
   const apply = () => {
     const ws = live.current;
@@ -218,8 +242,8 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
       <div className="code_toolbar">
         <div className="lang_toggle code_mode" role="group" aria-label={t('積木的樣子', 'Block style')}>
           {BLOCK_MODES.map(([m, name]) => (
-            // 編輯中不能換外觀（換了會從流程圖重新產生，改到一半的積木會不見）
-            <button key={m} className={mode == m ? 'selected' : ''} aria-pressed={mode == m} disabled={editing && mode != m} onClick={() => setMode(m)}>{name}</button>
+            // 編輯中也能換：改到一半的積木會轉成另一種外觀
+            <button key={m} className={mode == m ? 'selected' : ''} aria-pressed={mode == m} onClick={() => switchMode(m)}>{name}</button>
           ))}
         </div>
         {editing
@@ -227,7 +251,7 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
             <>
               <span className="muted">{t('拖拉積木修改，改好後按「套用到流程圖」', 'Drag blocks to change the program, then click "Use for flowchart".')}</span>
               <button className="code_apply" onClick={apply}>{t('套用到流程圖', 'Use for flowchart')}</button>
-              <button className="code_edit" onClick={() => setEditing(false)}>{t('取消', 'Cancel')}</button>
+              <button className="code_edit" onClick={stopEditing}>{t('取消', 'Cancel')}</button>
             </>
           )
           : <button className="code_edit" onClick={() => setEditing(true)}>{t('編輯積木', 'Edit blocks')}</button>}
