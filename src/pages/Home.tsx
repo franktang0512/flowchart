@@ -16,6 +16,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             {t('電子式學習單', 'Flowchart Worksheet')}
           </a>
           <LangToggle />
+          <TargetToggle />
         </div>
       </div>
       <div className="home_main">{children}</div>
@@ -48,6 +49,24 @@ const TARGET_CHOICES: { target: Target; desc: () => string; index: () => string 
   },
 ];
 
+/** 左上角的「積木 / C++」切換（跟中英切換放在一起，隨時可以換）；還沒選過時不顯示，等學生先選 */
+function TargetToggle() {
+  const target = useTarget();
+  if (!target) return null;
+  return (
+    <div className="lang_toggle" role="group" aria-label={t('學習目標', 'Learning')}>
+      {TARGET_CHOICES.map(c => (
+        <button
+          key={c.target} className={target == c.target ? 'selected' : ''} aria-pressed={target == c.target}
+          title={c.index()} onClick={() => setTarget(c.target)}
+        >
+          {targetName(c.target)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** 進入課程前先選要學哪一種程式 */
 function TargetChooser() {
   return (
@@ -73,14 +92,10 @@ export function CourseList() {
   if (!target) return <Shell><TargetChooser /></Shell>;
   return (
     <Shell>
-      <p className="target_now">
-        {t('學習目標：', 'Learning: ')}<strong>{targetName(target)}</strong>
-        <span className="muted">（{TARGET_CHOICES.find(c => c.target == target)!.index()}）</span>
-        <button className="link_button" onClick={() => setTarget(target == 'cpp' ? 'blocks' : 'cpp')}>
-          {t(`改成${targetName(target == 'cpp' ? 'blocks' : 'cpp')}`, `Switch to ${targetName(target == 'cpp' ? 'blocks' : 'cpp')}`)}
-        </button>
-      </p>
-      <h4 className="home_heading">{t('選擇課程', 'Choose a course')}</h4>
+      <h4 className="home_heading">
+        {t('選擇課程', 'Choose a course')}
+        <span className="muted target_hint">（{targetName(target)}：{TARGET_CHOICES.find(c => c.target == target)!.index()}）</span>
+      </h4>
       <div className="home_courses">
         {COURSES.filter(c => !c.target || c.target == target).map(c => (
           <a key={c.id} className="home_card" href={link(`?course=${encodeURIComponent(c.id)}`)}>

@@ -111,20 +111,11 @@ input, textarea, select, button {
     font-size: 0.85rem;
     cursor: default;
 }
-/* 首頁：目前的學習目標，可以換 */
-.target_now {
-    margin: 0 0 4px;
-}
-.target_now .muted {
-    margin: 0 6px 0 2px;
-}
-.link_button {
-    border: none;
-    background: none;
-    padding: 0;
-    color: var(--green-dark);
-    text-decoration: underline;
-    cursor: pointer;
+/* 首頁：「選擇課程」旁邊說明目前的學習目標 */
+.target_hint {
+    margin-left: 6px;
+    font-size: 0.95rem;
+    font-weight: normal;
 }
 /* 選學習目標的卡片是按鈕，樣式跟課程卡片一樣 */
 .target_card {
