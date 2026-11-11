@@ -1,0 +1,34 @@
+{
+  "title": "叫號機",
+  "question": "餐廳門口的叫號機：先來的先叫，這就是 queue（先進先出）。\n請先輸入有幾個操作，再輸入每個操作：大於 0 的數字代表那個號碼的客人來排隊；0 代表叫號，輸出排在最前面的號碼並讓他離開隊伍。沒有人在排隊時，輸出「沒有人在排隊」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "6 101 102 0 103 0 0",
+      "output": "101\n102\n103",
+      "note": ""
+    },
+    {
+      "input": "4 0 7 0 0",
+      "output": "沒有人在排隊\n7\n沒有人在排隊",
+      "note": "一開始和最後都沒有人"
+    }
+  ],
+  "en": {
+    "title": "Ticket Machine",
+    "question": "A restaurant calls numbers. First come, first served: this is a queue (first in, first out).\nFirst input the number of actions. Then input each action: a number > 0 means that customer joins the line. 0 means call the next one: output the first number and remove it. If nobody is in line, output \"Nobody in line\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "6 101 102 0 103 0 0",
+        "output": "101\n102\n103",
+        "note": ""
+      },
+      {
+        "input": "4 0 7 0 0",
+        "output": "Nobody in line\n7\nNobody in line",
+        "note": "Nobody at the start and at the end"
+      }
+    ]
+  }
+}

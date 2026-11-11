@@ -1,0 +1,44 @@
+{
+  "title": "雲霄飛車",
+  "question": "遊樂園的雲霄飛車規定：身高 120 公分以上，而且年齡 7 歲以上才能搭。\n請輸入身高、年齡，可以搭輸出「可以搭」，不行輸出「不能搭」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "130 10",
+      "output": "可以搭",
+      "note": "兩個都符合"
+    },
+    {
+      "input": "125 6",
+      "output": "不能搭",
+      "note": "身高夠，年齡不夠"
+    },
+    {
+      "input": "110 9",
+      "output": "不能搭",
+      "note": "年齡夠，身高不夠"
+    }
+  ],
+  "en": {
+    "title": "Roller Coaster",
+    "question": "To ride the roller coaster, you must be 120 cm or taller AND 7 years old or older.\nInput the height and the age. Output \"You can ride\" or \"You cannot ride\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "130 10",
+        "output": "You can ride",
+        "note": "Both OK"
+      },
+      {
+        "input": "125 6",
+        "output": "You cannot ride",
+        "note": "Tall enough, too young"
+      },
+      {
+        "input": "110 9",
+        "output": "You cannot ride",
+        "note": "Old enough, too short"
+      }
+    ]
+  }
+}

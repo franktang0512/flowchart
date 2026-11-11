@@ -1,0 +1,44 @@
+{
+  "title": "按身高排隊",
+  "question": "升旗要按身高排隊。請輸入 6 位同學的身高存進清單，由矮到高排好，最後輸出整個清單。\n請用泡泡排序。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "150 142 160 155 138 147",
+      "output": "138 142 147 150 155 160",
+      "note": ""
+    },
+    {
+      "input": "140 145 150 155 160 165",
+      "output": "140 145 150 155 160 165",
+      "note": "本來就排好了"
+    },
+    {
+      "input": "170 160 150 140 130 120",
+      "output": "120 130 140 150 160 170",
+      "note": "剛好反過來，每一趟都要換很多次"
+    }
+  ],
+  "en": {
+    "title": "Line Up by Height",
+    "question": "Line up by height. Input 6 heights into a list. Sort them from short to tall. Output the whole list.\nUse bubble sort.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "150 142 160 155 138 147",
+        "output": "138 142 147 150 155 160",
+        "note": ""
+      },
+      {
+        "input": "140 145 150 155 160 165",
+        "output": "140 145 150 155 160 165",
+        "note": "Already sorted"
+      },
+      {
+        "input": "170 160 150 140 130 120",
+        "output": "120 130 140 150 160 170",
+        "note": "Reversed: many swaps each pass"
+      }
+    ]
+  }
+}

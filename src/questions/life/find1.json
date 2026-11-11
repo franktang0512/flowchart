@@ -1,0 +1,44 @@
+{
+  "title": "查會員卡",
+  "question": "店員要查客人是不是會員。請先輸入 6 個會員卡號存進清單，再輸入客人的卡號。\n從清單的第一個開始一個一個比，找到就停下來，輸出「是會員」；全部比完都沒有就輸出「不是會員」。最後輸出「比了 幾 次」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "305 112 478 291 650 833 478",
+      "output": "是會員\n比了 3 次",
+      "note": "第 3 個就找到，比了 3 次"
+    },
+    {
+      "input": "305 112 478 291 650 833 999",
+      "output": "不是會員\n比了 6 次",
+      "note": "全部比完都沒有，比了 6 次"
+    },
+    {
+      "input": "305 112 478 291 650 833 305",
+      "output": "是會員\n比了 1 次",
+      "note": "第一個就是"
+    }
+  ],
+  "en": {
+    "title": "Member Card",
+    "question": "Is the customer a member? First input 6 member card numbers into a list. Then input the customer's card number.\nCheck the list one by one from the start. If you find it, stop and output \"Member\". If you check all of them and it is not there, output \"Not a member\". Then output \"Checks: \" and how many you checked.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "305 112 478 291 650 833 478",
+        "output": "Member\nChecks: 3",
+        "note": "Found at the 3rd one"
+      },
+      {
+        "input": "305 112 478 291 650 833 999",
+        "output": "Not a member\nChecks: 6",
+        "note": "Not found: 6 checks"
+      },
+      {
+        "input": "305 112 478 291 650 833 305",
+        "output": "Member\nChecks: 1",
+        "note": "The first one"
+      }
+    ]
+  }
+}

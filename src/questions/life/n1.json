@@ -1,0 +1,44 @@
+{
+  "title": "存錢筒湊零錢",
+  "question": "存錢筒裡有 10 元和 50 元硬幣，各最多 10 枚。請輸入要湊出的金額，輸出剛好湊出這個金額有幾種湊法。\n例如 100 元可以是 10 個 10 元、5 個 10 元加 1 個 50 元、或 2 個 50 元，共 3 種。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "100",
+      "output": "3",
+      "note": "10×10、10×5 + 50×1、50×2"
+    },
+    {
+      "input": "120",
+      "output": "2",
+      "note": ""
+    },
+    {
+      "input": "35",
+      "output": "0",
+      "note": "湊不出來"
+    }
+  ],
+  "en": {
+    "title": "Piggy Bank Coins",
+    "question": "A piggy bank has 10-dollar and 50-dollar coins, at most 10 of each. Input an amount. Output how many ways can make exactly that amount.\nFor example, 100 can be ten 10s, five 10s and one 50, or two 50s: 3 ways.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "100",
+        "output": "3",
+        "note": "10×10, 10×5 + 50×1, 50×2"
+      },
+      {
+        "input": "120",
+        "output": "2",
+        "note": ""
+      },
+      {
+        "input": "35",
+        "output": "0",
+        "note": "Not possible"
+      }
+    ]
+  }
+}

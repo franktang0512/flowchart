@@ -13,9 +13,9 @@ export interface PrintData {
 
 import { t, useLang } from '../i18n';
 
-const typeName = (type: string) => (type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : t('數字', 'Number'));
+const typeName = (type: string) => (type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : type == '二維清單' ? t('二維清單', '2D list') : t('數字', 'Number'));
 
-export function PrintView({ visible, data, imgSrc }: { visible: boolean; data: PrintData | null; imgSrc: string | undefined }) {
+export function PrintView({ visible, data, imgSrc, modules }: { visible: boolean; data: PrintData | null; imgSrc: string | undefined; modules: { title: string; src: string }[] }) {
   useLang();
   return (
     <div id="print" style={{ display: visible ? 'block' : 'none' }}>
@@ -82,6 +82,12 @@ export function PrintView({ visible, data, imgSrc }: { visible: boolean; data: P
             <th>{t('流程圖', 'Flowchart')}</th>
             <td id="print_img">{imgSrc && <img id="flow_chart" src={imgSrc} />}</td>
           </tr>
+          {modules.map(m => (
+            <tr key={m.title}>
+              <th>{t('模組', 'Module')}<br />{m.title}</th>
+              <td><img className="flow_chart_module" src={m.src} /></td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

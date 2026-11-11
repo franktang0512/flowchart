@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
+import type { ModuleInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { byTarget, itemWord } from '../target';
 
@@ -26,12 +27,17 @@ export interface DialogForm {
   showWhile: boolean;
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
-  /** 第幾項：計算積木的「插入」「替換」「刪除」，輸入到清單的「插入」「替換」 */
+  /** 第幾項：計算積木的「插入」「替換」「刪除」，輸入到清單的「插入」「替換」；二維清單是第幾列（建立時是幾列） */
   rectIndex: string;
-  /** 輸入積木要存到變數還是清單；'' = 還沒選（先選類型才出現下拉選單） */
-  ioTarget: '' | '變數' | '清單';
+  /** 二維清單：第幾行（建立時是幾行） */
+  rectIndex2: string;
+  /** 輸入積木要存到變數、清單還是二維清單的一格；'' = 還沒選（先選類型才出現下拉選單） */
+  ioTarget: '' | '變數' | '清單' | '二維清單';
   /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
   ioPlace: '加入' | '插入' | '替換';
+  /** 執行模組：哪個模組、每個參數要用的值 */
+  moduleName: string;
+  moduleArgs: string[];
 }
 
 // 清單操作的名稱照 Scratch 的清單積木，下一堂改用 Scratch 時說法一樣
@@ -42,6 +48,8 @@ const RECT_ACTIONS: [RectAction, () => string][] = [
   ['替換', () => t('替換', 'Replace')],
   ['刪除', () => byTarget(t('刪除第幾項', 'Delete item'), t('刪除某個索引', 'Delete at index'))],
   ['清空', () => t('刪除所有項目', 'Delete all')],
+  // 只有變數表裡有二維清單（C++）時才出現
+  ['建立', () => t('建立二維清單', 'Make 2D list')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
@@ -51,6 +59,7 @@ const RECT_HINT: Record<RectAction, () => string> = {
   替換: () => t(`把清單的${byTarget('第幾項', '某個索引')}換成新的值...`, 'Change one item of a list...'),
   刪除: () => t(`刪除清單的${byTarget('第幾項', '某個索引')}，後面的都往前移...`, 'Delete one item from a list. The items after it move up...'),
   清空: () => t('刪除清單的所有項目，清單會變成空的...', 'Delete all items. The list will be empty...'),
+  建立: () => t('設定二維清單有幾列、幾行，每一格先放 0（裝文字的放空的文字）...', 'Set how many rows and columns. Every cell starts as 0 (or empty text)...'),
 };
 
 /** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
@@ -61,6 +70,7 @@ const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   替換: () => byTarget(t('替換第', 'Item'), t('替換索引', 'Index')),
   刪除: () => byTarget(t('刪除第', 'Delete item'), t('刪除索引', 'Delete index')),
   清空: null,
+  建立: () => t('列數', 'Rows'),
 };
 
 /** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
@@ -74,6 +84,7 @@ const RECT_VERB: Record<RectAction, (() => string) | null> = {
   替換: () => t('換成', 'with'),
   刪除: null,
   清空: null,
+  建立: null,
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -99,8 +110,11 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   showWhile: false,
   rectAction: '設為',
   rectIndex: '',
+  rectIndex2: '',
   ioTarget: '',
   ioPlace: '加入',
+  moduleName: '',
+  moduleArgs: [],
 });
 
 export interface DialogRequest {
@@ -123,6 +137,8 @@ interface Props {
   request: DialogRequest | null;
   onClose: () => void;
   varTypes: VarTypes;
+  /** 可以執行的模組（「執行模組」積木的下拉選單） */
+  modules: ModuleInfo[];
 }
 
 /**
@@ -146,7 +162,7 @@ const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string
   替換: (list, k) => t(`輸入的值會換掉清單「${list}」的${itemWord(k || '?')}`, `The value replaces ${itemWord(k || '?')} of "${list}".`),
 };
 
-export function NodeDialog({ request, onClose, varTypes }: Props) {
+export function NodeDialog({ request, onClose, varTypes, modules }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -165,12 +181,12 @@ export function NodeDialog({ request, onClose, varTypes }: Props) {
         onClose();
       }}
     >
-      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} />}
+      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} modules={modules} />}
     </dialog>
   );
 }
 
-function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes }) {
+function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[] }) {
   const { kind } = request;
   useLang();
   const [f, setF] = useState<DialogForm>(() => {
@@ -241,13 +257,22 @@ function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; on
                   {t('存到：', 'Save to: ')}
                   <label><input type="radio" name="io_target" checked={f.ioTarget == '變數'} onChange={() => set({ ioTarget: '變數', varSelect: '' })} />{t('變數', 'Variable')}</label>
                   <label><input type="radio" name="io_target" checked={f.ioTarget == '清單'} onChange={() => set({ ioTarget: '清單', varSelect: '' })} />{t('清單', 'List')}</label>
+                  {(varTypes.grid.length > 0 || f.ioTarget == '二維清單') && (
+                    <label><input type="radio" name="io_target" checked={f.ioTarget == '二維清單'} onChange={() => set({ ioTarget: '二維清單', varSelect: '' })} />{t('二維清單的一格', 'A 2D list cell')}</label>
+                  )}
                 </p>
                 {f.ioTarget && (
                   <p>
                     <VarPicker
                       id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
-                      names={f.ioTarget == '清單' ? varTypes.array : [...varTypes.number, ...varTypes.text]}
+                      names={f.ioTarget == '清單' ? varTypes.array : f.ioTarget == '二維清單' ? varTypes.grid : [...varTypes.number, ...varTypes.text]}
                     />
+                  </p>
+                )}
+                {f.ioTarget == '二維清單' && (
+                  <p>
+                    {t('列（索引）', 'Row index')} <input id="rect_index" style={{ width: '20%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
+                    {t('行（索引）', 'Column index')} <input id="rect_index2" style={{ width: '20%' }} value={f.rectIndex2} onChange={e => set({ rectIndex2: e.target.value })} />
                   </p>
                 )}
                 {f.ioTarget == '清單' && (
@@ -315,40 +340,82 @@ function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; on
         </>
       );
       break;
-    case 'Function':
+    case 'Function': {
+      // 執行模組：選一個模組，每個參數填要用的值（跟 Scratch 執行自訂積木一樣）
+      const m = modules.find(x => x.name == f.moduleName);
       body = (
         <>
-          <p id="hint">{t('請說明步驟內要做什麼？', 'What does this step do?')}</p>{' '}
-          <input id="doing_something" style={{ width: '80%' }} value={f.doingSomething} onChange={e => set({ doingSomething: e.target.value })} />{' '}
-          <br />{buttons}
+          <p id="hint">{t('要執行哪一個模組？', 'Which module do you want to run?')}</p>
+          {modules.length
+            ? (
+              <select className="var_select" id="module_select" value={f.moduleName} onChange={e => set({ moduleName: e.target.value, moduleArgs: [] })}>
+                <option value="" disabled>{t('請選擇', 'Choose one')}</option>
+                {f.moduleName && !m && <option value={f.moduleName}>{f.moduleName}</option>}
+                {modules.map(x => <option key={x.name} value={x.name}>{x.name}</option>)}
+              </select>
+            )
+            : <p className="dialog_note">{t('還沒有模組：請先按流程圖上方的「＋ 新增模組」。', 'There are no modules yet. Click "+ New module" above the flowchart first.')}</p>}
+          {m && m.params.length > 0 && (
+            <div className="module_args">
+              {m.params.map((p, k) => (
+                <p key={p.name}>
+                  <label>
+                    {p.name}<span className="muted">（{p.type == '文字' ? t('文字', 'text') : t('數字', 'number')}）</span>{' = '}
+                    <input
+                      value={f.moduleArgs[k] ?? ''}
+                      onChange={e => {
+                        const args = [...f.moduleArgs];
+                        args[k] = e.target.value;
+                        set({ moduleArgs: args });
+                      }}
+                    />
+                  </label>
+                </p>
+              ))}
+              <span className="dialog_note">{t('可以填數字、"文字"、變數或算式', 'Use a number, "text", a variable or math')}</span>
+            </div>
+          )}
+          {m && m.params.length == 0 && <p className="dialog_note">{t('這個模組沒有參數。', 'This module has no parameters.')}</p>}
+          <p><br />{buttons}</p>
         </>
       );
       break;
+    }
     case 'Rectangle': {
-      const indexLabel = RECT_INDEX[f.rectAction];
+      // 每種動作可以選的變數：設定變數選數字/文字，建立選二維清單，替換可以是清單或二維清單的一格，其他選清單
+      const namesFor = (action: RectAction) => (action == '設為' ? [...varTypes.number, ...varTypes.text]
+        : action == '建立' ? varTypes.grid
+        : action == '替換' ? [...varTypes.array, ...varTypes.grid]
+        : varTypes.array);
+      const cell = f.rectAction == '替換' && varTypes.grid.includes(f.varSelect);
+      const indexLabel = cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
+      const index2Label = f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
       const verb = RECT_VERB[f.rectAction];
       body = (
         <>
           <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
           <p className="rect_action">
-            {RECT_ACTIONS.map(([action, label]) => (
+            {RECT_ACTIONS.filter(([action]) => action != '建立' || varTypes.grid.length > 0).map(([action, label]) => (
               <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({
                 rectAction: action,
-                // 「設定變數」選數字/文字，其他選清單：換到另一種時，原本選的已經不適用
-                ...((action == '設為') != (f.rectAction == '設為') ? { varSelect: '' } : {}),
+                // 換到另一種動作時，原本選的變數不能用就清掉
+                ...(namesFor(action).includes(f.varSelect) ? {} : { varSelect: '' }),
               })} />{label()}</label>
             ))}
           </p>
-          {f.rectAction == '設為' ? t('變數：', 'Variable: ') : t('清單：', 'List: ')}
-          <VarPicker
-            id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
-            names={f.rectAction == '設為' ? [...varTypes.number, ...varTypes.text] : varTypes.array}
-          />
+          {f.rectAction == '設為' ? t('變數：', 'Variable: ') : f.rectAction == '建立' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
+          <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction)} />
           {indexLabel && (
             <>
               <br /><br /> {indexLabel()}{' '}
               <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
-              {indexSuffix()}
+              {!cell && f.rectAction != '建立' && indexSuffix()}
+            </>
+          )}
+          {index2Label && (
+            <>
+              {' '}{index2Label}{' '}
+              <input id="rect_index2" style={{ width: '25%' }} value={f.rectIndex2} onChange={e => set({ rectIndex2: e.target.value })} />
             </>
           )}
           {verb && (

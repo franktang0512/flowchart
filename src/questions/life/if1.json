@@ -1,0 +1,44 @@
+{
+  "title": "集點貼紙",
+  "question": "買滿 100 元送一張集點貼紙。請輸入消費金額，滿 100 元（含）先輸出「送你一張集點貼紙」；不論有沒有送，最後都輸出「謝謝光臨」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "150",
+      "output": "送你一張集點貼紙\n謝謝光臨",
+      "note": "有滿 100"
+    },
+    {
+      "input": "100",
+      "output": "送你一張集點貼紙\n謝謝光臨",
+      "note": "剛好 100 也算"
+    },
+    {
+      "input": "85",
+      "output": "謝謝光臨",
+      "note": "沒滿 100，只說謝謝光臨"
+    }
+  ],
+  "en": {
+    "title": "Sticker Gift",
+    "question": "Spend 100 dollars or more and get a sticker. Input how much you spent. If it is 100 or more, output \"Here is a sticker\". Then always output \"Thank you\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "150",
+        "output": "Here is a sticker\nThank you",
+        "note": "100 or more"
+      },
+      {
+        "input": "100",
+        "output": "Here is a sticker\nThank you",
+        "note": "Exactly 100 counts"
+      },
+      {
+        "input": "85",
+        "output": "Thank you",
+        "note": "Less than 100"
+      }
+    ]
+  }
+}

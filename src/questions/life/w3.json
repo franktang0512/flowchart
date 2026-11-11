@@ -1,0 +1,44 @@
+{
+  "title": "猜數字",
+  "question": "跟同學玩猜數字。先輸入答案（1 到 100），再一直輸入猜的數字：\n比答案大輸出「太大了」，比答案小輸出「太小了」，猜中輸出「猜對了！」並停止。\n最後輸出「猜了 幾 次」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "37 50 25 37",
+      "output": "太大了\n太小了\n猜對了！\n猜了 3 次",
+      "note": ""
+    },
+    {
+      "input": "80 80",
+      "output": "猜對了！\n猜了 1 次",
+      "note": "一次就猜中"
+    },
+    {
+      "input": "64 50 75 62 68 65 63 64",
+      "output": "太小了\n太大了\n太小了\n太大了\n太大了\n太小了\n猜對了！\n猜了 7 次",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Guess the Number",
+    "question": "Play a guessing game. First input the answer (1 to 100). Then keep inputting guesses:\nToo big: output \"Too big\". Too small: output \"Too small\". Right: output \"You got it!\" and stop.\nAt the end, output \"Guesses: \" and the number of guesses.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "37 50 25 37",
+        "output": "Too big\nToo small\nYou got it!\nGuesses: 3",
+        "note": ""
+      },
+      {
+        "input": "80 80",
+        "output": "You got it!\nGuesses: 1",
+        "note": "Right the first time"
+      },
+      {
+        "input": "64 50 75 62 68 65 63 64",
+        "output": "Too small\nToo big\nToo small\nToo big\nToo big\nToo small\nYou got it!\nGuesses: 7",
+        "note": ""
+      }
+    ]
+  }
+}

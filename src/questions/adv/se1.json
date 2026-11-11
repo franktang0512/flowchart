@@ -1,0 +1,44 @@
+{
+  "title": "電腦猜你的數字",
+  "question": "換電腦來猜！你心裡想一個 1 到 100 的數字，電腦每次猜一個數，你回答「太大」「太小」或「對了」。\n電腦用二分搜尋，每次猜可能範圍的正中間（猜 = (最小 + 最大) / 2，無條件捨去）。每次先輸出猜的數字，再輸入你的回答；回答「對了」就停，最後輸出「猜了 幾 次」。\n想想看：不管你想哪個數字，電腦最多要猜幾次？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "太大 太小 對了",
+      "output": "50\n25\n37\n猜了 3 次",
+      "note": "心裡想的是 37"
+    },
+    {
+      "input": "對了",
+      "output": "50\n猜了 1 次",
+      "note": "心裡想的是 50，第一次就猜中"
+    },
+    {
+      "input": "太小 太小 太小 太小 太小 太小 對了",
+      "output": "50\n75\n88\n94\n97\n99\n100\n猜了 7 次",
+      "note": "心裡想的是 100"
+    }
+  ],
+  "en": {
+    "title": "The Computer Guesses",
+    "question": "Now the computer guesses! Think of a number from 1 to 100. Each time the computer guesses, you answer 太大 (too big), 太小 (too small), or 對了 (right).\nThe computer uses binary search. Each time it guesses the middle of the possible range (guess = (low + high) / 2, round down). Each time, first output the guess, then input the answer. Stop on 對了. At the end, output \"Guesses: \" and the number.\nThink: For any number, what is the most guesses the computer needs?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "太大 太小 對了",
+        "output": "50\n25\n37\nGuesses: 3",
+        "note": "The number is 37"
+      },
+      {
+        "input": "對了",
+        "output": "50\nGuesses: 1",
+        "note": "The number is 50: right the first time"
+      },
+      {
+        "input": "太小 太小 太小 太小 太小 太小 對了",
+        "output": "50\n75\n88\n94\n97\n99\n100\nGuesses: 7",
+        "note": "The number is 100"
+      }
+    ]
+  }
+}

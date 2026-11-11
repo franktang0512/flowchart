@@ -1,0 +1,34 @@
+{
+  "title": "每日步數",
+  "question": "手環記錄了一週 7 天的步數。請輸入每天的步數，每天輸出一行：\n10000 步以上「達標」；6000 到 9999 步「差一點」；不到 6000 步「要多走」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "12000 8000 5000 10000 6000 3000 9999",
+      "output": "達標\n差一點\n要多走\n達標\n差一點\n要多走\n差一點",
+      "note": ""
+    },
+    {
+      "input": "10500 11000 10200 13000 10000 12500 15000",
+      "output": "達標\n達標\n達標\n達標\n達標\n達標\n達標",
+      "note": "每天都達標"
+    }
+  ],
+  "en": {
+    "title": "Daily Steps",
+    "question": "A watch counts your steps for 7 days. Input the steps for each day. Output one line for each day:\n10000 or more: \"Goal\". 6000 to 9999: \"Almost\". Less than 6000: \"Walk more\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "12000 8000 5000 10000 6000 3000 9999",
+        "output": "Goal\nAlmost\nWalk more\nGoal\nAlmost\nWalk more\nAlmost",
+        "note": ""
+      },
+      {
+        "input": "10500 11000 10200 13000 10000 12500 15000",
+        "output": "Goal\nGoal\nGoal\nGoal\nGoal\nGoal\nGoal",
+        "note": "Goal every day"
+      }
+    ]
+  }
+}

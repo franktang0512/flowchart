@@ -1,0 +1,34 @@
+{
+  "title": "點餐複誦",
+  "question": "點餐機會把客人點的餐念一次，確認沒有點錯。請輸入餐點名稱，輸出「您點的是：」加上餐點名稱。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "珍珠奶茶",
+      "output": "您點的是：珍珠奶茶",
+      "note": ""
+    },
+    {
+      "input": "雞排",
+      "output": "您點的是：雞排",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Repeat the Order",
+    "question": "The order machine says your order again. Input the food name. Output \"You ordered: \" and the food name.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "hamburger",
+        "output": "You ordered: hamburger",
+        "note": ""
+      },
+      {
+        "input": "noodles",
+        "output": "You ordered: noodles",
+        "note": ""
+      }
+    ]
+  }
+}

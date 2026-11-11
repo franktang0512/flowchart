@@ -23,6 +23,39 @@ export interface Course {
 
 export const COURSES: Course[] = [
   {
+    id: 'life',
+    name: '生活中的解題', nameEn: 'Everyday Problem Solving',
+    units: [
+      { name: '輸出與輸入', nameEn: 'Output and input', questions: ['life/o1', 'life/io1', 'life/io2', 'life/io3'] },
+      { name: '選擇結構（if、if / else）', nameEn: 'Decisions (if, if / else)', questions: ['life/if1', 'life/if2'] },
+      { name: '多重條件（and、or）', nameEn: 'More than one condition (and, or)', questions: ['life/if3', 'life/if4'] },
+      { name: '巢狀條件', nameEn: 'If inside if', questions: ['life/if5'] },
+      { name: '次數迴圈', nameEn: 'Repeat n times', questions: ['life/f1', 'life/f2', 'life/f3'] },
+      { name: '條件迴圈', nameEn: 'Repeat until', questions: ['life/w1', 'life/w2', 'life/w3'] },
+      { name: '巢狀迴圈', nameEn: 'Loop inside a loop', questions: ['life/n1', 'life/n2'] },
+      { name: '排序：泡泡排序', nameEn: 'Sorting: bubble sort', questions: ['life/sort1'] },
+      { name: '搜尋：一個一個找、二分搜尋', nameEn: 'Searching: one by one, binary search', questions: ['life/find1', 'life/find2'] },
+      { name: '挑戰：怎麼買最划算（背包問題）', nameEn: 'Challenge: the best plan (knapsack)', questions: ['life/bag1'] },
+    ],
+  },
+  {
+    // 高中進階：題目寫的是索引從 0 開始（C++）
+    id: 'adv',
+    name: '生活中的演算法', nameEn: 'Algorithms in Everyday Life',
+    target: 'cpp',
+    units: [
+      { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st1', 'adv/st2'] },
+      { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q1', 'adv/q2'] },
+      { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },
+      { name: '搜尋', nameEn: 'Searching', questions: ['adv/se1'] },
+      { name: '窮舉', nameEn: 'Brute force', questions: ['adv/b1', 'adv/b2'] },
+      { name: '貪心', nameEn: 'Greedy', questions: ['adv/g1', 'adv/g2'] },
+      { name: '動態規劃', nameEn: 'Dynamic programming', questions: ['adv/d1', 'adv/d2'] },
+      { name: '樹', nameEn: 'Trees', questions: ['adv/t1'] },
+      { name: '圖', nameEn: 'Graphs', questions: ['adv/gr1'] },
+    ],
+  },
+  {
     id: '114',
     name: '信義國中 114 上學期', nameEn: 'Sinyi JHS · Fall 2025',
     units: [

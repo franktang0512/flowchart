@@ -2,7 +2,8 @@
 // 是 toBlockly 的反方向；Scratch（scratch_* 積木）和 Blockly（內建積木）兩種都看得懂。
 // 流程圖做不到的積木（例如中斷循環、函式）會丟出 BlockError，說明是哪個積木、要怎麼改。
 import { t } from '../i18n';
-import type { Expr, Stmt, VarInfo } from './structure';
+import type { ModuleInfo, ParamInfo } from './modules';
+import type { Expr, ModuleProgram, Stmt, VarInfo } from './structure';
 import type { BlockMode } from './toBlockly';
 
 type Json = {
@@ -28,7 +29,10 @@ const BLOCK_NAME: Record<string, string> = {
   scratch_whileUntil: '重複直到', scratch_while: '重複當', controls_whileUntil: '重複當/直到',
   scratch_variables_set: '變數設為', variables_set: '設定變數', math_round: '四捨五入',
   text_prompt_ext: '輸入', text_prompt: '輸入',
+  scratch_proc_def: '定義', scratch_proc_call: '自訂積木', procedures_defnoreturn: '函式', procedures_callnoreturn: '執行函式',
 };
+/** 會回傳值的函式：流程圖的模組沒有回傳值 */
+const RETURN_BLOCKS = new Set(['procedures_defreturn', 'procedures_callreturn', 'procedures_ifreturn']);
 const nameOf = (type: string) => BLOCK_NAME[type] ?? type;
 
 const ARITH: Record<string, string> = { ADD: '+', MINUS: '-', MULTIPLY: '*', DIVIDE: '/' };
@@ -40,11 +44,18 @@ export interface FromBlocks {
   program: Stmt[];
   /** 積木裡的變數（型別、初始值）；變數表會照這個更新 */
   vars: VarInfo[];
+  /** 積木裡的自訂積木／函式 → 流程圖的模組 */
+  modules: ModuleProgram[];
 }
 
-/** 積木 → 流程圖的結構；current 是目前的變數表（判斷型別用，沒有的再從用法猜） */
-export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): FromBlocks {
+/**
+ * 積木 → 流程圖的結構；current 是目前的變數表（判斷型別用，沒有的再從用法猜），
+ * currentModules 是目前的模組（參數的型別照原本的，新的參數再從用法猜）
+ */
+export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], currentModules: ModuleInfo[] = []): FromBlocks {
   const scratch = mode == 'scratch';
+  /** 每次執行自訂積木傳了什麼值（猜參數是數字還是文字用） */
+  const callArgs = new Map<string, Expr[][]>();
   const varById = new Map((saved.variables ?? []).map(v => [v.id, v]));
   /** 從用法看出來的型別：用在清單積木的是清單，存文字的是文字 */
   const usedAsList = new Set<string>();
@@ -98,6 +109,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
       case 'variables_get':
         return { t: 'var', name: varName(b, 'VAR') };
       case 'scratch_list_get': return { t: 'var', name: listOf(b, 'LIST') };
+      case 'scratch_proc_arg': return { t: 'var', name: String(field(b, 'NAME') ?? '') };
       case 'scratch_math_arithmetic':
       case 'math_arithmetic': {
         const op = ARITH[String(field(b, 'OP'))];
@@ -151,8 +163,21 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
       case 'event_answer':
         throw new BlockError(t('「詢問的答案」要放在「詢問並等待」的下一個積木裡，直接存到變數或清單。', 'Put "answer" in the block right after "ask and wait", and save it to a variable or list.'));
       default:
+        if (RETURN_BLOCKS.has(b.type)) throw returnError();
         throw new BlockError(t(`流程圖沒有「${nameOf(b.type)}」這種積木。`, `The flowchart has no "${nameOf(b.type)}" block.`));
     }
+  };
+  const returnError = () => new BlockError(t('流程圖的模組不會回傳值：請用「沒有回傳值」的函式，要帶回去的結果存到變數裡。', 'Flowchart modules do not return a value. Use a function with no return, and save the result in a variable.'));
+
+  /** 執行自訂積木／函式：名稱在 extraState，引數在 ARG0、ARG1… */
+  const callStmt = (b: Json): Stmt => {
+    const name = String(b.extraState?.name ?? '');
+    const count = Array.isArray(b.extraState?.params) ? (b.extraState.params as unknown[]).length : 0;
+    if (!name) throw new BlockError(t(`「${nameOf(b.type)}」積木還沒有選要執行哪一個。`, `The "${nameOf(b.type)}" block does not say what to run.`));
+    const args: Expr[] = [];
+    for (let k = 0; k < count; k++) args.push(expr(need(b, 'ARG' + k)));
+    callArgs.set(name, [...(callArgs.get(name) ?? []), args]);
+    return { kind: 'call', name, args };
   };
 
   /** 「設為」的值：最外面可以是四捨五入 */
@@ -275,20 +300,32 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
           return [{ kind: 'rect', action: '刪除', target: listInput(b, 'VALUE'), index: expr(need(b, 'AT')), round: '' }];
         }
         throw new BlockError(t('刪除清單的項目請用「移除 第 # 項」。', 'Use "remove #" to delete a list item.'));
+      case 'scratch_proc_call':
+      case 'procedures_callnoreturn':
+        return [callStmt(b)];
       case 'event_whenflagclicked':
         throw new BlockError(t('「當綠旗被點擊」只能有一個，而且要放在最上面。', 'There can be only one "when flag clicked", at the top.'));
+      case 'scratch_proc_def':
+      case 'procedures_defnoreturn':
+        throw new BlockError(t('「定義」積木（函式）要自己放一串，不能接在別的積木下面。', 'A "define" block (function) must be on its own, not under other blocks.'));
       default:
+        if (RETURN_BLOCKS.has(b.type)) throw returnError();
         throw new BlockError(t(`流程圖沒有「${nameOf(b.type)}」這種積木。`, `The flowchart has no "${nameOf(b.type)}" block.`));
     }
   };
 
   // ---------------- 從哪裡開始 ----------------
-  const tops = saved.blocks?.blocks ?? [];
+  const allTops = saved.blocks?.blocks ?? [];
+  if (allTops.some(b => RETURN_BLOCKS.has(b.type))) throw returnError();
+  // 自訂積木／函式的定義各自一串，其他的是主程式
+  const isDef = (b: Json) => b.type == 'scratch_proc_def' || b.type == 'procedures_defnoreturn';
+  const defBlocks = allTops.filter(isDef);
+  const tops = allTops.filter(b => !isDef(b));
   let first: Json | undefined;
   if (scratch) {
     const hats = tops.filter(b => b.type == 'event_whenflagclicked');
     if (hats.length != 1) throw new BlockError(t('要有一個「當綠旗被點擊」，程式接在它下面。', 'You need one "when flag clicked" block, with the program under it.'));
-    if (tops.length > 1) throw new BlockError(t('有積木沒有接在「當綠旗被點擊」下面：請接上去，或把它拖到左邊刪掉。', 'Some blocks are not under "when flag clicked". Connect them, or drag them to the left to delete.'));
+    if (tops.length > 1) throw new BlockError(t('有積木沒有接在「當綠旗被點擊」或「定義」下面：請接上去，或把它拖到左邊刪掉。', 'Some blocks are not under "when flag clicked" or "define". Connect them, or drag them to the left to delete.'));
     first = hats[0].next?.block;
   }
   else {
@@ -298,11 +335,46 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
   // 積木裡看到的每個積木都畫成流程圖的節點（包括最前面「變數設為 …」），學生看到的跟流程圖一樣
   const program = stmts(chain(first));
 
+  // 模組：名稱、參數（Scratch 存在 extraState；Blockly 的參數是變數，存 { name, id }）、裡面的積木
+  const known = new Map(current.map(v => [v.name, v]));
+  const knownModules = new Map(currentModules.map(m => [m.name, m]));
+  const defs = defBlocks.map(b => {
+    const name = String(scratch ? b.extraState?.name ?? '' : field(b, 'NAME') ?? '').trim();
+    const raw = (b.extraState?.params ?? []) as ({ name: string } | string)[];
+    const names = raw.map(p => (typeof p == 'string' ? p : p.name));
+    const list = scratch ? chain(b.next?.block) : chain(b.inputs?.STACK?.block);
+    return { name, names, list };
+  });
+  const seen = new Set<string>();
+  for (const d of defs) {
+    if (!d.name) throw new BlockError(t('有「定義」積木還沒有名字。', 'A "define" block has no name.'));
+    if (seen.has(d.name)) throw new BlockError(t(`有兩個都叫「${d.name}」的積木（函式）。`, `Two blocks (functions) are both called "${d.name}".`));
+    seen.add(d.name);
+  }
+  const modules: ModuleProgram[] = defs.map(d => ({ name: d.name, params: [], body: stmts(d.list) }));
+  // 執行的自訂積木要有定義，參數個數也要一樣
+  for (const [name, calls] of callArgs) {
+    const d = defs.find(x => x.name == name);
+    if (!d) throw new BlockError(t(`「${name}」這個積木（函式）沒有定義。`, `"${name}" is used but never defined.`));
+    if (calls.some(a => a.length != d.names.length)) throw new BlockError(t(`執行「${name}」時參數的個數不對。`, `"${name}" is run with the wrong number of values.`));
+  }
+  /** 參數是數字還是文字：原本的模組有的照原本；沒有的看執行時傳了什麼（有傳文字就是文字） */
+  const isTextValue = (e: Expr) => e.t == 'str' || (e.t == 'var' && (known.get(e.name)?.type == '文字' || usedAsText.has(e.name)));
+  modules.forEach((m, k) => {
+    const old = knownModules.get(m.name);
+    m.params = defs[k].names.map((p, i): ParamInfo => {
+      const type = old?.params.find(x => x.name == p)?.type
+        ?? ((callArgs.get(m.name) ?? []).some(a => a[i] && isTextValue(a[i])) ? '文字' : '數字');
+      return { name: p, type };
+    });
+  });
+  // Blockly 的函式參數也是變數，但不是變數表的變數
+  const paramNames = new Set(defs.flatMap(d => d.names));
+
   // 變數表：原本就有的照原本的型別；新的看用法（清單積木 → 清單，存文字 → 文字，其他 → 數字）。
   // 初始值一律用預設值（數字 0、文字空的）：toBlockly 把不是預設值的初始值寫成了最前面的積木，
   // 現在那些積木變成流程圖上的節點，變數表再留著初始值的話，下次轉成積木會重複
-  const known = new Map(current.map(v => [v.name, v]));
-  const names = [...new Set([...(saved.variables ?? []).map(v => v.name), ...usedAsList])];
+  const names = [...new Set([...(saved.variables ?? []).map(v => v.name), ...usedAsList])].filter(n => !paramNames.has(n));
   const vars: VarInfo[] = names.map(name => {
     const old = known.get(name);
     const listType = (saved.variables ?? []).find(v => v.name == name)?.type == 'list' || usedAsList.has(name);
@@ -310,5 +382,5 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[]): 
     if (type == '清單') return { name, type, init: old?.type == '清單' ? old.init : '數字' };
     return { name, type, init: type == '數字' ? '0' : '' };
   });
-  return { program, vars };
+  return { program, vars, modules };
 }

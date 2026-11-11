@@ -1,0 +1,34 @@
+{
+  "title": "量體溫",
+  "question": "早上進校門要量體溫。請輸入 5 位同學的體溫，每輸入一位就輸出一行：37.5 度以上輸出「發燒」，不然輸出「正常」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "36.5 37.8 36.9 37.5 36.2",
+      "output": "正常\n發燒\n正常\n發燒\n正常",
+      "note": "37.5 剛好也算發燒"
+    },
+    {
+      "input": "36.4 36.6 36.8 36.5 36.7",
+      "output": "正常\n正常\n正常\n正常\n正常",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Check Temperature",
+    "question": "Students check their temperature at the school gate. Input 5 temperatures. For each one, output a line: 37.5 or higher is \"Fever\". Lower is \"OK\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "36.5 37.8 36.9 37.5 36.2",
+        "output": "OK\nFever\nOK\nFever\nOK",
+        "note": "Exactly 37.5 is a fever"
+      },
+      {
+        "input": "36.4 36.6 36.8 36.5 36.7",
+        "output": "OK\nOK\nOK\nOK\nOK",
+        "note": ""
+      }
+    ]
+  }
+}

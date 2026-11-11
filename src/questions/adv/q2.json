@@ -1,0 +1,44 @@
+{
+  "title": "傳炸彈遊戲",
+  "question": "n 個人排成一圈玩傳炸彈，編號 1 到 n，炸彈從 1 號開始。每傳一次，炸彈就交給下一個人；傳了 k 次之後，拿著炸彈的人出局，炸彈從下一個人重新開始傳。一直玩到只剩一個人。\n請輸入 n、k，依序輸出出局的人，最後輸出「最後留下 幾號」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 2",
+      "output": "3\n1\n5\n2\n最後留下 4",
+      "note": ""
+    },
+    {
+      "input": "4 1",
+      "output": "2\n4\n3\n最後留下 1",
+      "note": ""
+    },
+    {
+      "input": "6 3",
+      "output": "4\n2\n1\n3\n6\n最後留下 5",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Hot Potato",
+    "question": "n people stand in a circle, numbered 1 to n. The potato starts with person 1. Each pass gives it to the next person. After k passes, the person holding it is out, and the next person starts again. Play until one person is left.\nInput n and k. Output the people who are out, in order. At the end, output \"Winner: \" and the number.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 2",
+        "output": "3\n1\n5\n2\nWinner: 4",
+        "note": ""
+      },
+      {
+        "input": "4 1",
+        "output": "2\n4\n3\nWinner: 1",
+        "note": ""
+      },
+      {
+        "input": "6 3",
+        "output": "4\n2\n1\n3\n6\nWinner: 5",
+        "note": ""
+      }
+    ]
+  }
+}

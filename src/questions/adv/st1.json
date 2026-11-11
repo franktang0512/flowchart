@@ -1,0 +1,44 @@
+{
+  "title": "瀏覽器的上一頁",
+  "question": "瀏覽器會記住你看過的網頁，按「上一頁」就回到前一頁，這就是 stack（後進先出）。\n請先輸入有幾個操作，再輸入每個操作：大於 0 的數字 x 代表打開第 x 頁；0 代表按「上一頁」。\n按上一頁時，把現在這頁拿掉（pop），輸出回到的那一頁；如果只剩一頁（或一頁都沒有），輸出「沒有上一頁」，什麼都不拿。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "6 1 2 3 0 0 0",
+      "output": "2\n1\n沒有上一頁",
+      "note": "打開 1、2、3 頁，上一頁回到 2、再回到 1，第三次已經沒有上一頁"
+    },
+    {
+      "input": "5 5 0 8 9 0",
+      "output": "沒有上一頁\n8",
+      "note": "只有第 5 頁時不能回上一頁；打開 8、9 後回到 8"
+    },
+    {
+      "input": "7 4 7 0 2 0 0 0",
+      "output": "4\n4\n沒有上一頁\n沒有上一頁",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Back Button",
+    "question": "A browser remembers the pages you visited. \"Back\" goes to the page before. This is a stack (last in, first out).\nFirst input the number of actions. Then input each action: a number x > 0 means open page x. 0 means click \"Back\".\nOn \"Back\", remove the current page (pop) and output the page you go back to. If there is only one page (or none), output \"No page to go back to\" and remove nothing.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "6 1 2 3 0 0 0",
+        "output": "2\n1\nNo page to go back to",
+        "note": "Open 1, 2, 3. Back to 2, then 1. The third time there is no page"
+      },
+      {
+        "input": "5 5 0 8 9 0",
+        "output": "No page to go back to\n8",
+        "note": "Only page 5: cannot go back. Open 8, 9, back to 8"
+      },
+      {
+        "input": "7 4 7 0 2 0 0 0",
+        "output": "4\n4\nNo page to go back to\nNo page to go back to",
+        "note": ""
+      }
+    ]
+  }
+}

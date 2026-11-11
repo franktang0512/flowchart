@@ -4,7 +4,7 @@
 //   blockly：Blockly 內建積木，輸入用「輸入數字/文字並顯示訊息」
 // 兩種的清單都從第 1 項開始，跟學習目標「積木」一樣，所以位置直接照抄。
 import { t } from '../i18n';
-import { exprType, type Expr, type Stmt, type VarInfo } from './structure';
+import { exprType, type Expr, type ModuleProgram, type Stmt, type VarInfo } from './structure';
 
 export type BlockMode = 'scratch' | 'blockly';
 
@@ -23,8 +23,16 @@ const COMPARE: Record<string, string> = { '==': 'EQ', '!=': 'NEQ', '<': 'LT', '<
 const ROUND: Record<string, string> = { 'Math.round': 'ROUND', 'Math.floor': 'ROUNDDOWN', 'Math.ceil': 'ROUNDUP' };
 
 /** 回傳 Blockly.serialization.workspaces.load 可以讀的 JSON */
-export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode) {
-  const vars = new Map(varList.map(v => [v.name, v]));
+export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, modules: ModuleProgram[] = []) {
+  const globals = new Map(varList.map(v => [v.name, v]));
+  /** 目前看得到的變數：主程式是變數表；模組裡再加上參數 */
+  let vars = globals;
+  /** 目前這個模組的參數（Scratch 要用粉紅色的參數積木，不是變數積木） */
+  let params = new Set<string>();
+  const enter = (m: ModuleProgram | null) => {
+    params = new Set(m?.params.map(p => p.name) ?? []);
+    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '' } as VarInfo] as const)]) : globals;
+  };
   const scratch = mode == 'scratch';
   const varId = (name: string) => 'var_' + name;
   const isList = (name: string) => vars.get(name)?.type == '清單';
@@ -49,7 +57,9 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode) 
       case 'num': return literal(e.v, true);
       case 'str': return literal(e.v, false);
       case 'raw': return literal(e.text, false);
-      case 'var': return getVar(e.name);
+      case 'var':
+        if (scratch && params.has(e.name)) return { type: 'scratch_proc_arg', fields: { NAME: e.name } };
+        return getVar(e.name);
       case 'idx': {
         const list = listName(e.obj);
         if (scratch) {
@@ -178,6 +188,13 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode) 
         const body = chain(s.body);
         return [{ type: scratch ? 'scratch_whileUntil' : 'controls_whileUntil', fields: { MODE: 'UNTIL' }, inputs: { BOOL: input(expr(s.cond)), ...(body ? { DO: input(body) } : {}) } }];
       }
+      case 'call': {
+        // 執行模組：Scratch 的自訂積木、Blockly 的「執行函式」；參數照模組定義的順序
+        const m = modules.find(x => x.name == s.name);
+        const names = m ? m.params.map(p => p.name) : s.args.map((_, k) => 'x' + (k + 1));
+        const inputs = Object.fromEntries(s.args.map((a, k) => ['ARG' + k, input(expr(a))]));
+        return [{ type: scratch ? 'scratch_proc_call' : 'procedures_callnoreturn', extraState: { name: s.name, params: names }, inputs }];
+      }
     }
   };
 
@@ -195,13 +212,33 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode) 
     .filter(v => v.type != '清單' && initValue(v) != (v.type == '文字' ? '' : '0'))
     .map(v => setVar(v.name, literal(initValue(v), v.type != '文字')));
 
+  enter(null);
   const all = [...inits, ...program.flatMap(stmt)];
   // Scratch 的程式從「當綠旗被點擊」開始
   if (scratch) all.unshift({ type: 'event_whenflagclicked' });
   const first = link(all);
+
+  // 模組：Scratch 是「定義」帽子積木，Blockly 是「函式」積木；排在主程式右邊
+  const defs = modules.map((m, k): Block => {
+    enter(m);
+    const body = chain(m.body);
+    const at = { x: 20 + 460 * (k + 1), y: 20 };
+    if (scratch) {
+      return { type: 'scratch_proc_def', extraState: { name: m.name, params: m.params }, ...(body ? { next: { block: body } } : {}), ...at };
+    }
+    return {
+      type: 'procedures_defnoreturn', fields: { NAME: m.name },
+      extraState: { params: m.params.map(p => ({ name: p.name, id: varId(p.name) })) },
+      ...(body ? { inputs: { STACK: input(body) } } : {}), ...at,
+    };
+  });
+  enter(null);
+
+  // Blockly 的函式參數也是變數（Scratch 的參數不是，不用放）
+  const paramVars = scratch ? [] : [...new Set(modules.flatMap(m => m.params.map(p => p.name)))].filter(n => !globals.has(n)).map(n => ({ name: n, id: varId(n) }));
   return {
-    blocks: { languageVersion: 0, blocks: first ? [{ ...first, x: 20, y: 20 }] : [] },
-    variables: varList.map(v => ({ name: v.name, id: varId(v.name), ...(scratch && v.type == '清單' ? { type: 'list' } : {}) })),
+    blocks: { languageVersion: 0, blocks: [...(first ? [{ ...first, x: 20, y: 20 }] : []), ...defs] },
+    variables: [...varList.map(v => ({ name: v.name, id: varId(v.name), ...(scratch && v.type == '清單' ? { type: 'list' } : {}) })), ...paramVars],
   };
 }
 

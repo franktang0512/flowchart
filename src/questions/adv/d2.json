@@ -1,0 +1,44 @@
+{
+  "title": "遊樂場代幣",
+  "question": "遊樂場的代幣有 1 點、4 點、5 點三種。請輸入要換的點數，輸出最少要幾枚代幣。\n想想看：先拿最大的代幣，一定最少嗎？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "8",
+      "output": "2",
+      "note": "4 + 4"
+    },
+    {
+      "input": "13",
+      "output": "3",
+      "note": "5 + 4 + 4"
+    },
+    {
+      "input": "7",
+      "output": "3",
+      "note": "5 + 1 + 1"
+    }
+  ],
+  "en": {
+    "title": "Arcade Tokens",
+    "question": "An arcade has tokens worth 1, 4, and 5 points. Input the points you need. Output the fewest tokens.\nThink: If you always take the biggest token first, is that always the fewest?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "8",
+        "output": "2",
+        "note": "4 + 4"
+      },
+      {
+        "input": "13",
+        "output": "3",
+        "note": "5 + 4 + 4"
+      },
+      {
+        "input": "7",
+        "output": "3",
+        "note": "5 + 1 + 1"
+      }
+    ]
+  }
+}

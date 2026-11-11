@@ -1,0 +1,44 @@
+{
+  "title": "分披薩",
+  "question": "一群人要分披薩，每個人分到一樣多片，分不完的留下來。\n請輸入披薩有幾片、有幾個人，第一行輸出每人分到幾片，第二行輸出剩下幾片。\n提示：計算時可以選「無條件捨去」；剩下幾片可以用 %（相除的餘數）。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "16 5",
+      "output": "3\n1",
+      "note": "16 ÷ 5 = 3 餘 1"
+    },
+    {
+      "input": "24 6",
+      "output": "4\n0",
+      "note": "剛好分完"
+    },
+    {
+      "input": "8 10",
+      "output": "0\n8",
+      "note": "人比披薩多，每人 0 片，剩 8 片"
+    }
+  ],
+  "en": {
+    "title": "Share the Pizza",
+    "question": "Some friends share a pizza. Everyone gets the same number of slices. The extra slices are left.\nInput the number of slices and the number of people. Line 1: output the slices for each person. Line 2: output the slices left.\nTip: Use \"Round down\". For the slices left, use % (the remainder).",
+    "array": [],
+    "test_case": [
+      {
+        "input": "16 5",
+        "output": "3\n1",
+        "note": "16 ÷ 5 = 3, 1 left"
+      },
+      {
+        "input": "24 6",
+        "output": "4\n0",
+        "note": "No slices left"
+      },
+      {
+        "input": "8 10",
+        "output": "0\n8",
+        "note": "More people than slices"
+      }
+    ]
+  }
+}

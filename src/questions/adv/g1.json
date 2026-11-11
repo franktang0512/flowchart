@@ -1,0 +1,44 @@
+{
+  "title": "收銀機找零",
+  "question": "收銀機要用最少的硬幣找錢，硬幣有 50 元、10 元、5 元、1 元。請輸入商品價格和客人付了多少錢，依序輸出每種硬幣要找幾個，例如「50 元 1 個」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "63 100",
+      "output": "50 元 0 個\n10 元 3 個\n5 元 1 個\n1 元 2 個",
+      "note": "要找 37 元：3 個 10 元、1 個 5 元、2 個 1 元"
+    },
+    {
+      "input": "12 500",
+      "output": "50 元 9 個\n10 元 3 個\n5 元 1 個\n1 元 3 個",
+      "note": "要找 488 元"
+    },
+    {
+      "input": "100 100",
+      "output": "50 元 0 個\n10 元 0 個\n5 元 0 個\n1 元 0 個",
+      "note": "不用找錢"
+    }
+  ],
+  "en": {
+    "title": "Give Change",
+    "question": "A cash register gives change with the fewest coins. The coins are 50, 10, 5, and 1. Input the price and the money paid. Output how many of each coin, like \"50-dollar coins: 1\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "63 100",
+        "output": "50-dollar coins: 0\n10-dollar coins: 3\n5-dollar coins: 1\n1-dollar coins: 2",
+        "note": "Change is 37: three 10s, one 5, two 1s"
+      },
+      {
+        "input": "12 500",
+        "output": "50-dollar coins: 9\n10-dollar coins: 3\n5-dollar coins: 1\n1-dollar coins: 3",
+        "note": "Change is 488"
+      },
+      {
+        "input": "100 100",
+        "output": "50-dollar coins: 0\n10-dollar coins: 0\n5-dollar coins: 0\n1-dollar coins: 0",
+        "note": "No change"
+      }
+    ]
+  }
+}

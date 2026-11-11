@@ -1,0 +1,44 @@
+{
+  "title": "存錢買遊戲機",
+  "question": "小明想買一台遊戲機，每週存一樣多的零用錢。請輸入遊戲機的價格、每週存多少元，輸出要存幾週才夠。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "9000 500",
+      "output": "18",
+      "note": "存 18 週剛好 9000"
+    },
+    {
+      "input": "1000 300",
+      "output": "4",
+      "note": "存 3 週 900 不夠，第 4 週 1200 才夠"
+    },
+    {
+      "input": "200 500",
+      "output": "1",
+      "note": "存 1 週就夠了"
+    }
+  ],
+  "en": {
+    "title": "Save for a Game",
+    "question": "Ming wants a game console. He saves the same money every week. Input the price and the money per week. Output how many weeks he needs.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "9000 500",
+        "output": "18",
+        "note": "18 weeks is exactly 9000"
+      },
+      {
+        "input": "1000 300",
+        "output": "4",
+        "note": "3 weeks is 900, not enough. 4 weeks is 1200"
+      },
+      {
+        "input": "200 500",
+        "output": "1",
+        "note": "1 week is enough"
+      }
+    ]
+  }
+}

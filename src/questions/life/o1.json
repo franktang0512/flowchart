@@ -1,0 +1,24 @@
+{
+  "title": "歡迎光臨",
+  "question": "便利商店的門口有一個電子看板。請輸出兩行字：\n第一行：歡迎光臨！\n第二行：今天飲料第二杯半價",
+  "array": [],
+  "test_case": [
+    {
+      "input": "",
+      "output": "歡迎光臨！\n今天飲料第二杯半價",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Welcome!",
+    "question": "A shop has a sign at the door. Output two lines:\nLine 1: Welcome!\nLine 2: Second drink half price today",
+    "array": [],
+    "test_case": [
+      {
+        "input": "",
+        "output": "Welcome!\nSecond drink half price today",
+        "note": ""
+      }
+    ]
+  }
+}

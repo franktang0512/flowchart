@@ -1,0 +1,44 @@
+{
+  "title": "自動販賣機投幣",
+  "question": "你身上有一些 50 元、10 元、5 元硬幣，要剛好投 x 元買飲料。請輸入 50 元、10 元、5 元各有幾枚，再輸入 x，輸出有幾種投法。\n想想看：其實知道 50 元和 10 元各投幾枚之後，5 元要幾枚就能算出來，可以少一層迴圈嗎？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "2 5 4 100",
+      "output": "4",
+      "note": ""
+    },
+    {
+      "input": "1 3 2 35",
+      "output": "1",
+      "note": ""
+    },
+    {
+      "input": "0 2 1 50",
+      "output": "0",
+      "note": "錢不夠"
+    }
+  ],
+  "en": {
+    "title": "Vending Machine Coins",
+    "question": "You have some 50, 10, and 5 dollar coins. You need to pay exactly x dollars. Input how many 50s, 10s, and 5s you have, then x. Output how many ways you can pay.\nThink: Once you know the 50s and 10s, you can work out the 5s. Can you use one less loop?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "2 5 4 100",
+        "output": "4",
+        "note": ""
+      },
+      {
+        "input": "1 3 2 35",
+        "output": "1",
+        "note": ""
+      },
+      {
+        "input": "0 2 1 50",
+        "output": "0",
+        "note": "Not enough money"
+      }
+    ]
+  }
+}

@@ -4,22 +4,46 @@
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
 import { FlowError, tokenize, type Token } from './decoder';
-import { splitRectangle, type RectAction } from './labels';
+import { splitRectangle, splitTarget, type RectAction } from './labels';
+import { parseCall, type ModuleInfo, type ModuleSource } from './modules';
 import type { FlowNode } from './node';
 
 // ---------------- 流程圖的結構 ----------------
 
 export type Stmt =
-  /** 輸入：存到變數、添加到清單最後、插入到某個位置、替換某個位置 */
-  | { kind: 'input'; target: string; place: 'var' | 'append' | 'insert' | 'replace'; index?: Expr }
+  /** 輸入：存到變數、添加到清單最後、插入到某個位置、替換某個位置（二維清單的一格：index2 是行） */
+  | { kind: 'input'; target: string; place: 'var' | 'append' | 'insert' | 'replace'; index?: Expr; index2?: Expr }
   | { kind: 'output'; value: Expr }
-  /** 計算積木（見 RectAction）；round 是 Math.round / Math.floor / Math.ceil 或空的 */
-  | { kind: 'rect'; action: RectAction; target: string; index?: Expr; value?: Expr; round: string }
+  /**
+   * 計算積木（見 RectAction）；round 是 Math.round / Math.floor / Math.ceil 或空的。
+   * 二維清單：「建立」的 index、index2 是列數、行數；「替換」一格時 index2 是行
+   */
+  | { kind: 'rect'; action: RectAction; target: string; index?: Expr; index2?: Expr; value?: Expr; round: string }
   | { kind: 'if'; cond: Expr; yes: Stmt[]; no: Stmt[] }
   /** 次數迴圈 */
   | { kind: 'repeat'; times: Expr; body: Stmt[] }
   /** 條件迴圈：重複直到條件成立 */
-  | { kind: 'until'; cond: Expr; body: Stmt[] };
+  | { kind: 'until'; cond: Expr; body: Stmt[] }
+  /** 執行模組（見 modules.ts） */
+  | { kind: 'call'; name: string; args: Expr[] };
+
+/** 一個模組：名稱、參數、裡面的步驟 */
+export interface ModuleProgram extends ModuleInfo {
+  body: Stmt[];
+}
+
+/** 每個模組的流程圖 → 結構；接得不完整時丟出 FlowError（訊息前面寫是哪個模組） */
+export function structureModules(modules: ModuleSource[]): ModuleProgram[] {
+  return modules.map(m => {
+    try {
+      return { ...m.info, body: structure(m.diagram) };
+    }
+    catch (e) {
+      if (e instanceof FlowError) throw new FlowError(t(`模組「${m.info.name}」裡：`, `In the module "${m.info.name}": `) + e.message);
+      throw e;
+    }
+  });
+}
 
 const ROUND_OF: Record<string, string> = { '(取四捨五入)': 'Math.round', '(取無條件捨去)': 'Math.floor', '(取無條件進位)': 'Math.ceil' };
 
@@ -47,6 +71,11 @@ export function structure(diagram: Diagram): Stmt[] {
         return { stmts: [ioStmt(n.text)], next: nextOf(n) };
       case 'Rectangle':
         return { stmts: [rectStmt(n.text)], next: nextOf(n) };
+      case 'Function': {
+        const call = parseCall(n.text);
+        if (!call) throw broken(n);
+        return { stmts: [{ kind: 'call', name: call.name, args: call.args.map(parseExpr) }], next: nextOf(n) };
+      }
       case 'Diamond': {
         const yes = branch(n, s => s.includes('true') || s.includes('真'));
         const no = branch(n, s => s.includes('false') || s.includes('假'));
@@ -118,8 +147,11 @@ function ioStmt(text: string): Stmt {
   if (!text.startsWith('輸入')) return { kind: 'output', value: parseExpr(rest) };
   const insert = /^(.*?) 插入第 (.*) 項$/s.exec(rest);
   if (insert) return { kind: 'input', target: insert[1].trim(), place: 'insert', index: parseExpr(insert[2]) };
-  const item = /^(.+?)\[(.*)\]$/s.exec(rest);
-  if (item) return { kind: 'input', target: item[1].trim(), place: 'replace', index: parseExpr(item[2]) };
+  const item = splitTarget(rest);
+  if (item) {
+    const [a, b] = item.indexes;
+    return { kind: 'input', target: item.name, place: 'replace', index: parseExpr(a), ...(b != null ? { index2: parseExpr(b) } : {}) };
+  }
   // 存到變數還是添加到清單，要看變數表；這裡先記成 var，產生程式時再依型別決定
   return { kind: 'input', target: rest, place: 'var' };
 }
@@ -134,11 +166,12 @@ function rectStmt(text: string): Stmt {
       round = fn;
     }
   }
-  const { target, action, index, expr } = splitRectangle(rest);
+  const { target, action, index, index2, expr } = splitRectangle(rest);
   return {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,
-    value: action == '刪除' || action == '清空' ? undefined : parseExpr(expr),
+    ...(index2 ? { index2: parseExpr(index2) } : {}),
+    value: action == '刪除' || action == '清空' || action == '建立' ? undefined : parseExpr(expr),
   };
 }
 
@@ -280,8 +313,9 @@ class Parser {
 
 export interface VarInfo {
   name: string;
-  type: '數字' | '文字' | '清單';
-  /** 數字/文字的初始值；清單是裡面裝「數字」還是「文字」 */
+  /** 二維清單只有學習目標是 C++ 時才有 */
+  type: '數字' | '文字' | '清單' | '二維清單';
+  /** 數字/文字的初始值；清單、二維清單是裡面裝「數字」還是「文字」 */
   init: string;
 }
 
@@ -294,12 +328,19 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>): ExprType {
     case 'str': return 'str';
     case 'var': {
       const v = vars.get(e.name);
-      return v?.type == '清單' ? 'list' : v?.type == '文字' ? 'str' : 'num';
+      return v?.type == '清單' || v?.type == '二維清單' ? 'list' : v?.type == '文字' ? 'str' : 'num';
     }
     case 'idx': {
       const o = exprType(e.obj, vars);
       if (o == 'str') return 'char';
-      if (e.obj.t == 'var') return vars.get(e.obj.name)?.init == '文字' ? 'str' : 'num';
+      if (e.obj.t == 'var') {
+        const v = vars.get(e.obj.name);
+        // 二維清單只取一個 [ ]：是一整列
+        if (v?.type == '二維清單') return 'list';
+        return v?.init == '文字' ? 'str' : 'num';
+      }
+      // 二維清單的一格：表[a][b]
+      if (e.obj.t == 'idx' && e.obj.obj.t == 'var') return vars.get(e.obj.obj.name)?.init == '文字' ? 'str' : 'num';
       return 'num';
     }
     case 'call': return e.fn == 'has' ? 'bool' : 'num';

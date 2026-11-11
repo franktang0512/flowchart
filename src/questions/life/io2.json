@@ -1,0 +1,34 @@
+{
+  "title": "飲料總價",
+  "question": "一杯珍珠奶茶 55 元。請輸入要買幾杯，輸出總共要付多少元。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3",
+      "output": "165",
+      "note": "55 × 3 = 165"
+    },
+    {
+      "input": "10",
+      "output": "550",
+      "note": "55 × 10 = 550"
+    }
+  ],
+  "en": {
+    "title": "Drink Price",
+    "question": "A cup of bubble tea is 55 dollars. Input how many cups. Output the total price.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3",
+        "output": "165",
+        "note": "55 × 3 = 165"
+      },
+      {
+        "input": "10",
+        "output": "550",
+        "note": "55 × 10 = 550"
+      }
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "title": "外送運費",
+  "question": "外送平台的運費規定：\n訂單 500 元以上免運費（0 元）；\n不到 500 元時，距離 3 公里以內運費 30 元，超過 3 公里運費 60 元。\n請輸入訂單金額、距離（公里），輸出運費。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "600 5",
+      "output": "0",
+      "note": "滿 500 免運，距離不用看"
+    },
+    {
+      "input": "300 2",
+      "output": "30",
+      "note": "不到 500，3 公里以內"
+    },
+    {
+      "input": "300 3",
+      "output": "30",
+      "note": "剛好 3 公里也算以內"
+    },
+    {
+      "input": "450 8",
+      "output": "60",
+      "note": "不到 500，超過 3 公里"
+    }
+  ],
+  "en": {
+    "title": "Delivery Fee",
+    "question": "Delivery fee rules:\nOrder 500 or more: free (0).\nOrder less than 500: 3 km or less costs 30. More than 3 km costs 60.\nInput the order price and the distance (km). Output the fee.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "600 5",
+        "output": "0",
+        "note": "500 or more: free"
+      },
+      {
+        "input": "300 2",
+        "output": "30",
+        "note": "Less than 500, 3 km or less"
+      },
+      {
+        "input": "300 3",
+        "output": "30",
+        "note": "Exactly 3 km"
+      },
+      {
+        "input": "450 8",
+        "output": "60",
+        "note": "Less than 500, far away"
+      }
+    ]
+  }
+}

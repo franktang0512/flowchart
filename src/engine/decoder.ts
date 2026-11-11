@@ -20,18 +20,37 @@
 import { t } from '../i18n';
 import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
-import { displayLinkText, displayNodeText, splitRectangle } from './labels';
+import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
+import { parseCall, sheetId, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 
 /** 第三步「變數」表格整理出來的變數清單 */
 export interface VarStore {
   var_list: { name: string[]; value: string[] };
-  type_var_list: { number: string[]; text: string[]; array: string[] };
+  /** grid：二維清單（只有學習目標是 C++ 時才有） */
+  type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[] };
+  /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用，但不能存值進去） */
+  params?: string[];
+}
+
+/** 模組裡用的變數清單：變數表的變數，再加上這個模組的參數 */
+export function withParams(vars: VarStore, params: ParamInfo[]): VarStore {
+  if (!params.length) return vars;
+  return {
+    var_list: vars.var_list,
+    type_var_list: {
+      number: [...vars.type_var_list.number, ...params.filter(p => p.type == '數字').map(p => p.name)],
+      text: [...vars.type_var_list.text, ...params.filter(p => p.type == '文字').map(p => p.name)],
+      array: vars.type_var_list.array,
+      grid: vars.type_var_list.grid,
+    },
+    params: params.map(p => p.name),
+  };
 }
 
 export const createVarStore = (): VarStore => ({
   var_list: { name: [], value: [] },
-  type_var_list: { number: [], text: [], array: [] },
+  type_var_list: { number: [], text: [], array: [], grid: [] },
 });
 
 const isNumeric = (s: string) => !isNaN(parseFloat(s)) && isFinite(s as unknown as number);
@@ -78,9 +97,22 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
   if (!str || !str.trim()) return false;
   const { type_var_list } = vars;
   const defined = (name: string) =>
-    type_var_list.number.includes(name) || type_var_list.text.includes(name) || type_var_list.array.includes(name);
+    type_var_list.number.includes(name) || type_var_list.text.includes(name) || type_var_list.array.includes(name) || type_var_list.grid.includes(name);
 
   if (!can_number) {
+    if (vars.params?.includes(str.trim())) {
+      alert(t(`「${str.trim()}」是模組的參數，只能拿來算，不能存值進去：要存結果請用變數表裡的變數。`, `"${str.trim()}" is a parameter of this module. You can use it, but you cannot change it. Use a variable from the variable table instead.`));
+      return false;
+    }
+    // 二維清單的一格：表[i][j]
+    const cell = splitTarget(str);
+    if (cell && cell.indexes.length == 2) {
+      if (!type_var_list.grid.includes(cell.name)) {
+        alert(t(`「${cell.name}」不是二維清單：只有型別是「二維清單」的變數才能用 [列][行]。`, `"${cell.name}" is not a 2D list. Only 2D list variables can use [row][column].`));
+        return false;
+      }
+      return checkVar(vars, cell.indexes[0], true) && checkVar(vars, cell.indexes[1], true);
+    }
     const item = listItemTarget(str);
     if (item) {
       if (type_var_list.text.includes(item.list)) {
@@ -109,6 +141,23 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
 /** 找出文字裡出現了哪些變數 */
 export function getCodeVar(vars: VarStore, str: string): string[] {
   return vars.var_list.name.filter(name => str.includes(name));
+}
+
+/** 執行模組的積木有沒有問題：選了模組、每個參數都填了看得懂的值；不行時跳出提示 */
+export function checkCall(vars: VarStore, modules: ModuleInfo[], name: string, args: string[]): boolean {
+  const m = modules.find(x => x.name == name);
+  if (!m) {
+    alert(t('請先選一個模組。', 'Choose a module first.'));
+    return false;
+  }
+  for (let k = 0; k < m.params.length; k++) {
+    if (!args[k]?.trim()) {
+      alert(t(`請填參數「${m.params[k].name}」要用的值。`, `Fill in the value for "${m.params[k].name}".`));
+      return false;
+    }
+    if (!checkVar(vars, args[k], true)) return false;
+  }
+  return true;
 }
 
 /** 判斷式轉成 JavaScript：= 變 ==、and/or/not（且/或/非）變 && || !，字串裡的字不動 */
@@ -188,6 +237,13 @@ const runtimeMessages = () => ({
   lenNotList: t('長度( ) 的括號裡要放清單或文字。', 'Put a list or text inside length( ).'),
   findNotList: t('項目編號( ) 和 包含( ) 的括號裡，第一個要放清單或文字，例如 包含(名單, "Amy")。', 'The first thing inside indexof( ) or contains( ) must be a list or text. Example: contains(names, "Amy").'),
   countNotNum: t('迴圈的次數不是數字。', 'The loop count is not a number.'),
+  tooManyLoops: t('迴圈一共跑了超過 20000 次，可能停不下來：檢查條件迴圈的條件會不會成立、次數是不是太大。', 'The loops ran more than 20000 times in all. Maybe a loop never stops. Check the loop condition and the number of times.'),
+  gridEmpty: t('二維清單「{name}」還沒有建立大小：先用計算積木「建立 幾 列 幾 行」。', 'The 2D list "{name}" has no size yet. First use a Math block to make it (rows × columns).'),
+  gridRow: t('二維清單「{name}」有 {len} 列，列的索引只能是 0 到 {max}，沒有索引 {k}。', 'The 2D list "{name}" has {len} rows. The row index must be 0 to {max}. There is no row {k}.'),
+  gridCol: t('二維清單「{name}」每列有 {len} 行，行的索引只能是 0 到 {max}，沒有索引 {k}。', 'The 2D list "{name}" has {len} columns. The column index must be 0 to {max}. There is no column {k}.'),
+  gridSize: t('二維清單「{name}」的列數和行數要是 0 以上的整數，現在是 {r} 列 {c} 行。', 'The rows and columns of "{name}" must be whole numbers 0 or more. Now it is {r} × {c}.'),
+  notGrid: t('「{name}」不是二維清單，不能用 [列][行]。', '"{name}" is not a 2D list. You cannot use [row][column].'),
+  tooDeep: t('模組一直執行自己（或互相執行）停不下來：檢查模組裡是不是在某個時候就不再執行自己。', 'A module keeps running itself and never stops. Check that it stops at some point.'),
 });
 
 // 執行時用到的小工具：存值時檢查型別、清單的位置從 __BASE 開始（積木 1、C++ 0）。錯誤會標出是哪個積木（i）
@@ -279,7 +335,29 @@ function __count(v, i) {
   if (!__isNum(v)) __err('countNotNum', i, {});
   return v;
 }
-function __show(v) { return Array.isArray(v) ? v.join(' ') : v; }
+// 二維清單（C++ 的 vector<vector<...>>）：表[r][c]，索引一律從 0 開始
+function __cell(g, name, i, r, c) {
+  if (!Array.isArray(g) || (g.length && !Array.isArray(g[0]))) __err('notGrid', i, { name: name });
+  if (!g.length) __err('gridEmpty', i, { name: name });
+  if (!(Number.isInteger(r) && r >= 0 && r < g.length)) __err('gridRow', i, { name: name, len: g.length, max: g.length - 1, k: r });
+  var row = g[r];
+  if (!(Number.isInteger(c) && c >= 0 && c < row.length)) __err('gridCol', i, { name: name, len: row.length, max: row.length - 1, k: c });
+  return row;
+}
+function __at2(g, name, i, r, c) { return __cell(g, name, i, r, c)[c]; }
+function __set2(g, name, i, r, c, v) { __cell(g, name, i, r, c)[c] = v; }
+function __grid(name, i, r, c, fill) {
+  if (!(Number.isInteger(r) && r >= 0 && Number.isInteger(c) && c >= 0)) __err('gridSize', i, { name: name, r: r, c: c });
+  var g = [];
+  for (var k = 0; k < r; k++) { var row = []; for (var j = 0; j < c; j++) row.push(fill); g.push(row); }
+  return g;
+}
+// 輸出清單：一項一項用空白隔開；二維清單一列一行
+function __show(v) {
+  if (!Array.isArray(v)) return v;
+  if (v.length && Array.isArray(v[0])) return v.map(function (row) { return row.join(' '); }).join('\\n');
+  return v.join(' ');
+}
 `;
 
 interface CodeResult {
@@ -294,17 +372,44 @@ class CodeGenerator {
   private readonly vars: VarStore;
   private readonly varStr: string;
   private readonly counter = { n: 0 };
+  /** 第幾張流程圖：0 是主程式，模組依序是 1、2… */
+  private readonly sheet: number;
+  private readonly modules: ModuleInfo[];
+  /** 在模組裡：這個模組的參數 */
+  private readonly params: ParamInfo[];
 
-  constructor(diagram: Diagram, vars: VarStore, names: string[]) {
+  constructor(diagram: Diagram, vars: VarStore, names: string[], sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = []) {
     this.diagram = diagram;
     this.nodes = diagram.nodes;
-    this.vars = vars;
-    // 每一步都把所有變數的值記下來：{"a": a,"b": b}
-    this.varStr = '{' + names.map(n => '"' + n + '": ' + n).join(',') + '}';
+    this.vars = withParams(vars, params);
+    this.sheet = sheet;
+    this.modules = modules;
+    this.params = params;
+    // 每一步都把所有變數（在模組裡再加上參數）的值記下來：{"a": a,"b": b}
+    this.varStr = '{' + [...names, ...params.map(p => p.name)].map(n => '"' + n + '": ' + n).join(',') + '}';
   }
 
+  /** 積木在這張流程圖裡的 index（找箭頭用） */
   private idx(node: FlowNode) {
     return this.nodes.indexOf(node);
+  }
+
+  /** 積木在整個程式裡的編號（逐步執行、錯誤訊息標出積木用；見 modules.ts） */
+  private gid(node: FlowNode) {
+    return sheetId(this.sheet, this.idx(node));
+  }
+
+  /** 錯誤訊息前面加上「在模組「X」裡」，學生才知道是哪一張流程圖 */
+  private where(message: string) {
+    return this.sheet == 0 ? message : t(`模組「${this.moduleName()}」裡：`, `In the module "${this.moduleName()}": `) + message;
+  }
+
+  private moduleName() {
+    return this.modules[this.sheet - 1]?.name ?? '';
+  }
+
+  private fail(message: string, node: FlowNode | null): never {
+    throw new FlowError(this.where(message), node ? this.gid(node) : null);
   }
 
   private isList(name: string) {
@@ -316,28 +421,63 @@ class CodeGenerator {
     return this.vars.var_list.name.includes(name);
   }
 
-  /** 學生寫的運算式 → JavaScript：清單或文字[第幾項]、長度(清單或文字)、判斷式的 and/or/= */
+  private isGrid(name: string) {
+    return this.vars.type_var_list.grid.includes(name);
+  }
+
+  /** 二維清單裡裝的是文字嗎（變數表的初始值欄選「裝文字」） */
+  private gridHoldsText(name: string) {
+    return this.vars.var_list.value[this.vars.var_list.name.indexOf(name)] == '文字';
+  }
+
+  /** 二維清單的一格「表[a][b]」：名稱後面的 [ 是第 k 個，配對的 ] 後面緊接著另一個 [ */
+  private isCell(tokens: Token[], k: number) {
+    const name = tokens[k - 1];
+    if (name?.type != 'name' || !this.isGrid(name.text)) return false;
+    let depth = 0;
+    for (let j = k; j < tokens.length; j++) {
+      if (tokens[j].text == '[') depth++;
+      else if (tokens[j].text == ']' && --depth == 0) return tokens[j + 1]?.text == '[';
+    }
+    return false;
+  }
+
+  /** 學生寫的運算式 → JavaScript：清單或文字[第幾項]、二維清單[列][行]、長度(清單或文字)、判斷式的 and/or/= */
   private expr(text: string, i: number, condition = false): string {
     const tokens = tokenize(text);
-    const stack: boolean[] = [];
+    // 每個 [ 是哪一種：清單的一項、二維清單的第一個／第二個 [ 、一般的中括號
+    const stack: ('item' | 'cell1' | 'cell2' | 'raw')[] = [];
+    let secondBracket = false;
     let out = '';
     let prevWord = false;
     tokens.forEach((t, k) => {
       const word = t.type != 'op';
       let piece = t.text;
       if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '[') {
-        piece = `__at(${t.text}, ${JSON.stringify(t.text)}, ${i}, `;
+        piece = this.isCell(tokens, k + 1)
+          ? `__at2(${t.text}, ${JSON.stringify(t.text)}, ${i}, `
+          : `__at(${t.text}, ${JSON.stringify(t.text)}, ${i}, `;
       }
       else if (t.type == 'name' && isFunc(t.text) && !this.isVar(t.text) && tokens[k + 1]?.text == '(') {
         piece = FUNCTIONS[t.text];
       }
       else if (t.text == '[') {
-        const isItem = tokens[k - 1]?.type == 'name' && this.isVar(tokens[k - 1].text);
-        stack.push(isItem);
-        piece = isItem ? '(' : '[';
+        if (secondBracket) {
+          // 表[a][b] 的第二個 [：前面已經寫了「, (」
+          secondBracket = false;
+          stack.push('cell2');
+          piece = '';
+        }
+        else {
+          const isItem = tokens[k - 1]?.type == 'name' && this.isVar(tokens[k - 1].text);
+          stack.push(!isItem ? 'raw' : this.isCell(tokens, k) ? 'cell1' : 'item');
+          piece = isItem ? '(' : '[';
+        }
       }
       else if (t.text == ']') {
-        piece = stack.pop() ? '))' : ']';
+        const kind = stack.pop();
+        piece = kind == 'cell1' ? '), (' : kind == 'raw' || kind == null ? ']' : '))';
+        if (kind == 'cell1') secondBracket = true;
       }
       out += (word && prevWord ? ' ' : '') + piece;
       prevWord = word;
@@ -350,17 +490,22 @@ class CodeGenerator {
   /** 積木內容寫錯（程式看不懂）時，指出是哪一個積木 */
   private checkSyntax(node: FlowNode, code: string) {
     if (!syntaxOk(code)) {
-      throw new FlowError(label(node) + t(' 的寫法程式看不懂：請檢查變數名稱有沒有打錯、括號和引號有沒有成對。', ' cannot be read. Check the variable names, and check that ( ) and " " come in pairs.'), this.idx(node));
+      this.fail(label(node) + t(' 的寫法程式看不懂：請檢查變數名稱有沒有打錯、括號和引號有沒有成對。', ' cannot be read. Check the variable names, and check that ( ) and " " come in pairs.'), node);
     }
   }
 
   /** 不是「結束」卻沒有往下接的箭頭 */
   private noNext(node: FlowNode): never {
-    throw new FlowError(label(node) + t(' 後面沒有接箭頭：每個積木都要用箭頭接到下一個積木，最後接到「結束」。', ' has no arrow to the next block. Every block needs an arrow to the next block. The last one goes to "End".'), this.idx(node));
+    this.fail(label(node) + t(' 後面沒有接箭頭：每個積木都要用箭頭接到下一個積木，最後接到「結束」。', ' has no arrow to the next block. Every block needs an arrow to the next block. The last one goes to "End".'), node);
   }
 
   /** 把 value 存進 target（變數或 清單[第幾項]），依型別檢查 */
   private assign(target: string, value: string, i: number) {
+    // 二維清單的一格：表[a][b]
+    const cell = splitTarget(target);
+    if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
+      return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${value});\n`;
+    }
     const item = listItemTarget(target);
     // 文字、數字變數接 [ ] 也交給 __set，執行時會說明為什麼不行
     if (item && this.isVar(item.list)) {
@@ -378,7 +523,7 @@ class CodeGenerator {
   private funcHelpers = new Set<number>();
 
   toCode(node: FlowNode): CodeResult {
-    const i = this.idx(node);
+    const i = this.gid(node);
     const update = 'Update_output(' + i + ', ' + this.varStr + ');\n';
     const expr = (text: string, condition = false) => {
       const js = this.expr(text, i, condition);
@@ -387,21 +532,52 @@ class CodeGenerator {
     };
     switch (node.figure) {
       case 'Circle':
+        if (this.sheet > 0) {
+          // 模組：一個 JavaScript 函式，參數就是模組的參數；一直執行自己停不下來時要提醒
+          if (node.text == '開始') {
+            const head = `function __mod${this.sheet}(${this.params.map(p => p.name).join(', ')}){\n`;
+            return { code: head + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
+          }
+          return { code: 'total_step ++;\n' + update + '__depth--;\n}\n', next: undefined };
+        }
         if (node.text == '開始') {
-          return { code: 'function flowchart_code(input_list){\n' + update, next: this.nextOf(node) };
+          return { code: 'function flowchart_code(){\n' + update, next: this.nextOf(node) };
         }
         return { code: 'total_step ++;\n' + update + '}\n', next: undefined };
+      case 'Function': {
+        // 執行模組：先標出這個積木，再跳進模組的流程圖；引數照參數的型別檢查
+        const call = parseCall(node.text);
+        const k = call ? this.modules.findIndex(m => m.name == call.name) : -1;
+        if (!call || k < 0) {
+          this.fail(t(`${label(node)} 要執行的模組「${call?.name ?? node.text}」不存在：請雙擊這個積木重新選一個模組。`, `${label(node)} runs the module "${call?.name ?? node.text}", but it does not exist. Double-click the block and choose a module.`), node);
+        }
+        const m = this.modules[k];
+        if (call.args.length != m.params.length) {
+          this.fail(t(`${label(node)} 的參數個數不對：模組「${m.name}」要 ${m.params.length} 個參數。請雙擊這個積木重新填。`, `${label(node)} has the wrong number of values. The module "${m.name}" needs ${m.params.length}. Double-click the block to fix it.`), node);
+        }
+        const args = m.params.map((p, a) => `${p.type == '文字' ? '__text' : '__num'}((${expr(call.args[a])}), ${i}, ${JSON.stringify(p.name)})`);
+        const code = `__mod${k + 1}(${args.join(', ')});\n`;
+        this.checkSyntax(node, code);
+        return { code: 'total_step ++;\n' + update + code, next: this.nextOf(node) };
+      }
       case 'Parallelogram': {
         const parts = node.text.split(' ');
         let code: string;
         if (parts[0].includes('輸入')) {
           const v = parts.slice(1).join(' ').trim();
-          if (!v) throw new FlowError(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), i);
+          if (!v) this.fail(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), node);
           const name = JSON.stringify(v);
           const item = listItemTarget(v);
           const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
+          const cell = splitTarget(v);
+          // 輸入 表[a][b]：二維清單的一格
+          if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
+            const g = JSON.stringify(cell.name);
+            const read = this.gridHoldsText(cell.name) ? '__inText' : '__inNum';
+            code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${read}(input_list, ${i}, ${g}));\n`;
+          }
           // 輸入 成績 插入第 k 項：跟計算積木的「插入」一樣，k 可以是 1 到 長度+1
-          if (insert) {
+          else if (insert) {
             const list = insert[1].trim();
             const listName = JSON.stringify(list);
             code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), __inList(input_list, ${i}, ${listName}));\n`;
@@ -436,7 +612,8 @@ class CodeGenerator {
         const c = 'counter' + i;
         let code = 'for(let ' + c + '=0; ' + c + '<' + times + ';' + c + '++){\ntotal_step ++;' + update;
         const l = this.loop(node, '進入迴圈', '離開迴圈');
-        code += 'if(--__loopTrap < 0){\n break;\n}\n' + l.code + '\n}\n';
+        // 所有迴圈加起來跑太多次：多半是停不下來，直接告訴學生（不要悄悄停掉，答案會錯得莫名其妙）
+        code += `if(--__loopTrap < 0) __err('tooManyLoops', ${i}, {});\n` + l.code + '\n}\n';
         code += 'total_step ++;' + update;
         return { code, next: l.next };
       }
@@ -445,19 +622,21 @@ class CodeGenerator {
         this.checkSyntax(node, 'return (' + cond + ');');
         let code = 'while(!(' + cond + ')){\ntotal_step ++;' + update;
         const l = this.loop(node, '假', '真');
-        code += 'if(--__loopTrap < 0){\n break;\n}\n' + l.code + '\n}\n';
+        code += `if(--__loopTrap < 0) __err('tooManyLoops', ${i}, {});\n` + l.code + '\n}\n';
         code += 'total_step ++;' + update;
         return { code, next: l.next };
       }
       case 'Rectangle': {
-        const { target, action, index, expr: rest } = splitRectangle(node.text);
+        const { target, action, index, index2, expr: rest } = splitRectangle(node.text);
         const value = (node.data || '') + '(' + expr(rest.split('(取')[0]) + ')';
         const name = JSON.stringify(target);
         const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${value});\n`
           : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${value});\n`
           : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
           : action == '清空' ? `__clear(${target}, ${name}, ${i});\n`
-          : this.assign(action == '替換' ? `${target}[${index}]` : target, value, i);
+          // 二維清單設定大小：每一格放 0（裝文字的放空的文字）
+          : action == '建立' ? `${target} = __grid(${name}, ${i}, (${expr(index)}), (${expr(index2)}), ${this.gridHoldsText(target) ? '""' : '0'});\n`
+          : this.assign(action == '替換' ? `${target}[${index}]${index2 ? `[${index2}]` : ''}` : target, value, i);
         this.checkSyntax(node, code);
         return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
       }
@@ -480,27 +659,27 @@ class CodeGenerator {
     const isEnter = (t: string) => t.includes('進入迴圈') || t.includes('假');
     const isExit = (t: string) => t.includes('離開迴圈') || t.includes('真');
     let next = this.nextOf(node, isEnter);
-    if (!next) throw new FlowError(t(`迴圈${label(node)} 少了「${enter}」的箭頭（迴圈裡要做的事）。`, `The loop ${label(node)} needs a "${arrowName(enter)}" arrow (what to repeat).`), this.idx(node));
+    if (!next) this.fail(t(`迴圈${label(node)} 少了「${enter}」的箭頭（迴圈裡要做的事）。`, `The loop ${label(node)} needs a "${arrowName(enter)}" arrow (what to repeat).`), node);
     let code = '';
     while (next != node) {
       guard(this.counter);
       const r = this.toCode(next);
       code += r.code;
       if (!r.next) {
-        if (next.text == '結束') throw new FlowError(t(`迴圈${label(node)} 裡面的積木要接回迴圈，不能直接接到「結束」。`, `Blocks inside the loop ${label(node)} must go back to the loop, not to "End".`), this.idx(next));
-        throw new FlowError(label(next) + t(' 後面沒有接箭頭：迴圈裡最後一個積木要用箭頭接回迴圈。', ' has no arrow. The last block in a loop needs an arrow back to the loop.'), this.idx(next));
+        if (next.text == '結束') this.fail(t(`迴圈${label(node)} 裡面的積木要接回迴圈，不能直接接到「結束」。`, `Blocks inside the loop ${label(node)} must go back to the loop, not to "End".`), next);
+        this.fail(label(next) + t(' 後面沒有接箭頭：迴圈裡最後一個積木要用箭頭接回迴圈。', ' has no arrow. The last block in a loop needs an arrow back to the loop.'), next);
       }
       next = r.next;
     }
     const after = this.nextOf(node, isExit);
-    if (!after) throw new FlowError(t(`迴圈${label(node)} 少了「${exit}」的箭頭（迴圈結束後要做的事）。`, `The loop ${label(node)} needs a "${arrowName(exit)}" arrow (what to do after the loop).`), this.idx(node));
+    if (!after) this.fail(t(`迴圈${label(node)} 少了「${exit}」的箭頭（迴圈結束後要做的事）。`, `The loop ${label(node)} needs a "${arrowName(exit)}" arrow (what to do after the loop).`), node);
     return { code, next: after };
   }
 
   /** 判斷的一個分支：一路走到匯合點（有兩條以上箭頭指進來的積木）為止 */
   private branch(node: FlowNode, pred: (text: string) => boolean, name: string): CodeResult {
     let next = this.nextOf(node, pred);
-    if (!next) throw new FlowError(t(`判斷${label(node)} 少了「${name}」的箭頭。`, `The decision ${label(node)} needs a "${arrowName(name)}" arrow.`), this.idx(node));
+    if (!next) this.fail(t(`判斷${label(node)} 少了「${name}」的箭頭。`, `The decision ${label(node)} needs a "${arrowName(name)}" arrow.`), node);
     let code = '';
     let num = this.linksInto(next);
     while (next && ((next.figure != 'Diamond' && num == 1) || (next.figure == 'Diamond' && num < 2))) {
@@ -517,7 +696,7 @@ class CodeGenerator {
   /** 從「開始」走到「結束」 */
   program(): string {
     let start = this.nodes.find(n => n && n.text == '開始');
-    if (!start) throw new FlowError(t('流程圖少了「開始」。', 'The flowchart needs a "Start" block.'));
+    if (!start) this.fail(t('流程圖少了「開始」。', 'The flowchart needs a "Start" block.'), null);
     let code = '';
     while (start.text != '結束') {
       guard(this.counter);
@@ -550,7 +729,7 @@ export interface RunResult {
 
 /** 變數的初始值：清單一開始是空的；文字變數沒加引號時自動加上；數字變數要是數字 */
 function initialValue(vars: VarStore, name: string, raw: string | undefined): string {
-  if (vars.type_var_list.array.includes(name)) return '[]';
+  if (vars.type_var_list.array.includes(name) || vars.type_var_list.grid.includes(name)) return '[]';
   const value = (raw ?? '').trim();
   if (vars.type_var_list.text.includes(name)) {
     return /^(".*"|'.*')$/.test(value) ? value : JSON.stringify(value);
@@ -561,13 +740,15 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
 }
 
 /** 用某一組測資執行流程圖，記錄每一步；沒辦法執行時丟出 FlowError（附上給學生看的說明） */
-export function buildRun(diagram: Diagram, vars: VarStore, inputText: string): RunResult {
+export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, modules: ModuleSource[] = []): RunResult {
   // 測資的輸入用空白、換行或逗號分開，每一項先當文字，存進變數時再依型別轉換
   const input_list = inputText.split(/[\n\s,]+/g).filter(s => s != '');
 
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');
-  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: []};\nvar __loopTrap = 1000;\n';
+  // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
+  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\n';
+  code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
   code += runtime();
   for (const name of names) {
     const decl = 'var ' + name + ' = ' + initialValue(vars, name, vars.var_list.value[vars.var_list.name.indexOf(name)]) + '\n';
@@ -575,33 +756,45 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string): R
     code += decl;
   }
   code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\n}\n';
-  code += new CodeGenerator(diagram, vars, names).program();
+  const infos = modules.map(m => m.info);
+  code += new CodeGenerator(diagram, vars, names, 0, infos).program();
+  // 模組：每個模組一個函式（__mod1、__mod2…）
+  modules.forEach((m, k) => {
+    code += new CodeGenerator(m.diagram, vars, names, k + 1, infos, m.info.params).program();
+  });
   // 執行到一半出錯時，保留出錯前的每一步，學生才看得到變數是怎麼變的
-  code += 'var __error = null;\ntry { flowchart_code(' + JSON.stringify(input_list) + '); } catch (e) { __error = e; }\n';
+  code += 'var __error = null;\ntry { flowchart_code(); } catch (e) { __error = e; }\n';
   code += 'return {totalStep: total_step, step: step_list.step, var: step_list.var, output: step_list.output, error: __error};\n';
 
   console.log('code = \n', code);
+  const diagrams = [diagram, ...modules.map(m => m.diagram)];
   let result: Omit<RunResult, 'error'> & { error: unknown };
   try {
     result = Function('__FlowError', code)(FlowError);
   }
   catch (e) {
-    throw explainError(e, diagram);
+    throw explainError(e, diagrams);
   }
   if (result.error == null) return { ...result, error: undefined };
   // 連第一步都沒跑到就出錯：當成整個沒辦法執行
-  if (result.step.length == 0) throw explainError(result.error, diagram);
-  return { ...result, totalStep: result.step.length - 1, error: explainError(result.error, diagram) };
+  if (result.step.length == 0) throw explainError(result.error, diagrams);
+  return { ...result, totalStep: result.step.length - 1, error: explainError(result.error, diagrams) };
 }
 
-/** 執行時的錯誤換成給學生看的說明 */
-function explainError(e: unknown, diagram: Diagram): FlowError {
+/** 執行時的錯誤換成給學生看的說明；diagrams 是主程式和各個模組的流程圖 */
+function explainError(e: unknown, diagrams: Diagram[]): FlowError {
   if (e instanceof FlowError) return e;
+  // 模組執行自己太多層，JavaScript 自己的堆疊先滿了
+  if (e instanceof RangeError) return new FlowError(runtimeMessages().tooDeep);
   const missing = e instanceof ReferenceError && /^(.+) is not defined$/.exec(e.message);
   if (missing) {
     const name = missing[1];
-    const at = diagram.nodes.findIndex(n => n != null && n.text.includes(name));
-    return new FlowError(t(`「${name}」沒有定義：請到第三步的變數表新增這個變數，或檢查積木裡是不是打錯字。`, `"${name}" is not a variable. Add it to the variable table (step 3), or check the spelling in your blocks.`), at >= 0 ? at : null);
+    let at: number | null = null;
+    diagrams.forEach((d, sheet) => {
+      const k = d.nodes.findIndex(n => n != null && n.text.includes(name));
+      if (at == null && k >= 0) at = sheetId(sheet, k);
+    });
+    return new FlowError(t(`「${name}」沒有定義：請到第三步的變數表新增這個變數，或檢查積木裡是不是打錯字。`, `"${name}" is not a variable. Add it to the variable table (step 3), or check the spelling in your blocks.`), at);
   }
   if (e instanceof SyntaxError) {
     return new FlowError(t('有積木的寫法程式看不懂：請檢查變數名稱、運算式的括號和引號。', 'A block cannot be read. Check the variable names, ( ) and " ".'));

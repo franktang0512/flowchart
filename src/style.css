@@ -1051,3 +1051,113 @@ input, textarea, select, button {
     white-space: nowrap;
     text-overflow: ellipsis;
 }
+
+/* ---------- 模組：畫布上方的分頁（主程式、各個模組）、模組的說明列 ---------- */
+.sheet_tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.sheet_tabs button {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 999px;
+    padding: 4px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+.sheet_tabs button.selected {
+    background: #ffd6de;
+    border-color: #ff6680;
+    font-weight: 600;
+}
+.sheet_tabs button:first-child.selected {
+    background: var(--green);
+    border-color: var(--green-dark);
+}
+.sheet_tabs .sheet_add {
+    border-style: dashed;
+    color: var(--muted);
+}
+.module_bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 6px 12px;
+    background: #fff0f3;
+    border: 1px solid #ffb3c1;
+    border-radius: 10px;
+}
+.module_bar button {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 2px 10px;
+    cursor: pointer;
+}
+#module_dialog {
+    max-width: 520px;
+}
+.module_param {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.module_param input {
+    flex: 1;
+}
+.module_args input {
+    width: 50%;
+}
+/* 第四步：現在畫布上是哪一張流程圖 */
+.run_sheet {
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #fff0f3;
+    border: 1px solid #ffb3c1;
+    font-size: 0.9rem;
+}
+.var_box.is_param .var_box_value {
+    background: #ffd6de;
+}
+.var_box_name small {
+    font-weight: normal;
+    color: var(--muted);
+}
+.flow_chart_module {
+    display: block;
+    margin: auto;
+    max-width: 100%;
+}
+
+/* ---------- 第四步：二維清單畫成表格 ---------- */
+.grid_value {
+    display: block;
+    max-width: 100%;
+    max-height: 260px;
+    overflow: auto;
+}
+.grid_value table {
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+.grid_value th {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: normal;
+    padding: 0 6px;
+    text-align: center;
+}
+.grid_value td {
+    min-width: 32px;
+    padding: 2px 6px;
+    text-align: center;
+    background: #fff;
+    border: 1px solid var(--line);
+}
+.grid_value td.changed {
+    background: #fff4c2;
+    border-color: #e0b100;
+}

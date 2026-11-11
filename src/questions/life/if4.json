@@ -1,0 +1,54 @@
+{
+  "title": "電影票",
+  "question": "電影院的票價：12 歲以下或 65 歲以上買優待票 150 元，其他人買全票 300 元。\n請輸入年齡，輸出票價。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "8",
+      "output": "150",
+      "note": "12 歲以下"
+    },
+    {
+      "input": "70",
+      "output": "150",
+      "note": "65 歲以上"
+    },
+    {
+      "input": "30",
+      "output": "300",
+      "note": ""
+    },
+    {
+      "input": "12",
+      "output": "150",
+      "note": "剛好 12 歲也算"
+    }
+  ],
+  "en": {
+    "title": "Movie Ticket",
+    "question": "Movie tickets: if you are 12 or younger, OR 65 or older, you pay 150. Others pay 300.\nInput the age. Output the price.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "8",
+        "output": "150",
+        "note": "12 or younger"
+      },
+      {
+        "input": "70",
+        "output": "150",
+        "note": "65 or older"
+      },
+      {
+        "input": "30",
+        "output": "300",
+        "note": ""
+      },
+      {
+        "input": "12",
+        "output": "150",
+        "note": "Exactly 12 counts"
+      }
+    ]
+  }
+}

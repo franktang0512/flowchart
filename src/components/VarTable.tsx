@@ -1,14 +1,19 @@
 // 第三步左邊的「變數」表格
 import { t, useLang } from '../i18n';
+import { getTarget } from '../target';
 import { useCommit } from '../useCommit';
 
 export interface VarRow {
   id: number;
   name: string;
-  type: '數字' | '文字' | '清單';
+  /** 二維清單只有學習目標是 C++ 時可以選（Scratch 沒有） */
+  type: '數字' | '文字' | '清單' | '二維清單';
   init: string;
   desc: string;
 }
+
+/** 清單、二維清單：一開始是空的，初始值欄改成選裡面裝什麼 */
+const isListType = (type: VarRow['type']) => type == '清單' || type == '二維清單';
 
 interface Props {
   rows: VarRow[];
@@ -60,8 +65,8 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
           onChange={e => {
             const type = e.target.value as VarRow['type'];
             // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字
-            const init = type == '清單' ? (row.init == '文字' ? '文字' : '數字')
-              : row.type == '清單' ? (type == '數字' ? '0' : '')
+            const init = isListType(type) ? (row.init == '文字' ? '文字' : '數字')
+              : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
             onChange(row.id, { type, init });
             onCommit();
@@ -70,14 +75,18 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
           <option value="數字">{t('數字', 'Number')}</option>
           <option value="文字">{t('文字', 'Text')}</option>
           <option value="清單">{t('清單', 'List')}</option>
+          {(getTarget() == 'cpp' || row.type == '二維清單') && <option value="二維清單">{t('二維清單', '2D list')}</option>}
         </select>
       </td>
       <td>
-        {row.type == '清單'
+        {isListType(row.type)
           ? (
             // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>）
             <select
-              className="var_input" value={row.init == '文字' ? '文字' : '數字'} title={t('清單一開始是空的，這裡選裡面要裝什麼', 'The list starts empty. Choose what it holds.')}
+              className="var_input" value={row.init == '文字' ? '文字' : '數字'}
+              title={row.type == '二維清單'
+                ? t('二維清單一開始是空的，要先用計算積木「建立 幾 列 幾 行」；這裡選裡面要裝什麼', 'The 2D list starts empty. Make it with a Math block (rows × columns). Choose what it holds.')
+                : t('清單一開始是空的，這裡選裡面要裝什麼', 'The list starts empty. Choose what it holds.')}
               onChange={e => { onChange(row.id, { init: e.target.value }); onCommit(); }}
             >
               <option value="數字">{t('裝數字', 'Numbers')}</option>

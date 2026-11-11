@@ -1,8 +1,9 @@
 // 對話框按「確認」之後：新增或修改積木。檢查條件的順序與舊版相同（會影響跳出哪個提示）。
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
-import { checkVar, getCodeVar, type VarStore } from './engine/decoder';
-import { splitRectangle } from './engine/labels';
+import { checkCall, checkVar, getCodeVar, type VarStore } from './engine/decoder';
+import { splitRectangle, splitTarget } from './engine/labels';
+import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
 import { t } from './i18n';
@@ -18,10 +19,13 @@ const sharedConnectors = createConnectors();
 /** 計算積木的文字（格式見 splitRectangle）以及它用到的變數 */
 function rectangleText(vars: VarStore, f: DialogForm) {
   const target = f.varSelect ? ' ' + f.varSelect : '';
+  // 二維清單的一格：表[列][行]
+  const cell = vars.type_var_list.grid.includes(f.varSelect.trim()) ? `[${f.rectIndex.trim()}][${f.rectIndex2.trim()}]` : `[${f.rectIndex}]`;
   let text = f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
-    : f.rectAction == '替換' ? `${target}[${f.rectIndex}] 設為 ${f.code}`
+    : f.rectAction == '替換' ? `${target}${cell} 設為 ${f.code}`
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
     : f.rectAction == '清空' ? `${target} 刪除所有項目`
+    : f.rectAction == '建立' ? `${target} 建立 ${f.rectIndex.trim()} 列 ${f.rectIndex2.trim()} 行`
     : `${target} ${f.rectAction} ${f.code}`;
   const nodeVar = getCodeVar(vars, text);
   if (!nodeVar.includes(f.varSelect || '')) nodeVar.push(f.varSelect || '');
@@ -30,12 +34,21 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   return { text, nodeVar };
 }
 
-/** 刪除第幾項、刪除所有項目不用填值 */
-const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空';
+/** 刪除第幾項、刪除所有項目、建立二維清單不用填值 */
+const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立';
 
 function rectangleValid(vars: VarStore, f: DialogForm) {
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
   const list = f.varSelect.trim();
+  // 二維清單：建立（幾列幾行）、替換一格（第幾列第幾行）
+  if (vars.type_var_list.grid.includes(list) && (f.rectAction == '建立' || f.rectAction == '替換')) {
+    if (!checkVar(vars, f.rectIndex, true) || !checkVar(vars, f.rectIndex2, true)) return false;
+    return !hasValue(f) || checkVar(vars, f.code, true);
+  }
+  if (f.rectAction == '建立') {
+    alert(t('請選一個二維清單。', 'Choose a 2D list.'));
+    return false;
+  }
   if (!vars.type_var_list.array.includes(list)) {
     alert(t(`「${list}」不是清單：只有型別是「清單」的變數才能添加、插入、替換或刪除。`, `"${list}" is not a list. Only list variables can add, insert, replace or delete.`));
     return false;
@@ -51,6 +64,11 @@ function rectangleValid(vars: VarStore, f: DialogForm) {
  */
 function ioText(vars: VarStore, f: DialogForm): string | null {
   if (f.radio == '輸入') {
+    // 二維清單的一格：輸入 表[列][行]
+    if (f.ioTarget == '二維清單') {
+      const text = `${f.varSelect.trim()}[${f.rectIndex.trim()}][${f.rectIndex2.trim()}]`;
+      return checkVar(vars, text, false) ? '輸入 ' + text : null;
+    }
     if (!checkVar(vars, f.varSelect, false)) return null;
     if (f.ioTarget != '清單' || f.ioPlace == '加入') return '輸入 ' + f.varSelect;
     if (!checkVar(vars, f.rectIndex, true)) return null;
@@ -63,8 +81,15 @@ function ioText(vars: VarStore, f: DialogForm): string | null {
   return null;
 }
 
+/** 執行模組積木的文字「模組名稱(引數, …)」；檢查沒過回傳 null */
+function callNodeText(vars: VarStore, modules: ModuleInfo[], f: DialogForm): string | null {
+  const m = modules.find(x => x.name == f.moduleName);
+  const args = m ? m.params.map((_, k) => (f.moduleArgs[k] ?? '').trim()) : [];
+  return checkCall(vars, modules, f.moduleName, args) ? callText(f.moduleName, args) : null;
+}
+
 /** 在 (x, y) 新增積木 */
-export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogForm, x: number, y: number): boolean {
+export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogForm, x: number, y: number, modules: ModuleInfo[] = []): boolean {
   const add = (text: string, figure: FlowNode['figure'], nodeVars?: string[], data?: string) => {
     const node = d.newNode(x, y, 120, 80, sharedConnectors, text, figure, nodeVars, data);
     d.addNode(node);
@@ -94,13 +119,17 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
         return add(text, 'Rectangle', nodeVar, f.radio);
       }
       return false;
+    case 'Function': {
+      const text = callNodeText(vars, modules, f);
+      return text != null && add(text, 'Function', getCodeVar(vars, text));
+    }
     default:
       return false;
   }
 }
 
 /** 雙擊後修改積木 */
-export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: DialogForm): boolean {
+export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): boolean {
   const done = () => {
     d.fitNode(node);
     d.pause = false;
@@ -139,6 +168,13 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
       node.variables = nodeVar;
       return done();
     }
+    case 'Function': {
+      const text = callNodeText(vars, modules, f);
+      if (text == null) return false;
+      node.text = text;
+      node.variables = getCodeVar(vars, text);
+      return done();
+    }
     default:
       return false;
   }
@@ -161,9 +197,10 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
       }
       // 輸入到清單的某一項：拆出清單和第幾項（存到變數還是清單，對話框再依變數表判斷）
       const insert = /^(.*?) 插入第 (.*) 項$/s.exec(rest);
-      const item = /^(.+?)\[(.*)\]$/s.exec(rest);
+      const item = splitTarget(rest);
       const place: Partial<DialogForm> = insert ? { varSelect: insert[1].trim(), ioPlace: '插入', rectIndex: insert[2].trim() }
-        : item ? { varSelect: item[1].trim(), ioPlace: '替換', rectIndex: item[2].trim() }
+        : item?.indexes.length == 2 ? { varSelect: item.name, ioTarget: '二維清單', rectIndex: item.indexes[0], rectIndex2: item.indexes[1] }
+        : item ? { varSelect: item.name, ioPlace: '替換', rectIndex: item.indexes[0] }
         : { varSelect: rest };
       return {
         kind: 'Parallelogram',
@@ -172,12 +209,16 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
     }
     case 'Diamond':
       return { kind: 'Diamond', initial: { code: text } };
+    case 'Function': {
+      const call = parseCall(text);
+      return { kind: 'Function', initial: call ? { moduleName: call.name, moduleArgs: call.args } : {} };
+    }
     case 'For_Loop':
       return { kind: 'For_Loop', initial: { radio: 'for', forNumber: text.substring(0, text.length - 1), showWhile: false } };
     case 'While_Loop':
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
     case 'Rectangle': {
-      const { target, action, index, expr } = splitRectangle(text);
+      const { target, action, index, index2, expr } = splitRectangle(text);
       return {
         kind: 'Rectangle',
         initial: {
@@ -185,6 +226,7 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
           rectIndex: index,
+          rectIndex2: index2,
           varSelect: target,
           code: expr.split('(取')[0],
         },

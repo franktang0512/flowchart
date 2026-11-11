@@ -6,7 +6,8 @@ import type { Diagram } from '../engine/diagram';
 import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
 import { blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
-import { structure, type VarInfo } from '../engine/structure';
+import type { ModuleSource } from '../engine/modules';
+import { structure, structureModules, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
 import { toCpp } from '../engine/toCpp';
 import { getLang, t, useLang } from '../i18n';
@@ -62,11 +63,13 @@ interface Props {
   diagram: Diagram;
   /** 變數表（沒填名稱的列不算） */
   vars: () => VarInfo[];
+  /** 模組（名稱、參數、各自的流程圖） */
+  modules: () => ModuleSource[];
   /** 積木改好、按「套用到流程圖」：用積木重畫流程圖、更新變數表 */
   onApply: (result: FromBlocks) => void;
 }
 
-export function CodeView({ open, onClose, diagram, vars, onApply }: Props) {
+export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Props) {
   useLang();
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -88,7 +91,9 @@ export function CodeView({ open, onClose, diagram, vars, onApply }: Props) {
         </span>
         <button onClick={onClose}>{t('關閉', 'Close')}</button>
       </div>
-      {open && (target == 'cpp' ? <CppCode diagram={diagram} vars={vars()} /> : <BlocklyCode diagram={diagram} vars={vars()} onApply={onApply} />)}
+      {open && (target == 'cpp'
+        ? <CppCode diagram={diagram} vars={vars()} modules={modules()} />
+        : <BlocklyCode diagram={diagram} vars={vars()} modules={modules()} onApply={onApply} />)}
       {/* Blockly 的輸入框、下拉選單放這裡：蓋滿整個畫面、不擋滑鼠（見 .blockly_layer） */}
       <div id={BLOCKLY_LAYER} className="blockly_layer" />
     </dialog>
@@ -96,20 +101,20 @@ export function CodeView({ open, onClose, diagram, vars, onApply }: Props) {
 }
 
 /** 流程圖 → 結構；接得不完整時回傳錯誤說明 */
-function programOf(diagram: Diagram) {
+function programOf(diagram: Diagram, modules: ModuleSource[]) {
   try {
-    return { program: structure(diagram), error: null };
+    return { program: structure(diagram), modules: structureModules(modules), error: null };
   }
   catch (e) {
-    return { program: null, error: e instanceof FlowError ? e.message : String(e) };
+    return { program: null, modules: [], error: e instanceof FlowError ? e.message : String(e) };
   }
 }
 
-function CppCode({ diagram, vars }: { diagram: Diagram; vars: VarInfo[] }) {
-  const { program, error } = programOf(diagram);
+function CppCode({ diagram, vars, modules }: { diagram: Diagram; vars: VarInfo[]; modules: ModuleSource[] }) {
+  const { program, modules: mods, error } = programOf(diagram, modules);
   const [copied, setCopied] = useState(false);
   if (!program) return <p className="run_error">{error}</p>;
-  const code = toCpp(program, vars);
+  const code = toCpp(program, vars, mods);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);
@@ -133,8 +138,9 @@ const emptyBlocks = (mode: BlockMode) => ({
   blocks: { languageVersion: 0, blocks: mode == 'scratch' ? [{ type: 'event_whenflagclicked', x: 20, y: 20 }] : [] },
 });
 
-function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarInfo[]; onApply: (result: FromBlocks) => void }) {
-  const { program, error } = programOf(diagram);
+function BlocklyCode({ diagram, vars, modules, onApply }: { diagram: Diagram; vars: VarInfo[]; modules: ModuleSource[]; onApply: (result: FromBlocks) => void }) {
+  const { program, modules: mods, error } = programOf(diagram, modules);
+  const infos = modules.map(m => m.info);
   const boxRef = useRef<HTMLDivElement>(null);
   /** 出錯的說明：下載不到 Blockly，或積木畫不出來（附上原因，才知道要修哪裡） */
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -147,7 +153,7 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
   /** 編輯中換外觀時，改到一半的積木轉成另一種外觀的樣子（沒有的話就從流程圖產生） */
   const [draft, setDraft] = useState<string | null>(null);
   const live = useRef<{ Blockly: BlocklyModule; workspace: BlocklyModule } | null>(null);
-  const json = editing && draft ? draft : program ? JSON.stringify(toBlockly(program, vars, mode)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
+  const json = editing && draft ? draft : program ? JSON.stringify(toBlockly(program, vars, mode, mods)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
 
   useEffect(() => {
     if (!json) return;
@@ -174,6 +180,8 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
         });
         if (editing && mode == 'scratch') setupScratchEditing(Blockly, workspace);
         Blockly.serialization.workspaces.load(JSON.parse(json), workspace);
+        // 有模組（好幾串積木）時排整齊，不然寬的積木會疊在一起
+        if (workspace.getTopBlocks(false).length > 1) workspace.cleanUp();
         live.current = { Blockly, workspace };
       }
       catch (e) {
@@ -197,8 +205,8 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
     const ws = live.current;
     if (editing && ws) {
       try {
-        const result = fromBlockly(ws.Blockly.serialization.workspaces.save(ws.workspace), mode, vars);
-        setDraft(JSON.stringify(toBlockly(result.program, result.vars, next)));
+        const result = fromBlockly(ws.Blockly.serialization.workspaces.save(ws.workspace), mode, vars, infos);
+        setDraft(JSON.stringify(toBlockly(result.program, result.vars, next, result.modules)));
       }
       catch (e) {
         if (!(e instanceof BlockError)) throw e;
@@ -218,7 +226,7 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
     const ws = live.current;
     if (!ws) return;
     try {
-      const result = fromBlockly(ws.Blockly.serialization.workspaces.save(ws.workspace), mode, vars);
+      const result = fromBlockly(ws.Blockly.serialization.workspaces.save(ws.workspace), mode, vars, infos);
       setApplyError(null);
       if (!confirm(t('目前的流程圖會被換成這些積木畫出來的流程圖，確定嗎？', 'Your flowchart will be replaced by one made from these blocks. Continue?'))) return;
       onApply(result);
@@ -229,6 +237,10 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
     }
   };
 
+  // 二維清單只有 C++ 有（Scratch 沒有），積木畫不出來
+  if (vars.some(v => v.type == '二維清單')) {
+    return <p className="run_error">{t('Scratch / Blockly 沒有二維清單：用到二維清單的流程圖，請把學習目標換成 C++ 再看程式。', 'Scratch / Blockly have no 2D lists. To see this flowchart as code, change the learning goal to C++.')}</p>;
+  }
   if (!program && !editing) {
     return (
       <>

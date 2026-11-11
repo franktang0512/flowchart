@@ -1,0 +1,44 @@
+{
+  "title": "要不要帶傘",
+  "question": "出門前看天氣預報。請輸入降雨機率（%），50 以上輸出「記得帶傘」，不然輸出「不用帶傘」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "70",
+      "output": "記得帶傘",
+      "note": ""
+    },
+    {
+      "input": "50",
+      "output": "記得帶傘",
+      "note": "剛好 50 也要帶"
+    },
+    {
+      "input": "20",
+      "output": "不用帶傘",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Umbrella or Not",
+    "question": "Check the weather before you go out. Input the chance of rain (%). If it is 50 or more, output \"Take an umbrella\". If not, output \"No umbrella\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "70",
+        "output": "Take an umbrella",
+        "note": ""
+      },
+      {
+        "input": "50",
+        "output": "Take an umbrella",
+        "note": "Exactly 50: take one"
+      },
+      {
+        "input": "20",
+        "output": "No umbrella",
+        "note": ""
+      }
+    ]
+  }
+}

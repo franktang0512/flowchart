@@ -1,0 +1,44 @@
+{
+  "title": "夜市怎麼買最開心",
+  "question": "你帶了一些錢去夜市，有 3 樣想吃的東西，每樣最多買一份。每樣都有價格和「喜歡程度」。\n請輸入帶了多少錢，再依序輸入 3 樣東西的價格和喜歡程度，輸出不超過預算時，喜歡程度加起來最多是多少。\n想想看：「先買最喜歡的」一定最好嗎？看第二組測資。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "100 60 8 45 6 50 7",
+      "output": "13",
+      "note": "雞排 60 元喜歡 8；奶茶 45 元喜歡 6；臭豆腐 50 元喜歡 7。買奶茶加臭豆腐 95 元，喜歡 13"
+    },
+    {
+      "input": "100 70 9 50 6 50 6",
+      "output": "12",
+      "note": "先買最喜歡的雞排（70 元）就只剩 30 元；其實買兩樣 50 元的，加起來 12 比較多"
+    },
+    {
+      "input": "40 60 8 45 6 50 7",
+      "output": "0",
+      "note": "錢不夠，一樣都買不了"
+    }
+  ],
+  "en": {
+    "title": "Best Night Market Plan",
+    "question": "You bring some money to the night market. There are 3 foods you want. You can buy at most one of each. Each food has a price and a \"like\" score.\nInput your money. Then input the price and like score of each food. Output the biggest total like score you can get without going over your money.\nThink: Is \"buy your favorite first\" always best? See test 2.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "100 60 8 45 6 50 7",
+        "output": "13",
+        "note": "Food A 60 (like 8), B 45 (like 6), C 50 (like 7). B + C costs 95, like 13"
+      },
+      {
+        "input": "100 70 9 50 6 50 6",
+        "output": "12",
+        "note": "The favorite (70) leaves only 30. Two 50s give 12, which is more"
+      },
+      {
+        "input": "40 60 8 45 6 50 7",
+        "output": "0",
+        "note": "Not enough money for anything"
+      }
+    ]
+  }
+}

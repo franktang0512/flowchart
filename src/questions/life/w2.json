@@ -1,0 +1,34 @@
+{
+  "title": "密碼鎖",
+  "question": "家門的密碼鎖密碼是 1234。請一直輸入密碼，錯了輸出「密碼錯誤」再輸入一次；對了輸出「開門」，結束程式。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1111 2222 1234",
+      "output": "密碼錯誤\n密碼錯誤\n開門",
+      "note": "錯兩次，第三次對"
+    },
+    {
+      "input": "1234",
+      "output": "開門",
+      "note": "第一次就對"
+    }
+  ],
+  "en": {
+    "title": "Door Lock",
+    "question": "The door code is 1234. Keep inputting a code. If it is wrong, output \"Wrong code\" and try again. If it is right, output \"Open\" and stop.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1111 2222 1234",
+        "output": "Wrong code\nWrong code\nOpen",
+        "note": "Wrong twice, right the third time"
+      },
+      {
+        "input": "1234",
+        "output": "Open",
+        "note": "Right the first time"
+      }
+    ]
+  }
+}

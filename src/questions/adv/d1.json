@@ -1,0 +1,44 @@
+{
+  "title": "上樓梯",
+  "question": "上學爬樓梯，每一步可以走 1 階或 2 階。請輸入樓梯有幾階，輸出有幾種走法。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "4",
+      "output": "5",
+      "note": "1111、112、121、211、22"
+    },
+    {
+      "input": "10",
+      "output": "89",
+      "note": ""
+    },
+    {
+      "input": "1",
+      "output": "1",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Climb the Stairs",
+    "question": "You climb the stairs to school. Each step goes up 1 or 2 stairs. Input the number of stairs. Output how many ways you can climb.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "4",
+        "output": "5",
+        "note": "1111, 112, 121, 211, 22"
+      },
+      {
+        "input": "10",
+        "output": "89",
+        "note": ""
+      },
+      {
+        "input": "1",
+        "output": "1",
+        "note": ""
+      }
+    ]
+  }
+}

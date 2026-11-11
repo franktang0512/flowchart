@@ -1,0 +1,34 @@
+{
+  "title": "跑操場",
+  "question": "體育課要跑操場。請輸入要跑幾圈，每跑一圈輸出「第 1 圈」「第 2 圈」……，跑完輸出「完成！」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3",
+      "output": "第 1 圈\n第 2 圈\n第 3 圈\n完成！",
+      "note": ""
+    },
+    {
+      "input": "1",
+      "output": "第 1 圈\n完成！",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Run Laps",
+    "question": "In PE class, you run laps. Input how many laps. For each lap, output \"Lap 1\", \"Lap 2\", and so on. At the end, output \"Done!\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3",
+        "output": "Lap 1\nLap 2\nLap 3\nDone!",
+        "note": ""
+      },
+      {
+        "input": "1",
+        "output": "Lap 1\nDone!",
+        "note": ""
+      }
+    ]
+  }
+}

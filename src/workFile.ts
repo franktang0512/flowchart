@@ -2,6 +2,7 @@
 import type { VarRow } from './components/VarTable';
 import { t } from './i18n';
 import type { DiagramData } from './engine/diagram';
+import type { ModuleInfo } from './engine/modules';
 
 const APP = 'flowchart-worksheet';
 const VERSION = 1;
@@ -24,6 +25,8 @@ export interface WorkFile {
   variables: Omit<VarRow, 'id'>[];
   /** 第三步：流程圖 */
   flowchart: DiagramData;
+  /** 第三步：模組（名稱、參數、各自的流程圖）；舊的作品檔沒有 */
+  modules?: (ModuleInfo & { flowchart: DiagramData })[];
 }
 
 export type WorkContent = Omit<WorkFile, 'app' | 'version' | 'savedAt'>;
@@ -45,6 +48,9 @@ export function parseWorkFile(text: string): WorkFile {
   if (!w || w.app !== APP) throw new Error(t('這不是這個學習單匯出的作品檔。', 'This file is not from this worksheet.'));
   if (typeof w.version != 'number' || w.version > VERSION) throw new Error(t('這個作品檔的版本比網頁新，請重新整理網頁後再試一次。', 'This file is newer than this page. Reload the page and try again.'));
   if (!Array.isArray(w.cases) || !Array.isArray(w.variables) || !w.flowchart || !Array.isArray(w.flowchart.nodes)) {
+    throw new Error(t('作品檔內容不完整，可能已經損壞。', 'This work file is broken.'));
+  }
+  if (w.modules != null && (!Array.isArray(w.modules) || w.modules.some(m => !m || !m.flowchart || !Array.isArray(m.flowchart.nodes)))) {
     throw new Error(t('作品檔內容不完整，可能已經損壞。', 'This work file is broken.'));
   }
   return w as WorkFile;

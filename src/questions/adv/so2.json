@@ -1,0 +1,44 @@
+{
+  "title": "賽跑排名",
+  "question": "運動會 100 公尺賽跑，秒數越少名次越前面。請先輸入有幾位選手，再依照座號 1、2、3……輸入每個人的秒數，最後輸出從第一名到最後一名的座號。秒數一樣的，座號小的排前面。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 14.2 13.8 15.0 13.8 14.0",
+      "output": "2 4 5 1 3",
+      "note": "2 號和 4 號都是 13.8，2 號排前面"
+    },
+    {
+      "input": "3 12.5 12.1 12.9",
+      "output": "2 1 3",
+      "note": ""
+    },
+    {
+      "input": "4 13.0 13.0 13.0 12.0",
+      "output": "4 1 2 3",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Race Ranking",
+    "question": "In a 100 m race, fewer seconds is better. First input the number of runners. Then input each time, for seat number 1, 2, 3, and so on. Output the seat numbers from first place to last. If two times are the same, the smaller seat number goes first.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 14.2 13.8 15.0 13.8 14.0",
+        "output": "2 4 5 1 3",
+        "note": "Runners 2 and 4 both have 13.8. Runner 2 goes first"
+      },
+      {
+        "input": "3 12.5 12.1 12.9",
+        "output": "2 1 3",
+        "note": ""
+      },
+      {
+        "input": "4 13.0 13.0 13.0 12.0",
+        "output": "4 1 2 3",
+        "note": ""
+      }
+    ]
+  }
+}

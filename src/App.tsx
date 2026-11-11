@@ -4,15 +4,17 @@
 //   第四步 測試執行並除錯：逐步執行流程圖
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { CodeView } from './components/CodeView';
+import { ModuleDialog, type ModuleRequest } from './components/ModuleDialog';
 import { NodeDialog, type DialogRequest } from './components/NodeDialog';
 import { PrintView, type PrintData } from './components/PrintView';
 import { QuestionPanel } from './components/QuestionPanel';
 import { RunArea } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
-import { connectorState } from './engine/connector';
-import { buildRun, createVarStore, FlowError, type RunResult } from './engine/decoder';
+import { connectorState, createConnectors } from './engine/connector';
+import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
+import { callText, parseCall, splitId, type ModuleInfo, type ModuleSource } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -39,7 +41,17 @@ const BLOCK_TOOLS = [
   { id: 'Diamond', icon: 'if', name: () => t('判斷', 'Decision') },
   { id: 'Rectangle', icon: 'cal', name: () => t('計算', 'Math') },
   { id: 'Loop', icon: 'loop', name: () => t('迴圈', 'Loop') },
+  // 流程圖的「預定處理」：執行一個模組（Scratch 的自訂積木）
+  { id: 'Function', icon: 'func', name: () => t('執行模組', 'Run a module') },
 ];
+
+/** 一個模組：名稱、參數，和它自己的一張流程圖；id 用來切換分頁（主程式是 0） */
+interface AppModule {
+  id: number;
+  info: ModuleInfo;
+  diagram: Diagram;
+}
+let moduleSeq = 0;
 const ARROW_TOOLS = [
   { id: 'straight', icon: 'arrow', name: () => t('直線箭頭', 'Arrow') },
   { id: 'square', icon: 'turn_arrow', name: () => t('折線箭頭', 'Bent arrow') },
@@ -89,6 +101,16 @@ export function App() {
   const [printing, setPrinting] = useState(false);
   const [printData, setPrintData] = useState<PrintData | null>(null);
   const [printImg, setPrintImg] = useState<string>();
+  const [printModules, setPrintModules] = useState<{ title: string; src: string }[]>([]);
+  /** 模組（每個有自己的一張流程圖）；sheet 是畫面上這一張：0 是主程式，其他是模組的 id */
+  const [modules, setModulesState] = useState<AppModule[]>([]);
+  const modulesRef = useRef<AppModule[]>([]);
+  const [sheet, setSheetState] = useState(0);
+  const sheetRef = useRef(0);
+  const [moduleDialog, setModuleDialog] = useState<ModuleRequest | null>(null);
+  /** 第四步：目前顯示哪一張流程圖（執行到模組裡時會換過去） */
+  const [runSheetName, setRunSheetName] = useState('');
+  const shownRef = useRef<Diagram | null>(null);
   const [which, setWhich] = useState(0);
   const [run, setRun] = useState<RunResult | null>(null);
   /** 流程圖沒辦法執行時，給學生看的原因 */
@@ -120,7 +142,7 @@ export function App() {
 
   // ---------------- 流程圖 ----------------
   const editNodeRef = useRef<DiagramHooks['editNode']>(() => {});
-  const [main] = useState(() => new Diagram({
+  const [hooks] = useState<DiagramHooks>(() => ({
     askLinkLabel: kind => new Promise(resolve => openDialog({
       kind,
       onYes: f => { resolve(f.radio); return true; },
@@ -130,8 +152,124 @@ export function App() {
     editNode: (d, i) => editNodeRef.current(d, i),
     selectedTool: () => toolRef.current,
   }));
+  const [main] = useState(() => new Diagram(hooks));
   // 開發模式下給自動化測試讀積木位置
-  if (import.meta.env.DEV) Object.assign(window, { __flowchart: { main } });
+  if (import.meta.env.DEV) Object.assign(window, { __flowchart: { main, modules: modulesRef } });
+
+  // ---------------- 模組 ----------------
+  const setModules = (next: AppModule[]) => {
+    modulesRef.current = next;
+    setModulesState(next);
+  };
+  /** 主程式和每個模組的流程圖（順序就是執行時的編號，見 modules.ts） */
+  const allDiagrams = () => [main, ...modulesRef.current.map(m => m.diagram)];
+  const moduleInfos = () => modulesRef.current.map(m => m.info);
+  const moduleSources = (): ModuleSource[] => modulesRef.current.map(m => ({ info: m.info, diagram: m.diagram }));
+  const moduleOf = (d: Diagram) => modulesRef.current.find(m => m.diagram == d);
+  /** 畫面上這一張流程圖 */
+  const currentDiagram = () => (sheetRef.current == 0 ? main : moduleOf2(sheetRef.current)?.diagram ?? main);
+  const moduleOf2 = (id: number) => modulesRef.current.find(m => m.id == id);
+  /** 在這張流程圖裡可以用的變數：模組裡還可以用它的參數 */
+  const storeFor = (d: Diagram) => withParams(varStore, moduleOf(d)?.info.params ?? []);
+
+  /** 換到另一張流程圖（第三步畫布上方的分頁） */
+  const showSheet = (id: number) => {
+    for (const d of allDiagrams()) {
+      d.active = false;
+      d.selNode = null;
+      d.selLink = null;
+    }
+    sheetRef.current = moduleOf2(id) ? id : 0;
+    setSheetState(sheetRef.current);
+    const d = currentDiagram();
+    d.active = true;
+    d.pause = false;
+    d.init(myCanvasRef.current!);
+    d.draw();
+  };
+
+  /** 新的一張模組流程圖（先接到畫布上，積木才量得到字的大小）；預先放好「開始」和「結束」 */
+  const newModuleDiagram = (withEnds: boolean) => {
+    const d = new Diagram(hooks);
+    d.active = false;
+    d.init(myCanvasRef.current!);
+    if (withEnds) {
+      const connectors = createConnectors();
+      d.addNode(d.newNode(60, 30, 120, 80, connectors, '開始', 'Circle'));
+      d.addNode(d.newNode(60, 330, 120, 80, connectors, '結束', 'Circle'));
+    }
+    return d;
+  };
+
+  /** 模組或參數的名字能不能用：不能跟變數、其他模組、清單的函式撞名 */
+  const nameProblem = (editing: AppModule | null) => (name: string, kind: 'module' | 'param'): string | null => {
+    if (varStore.var_list.name.includes(name)) return t(`「${name}」已經是變數的名字了，請換一個。`, `"${name}" is already a variable. Choose another name.`);
+    if (kind == 'module' && modulesRef.current.some(m => m != editing && m.info.name == name)) return t(`已經有叫「${name}」的模組了。`, `There is already a module called "${name}".`);
+    if (['長度', 'length', '項目編號', 'indexof', '包含', 'contains', 'and', 'or', 'not'].includes(name)) return t(`「${name}」是保留的字，請換一個。`, `"${name}" is a reserved word. Choose another name.`);
+    try {
+      Function(`var ${name};`);
+    }
+    catch {
+      return t(`「${name}」是程式保留的字，請換一個。`, `"${name}" is a reserved word. Choose another name.`);
+    }
+    return null;
+  };
+
+  const newModule = () => setModuleDialog({
+    id: ++dialogSeq,
+    nameProblem: nameProblem(null),
+    onSave: info => {
+      const m: AppModule = { id: ++moduleSeq, info, diagram: newModuleDiagram(true) };
+      setModules([...modulesRef.current, m]);
+      showSheet(m.id);
+    },
+  });
+
+  const editModule = (m: AppModule) => setModuleDialog({
+    id: ++dialogSeq,
+    initial: m.info,
+    nameProblem: nameProblem(m),
+    onSave: info => {
+      const oldName = m.info.name;
+      // 改名：每張流程圖裡執行這個模組的積木也跟著改
+      if (info.name != oldName) {
+        for (const d of allDiagrams()) {
+          for (const node of d.nodes) {
+            const call = node?.figure == 'Function' ? parseCall(node.text) : null;
+            if (node && call?.name == oldName) {
+              node.text = callText(info.name, call.args);
+              d.fitNode(node);
+            }
+          }
+        }
+      }
+      setModules(modulesRef.current.map(x => (x == m ? { ...m, info } : x)));
+      currentDiagram().draw();
+    },
+  });
+
+  const deleteModule = (m: AppModule) => {
+    if (!confirm(t(`確定要刪除模組「${m.info.name}」嗎？它的流程圖也會一起刪掉。`, `Delete the module "${m.info.name}"? Its flowchart will be deleted too.`))) return;
+    m.diagram.dispose();
+    setModules(modulesRef.current.filter(x => x != m));
+    showSheet(0);
+  };
+
+  /** 換掉全部的模組（匯入作品、積木套用回來時） */
+  const replaceModules = (list: { info: ModuleInfo; fill: (d: Diagram) => void }[]) => {
+    const old = modulesRef.current;
+    const next = list.map(({ info, fill }) => {
+      // 同名的模組沿用原本的分頁
+      const same = old.find(m => m.info.name == info.name);
+      const diagram = same?.diagram ?? newModuleDiagram(false);
+      diagram.init(myCanvasRef.current!);
+      fill(diagram);
+      return { id: same?.id ?? ++moduleSeq, info, diagram };
+    });
+    old.filter(m => !next.some(n => n.diagram == m.diagram)).forEach(m => m.diagram.dispose());
+    setModules(next);
+    showSheet(sheetRef.current);
+  };
 
   /** 依變數表格重建變數清單；如果有變數改名，流程圖裡用到的地方也跟著改 */
   const syncVarList = () => {
@@ -143,18 +281,22 @@ export function App() {
     varStore.type_var_list.number = rows.filter(r => r.type == '數字').map(r => r.name);
     varStore.type_var_list.text = rows.filter(r => r.type == '文字').map(r => r.name);
     varStore.type_var_list.array = rows.filter(r => r.type == '清單').map(r => r.name);
+    varStore.type_var_list.grid = rows.filter(r => r.type == '二維清單').map(r => r.name);
 
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
     const added = varStore.var_list.name.filter(n => !oldNames.includes(n));
     if (replaced.length && added.length) {
-      for (const node of main.nodes) {
-        if (node?.variables?.includes(replaced[0])) {
-          node.variables = node.variables.map(v => v == replaced[0] ? added[0] : v);
-          node.text = node.text.replaceAll(replaced[0], added[0]);
-          main.fitNode(node);
+      // 主程式和每個模組的流程圖都要改
+      for (const d of allDiagrams()) {
+        for (const node of d.nodes) {
+          if (node?.variables?.includes(replaced[0])) {
+            node.variables = node.variables.map(v => v == replaced[0] ? added[0] : v);
+            node.text = node.text.replaceAll(replaced[0], added[0]);
+            d.fitNode(node);
+          }
         }
       }
-      main.draw();
+      currentDiagram().draw();
     }
   };
 
@@ -166,7 +308,7 @@ export function App() {
     openDialog({
       kind,
       initial,
-      onYes: f => editMainNode(node, d, varStore, f),
+      onYes: f => editMainNode(node, d, storeFor(d), f, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
   };
@@ -174,8 +316,8 @@ export function App() {
   // ---------------- 語言切換 ----------------
   const lang = useLang();
   useEffect(() => onLangChange(() => {
-    main.nodes.forEach(n => { if (n) main.fitNode(n); });
-    main.draw();
+    for (const d of allDiagrams()) d.nodes.forEach(n => { if (n) d.fitNode(n); });
+    currentDiagram().draw();
   }), []);
   useEffect(() => {
     const title = questionIn(question, lang).title;
@@ -199,8 +341,9 @@ export function App() {
       const rect = canvas.getBoundingClientRect();
       const inside = rect.left < event.clientX && event.clientX < rect.right
         && rect.top < event.clientY && event.clientY < rect.bottom;
-      if (!main.pause && inside) myMouse.current = canvasPoint(canvas, event);
-      if (!inside) main.copyNode = null;
+      const d = currentDiagram();
+      if (!d.pause && inside) myMouse.current = canvasPoint(canvas, event);
+      if (!inside) d.copyNode = null;
     };
     window.addEventListener('mousemove', onMouseMove);
     return () => window.removeEventListener('mousemove', onMouseMove);
@@ -212,7 +355,7 @@ export function App() {
     let result: RunResult | null = null;
     let error: FlowError | null = null;
     try {
-      result = buildRun(main, varStore, cases[n * 3]);
+      result = buildRun(main, varStore, cases[n * 3], moduleSources());
     }
     catch (e) {
       console.error(e);
@@ -226,7 +369,7 @@ export function App() {
   const clickTab = (index: number) => {
     setTool('none');
     connectorState.r = 0;
-    main.pause = false;
+    for (const d of allDiagrams()) d.pause = false;
     if (index == 3 && !(main.hasNodeWithText('開始') && main.hasNodeWithText('結束'))) {
       alert(t('記得要加上開始跟結束！', 'Add a Start block and an End block first!'));
       return;
@@ -238,43 +381,63 @@ export function App() {
   // 畫面切換完（版面已經算好）才把流程圖接到要顯示的畫布上
   useLayoutEffect(() => {
     if (pageNonce == 0) return;
-    main.selNode = null;
-    main.selLink = null;
+    for (const d of allDiagrams()) {
+      d.selNode = null;
+      d.selLink = null;
+      d.stepHighlight = null;
+    }
     if (page == 3) {
+      // 第四步從主程式開始顯示；執行到模組裡時再換（見下面）
+      for (const d of allDiagrams()) d.active = false;
+      main.active = true;
       main.init(showCanvasRef.current!);
+      shownRef.current = main;
       runCase(which);
     }
     else {
-      main.stepHighlight = null;
-      main.init(myCanvasRef.current!);
-      main.draw();
       setRun(null);
       setRunError(null);
       syncVarList();
+      showSheet(sheetRef.current);
     }
   }, [page, pageNonce]);
 
-  // 逐步執行：標出目前執行到的積木
+  // 逐步執行：標出目前執行到的積木；執行到模組裡時，畫布換成那個模組的流程圖
   useLayoutEffect(() => {
     if (page != 3) return;
     // 執行成功：標出目前這一步；失敗：標出有問題的積木
     // 執行到一半出錯時，最後一步標出出錯的積木
     const errorStep = runError && (!run || step == run.totalStep);
-    main.stepHighlight = errorStep && runError.node != null ? runError.node : run ? run.step[step] ?? null : null;
-    main.draw();
-  }, [run, runError, step, page]);
+    const id = errorStep && runError.node != null ? runError.node : run ? run.step[step] ?? null : null;
+    const where = id == null ? { sheet: 0, node: null } : splitId(id);
+    const diagrams = allDiagrams();
+    const d = diagrams[where.sheet] ?? main;
+    for (const x of diagrams) {
+      x.stepHighlight = null;
+      x.active = false;
+    }
+    d.active = true;
+    if (shownRef.current != d) {
+      d.init(showCanvasRef.current!);
+      shownRef.current = d;
+    }
+    d.stepHighlight = where.node;
+    d.draw();
+    setRunSheetName(where.sheet == 0 ? t('主程式', 'Main program') : t('模組：', 'Module: ') + (modulesRef.current[where.sheet - 1]?.info.name ?? ''));
+  }, [run, runError, step, page, lang]);
 
   // ---------------- 畫布：點一下新增積木 ----------------
   const clickCanvas = () => {
     const t = toolRef.current;
-    if (page != 2 || t == 'none' || isArrowTool(t) || main.pause) return;
+    const d = currentDiagram();
+    if (page != 2 || t == 'none' || isArrowTool(t) || d.pause) return;
     syncVarList();
-    main.pause = true;
+    d.pause = true;
     const { x, y } = myMouse.current;
     openDialog({
       kind: t as DialogRequest['kind'],
-      onYes: f => addMainNode(t, main, varStore, f, x, y),
-      onNo: () => { main.pause = false; },
+      onYes: f => addMainNode(t, d, storeFor(d), f, x, y, moduleInfos()),
+      onNo: () => { d.pause = false; },
     });
   };
 
@@ -282,15 +445,17 @@ export function App() {
     const next = id == tool ? 'none' : id;
     setTool(next);
     connectorState.r = isArrowTool(next) ? 7 : 0;
-    main.draw();
+    currentDiagram().draw();
   };
 
   const clickClear = () => openDialog({
     kind: 'clear',
     onYes: () => {
-      main.clear();
-      main.init(myCanvasRef.current!);
-      main.draw();
+      // 只清空畫面上這一張（主程式或某個模組）
+      const d = currentDiagram();
+      d.clear();
+      d.init(myCanvasRef.current!);
+      d.draw();
       return true;
     },
   });
@@ -306,7 +471,11 @@ export function App() {
     setVars([...rows, ...varsRef.current.filter(v => !names.has(v.name.trim()))]);
     syncVarList();
     buildFlowchart(main, result.program, varStore);
-    main.draw();
+    // 積木裡的自訂積木／函式 → 模組（同名的沿用原本的分頁，積木裡沒有的就刪掉）
+    replaceModules(result.modules.map(m => ({
+      info: { name: m.name, params: m.params },
+      fill: d => buildFlowchart(d, m.body, withParams(varStore, m.params)),
+    })));
     setCodeOpen(false);
   };
 
@@ -349,6 +518,11 @@ export function App() {
       cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     });
     setPrintImg(main.toImage() ?? undefined);
+    setPrintModules(modulesRef.current.flatMap(m => {
+      const src = m.diagram.toImage();
+      const params = m.info.params.map(p => p.name).join(', ');
+      return src ? [{ title: `${m.info.name}(${params})`, src }] : [];
+    }));
     await new Promise(resolve => setTimeout(resolve, 1000));
     window.print();
   };
@@ -366,11 +540,12 @@ export function App() {
     cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     variables: varsRef.current.map(({ id: _id, ...v }) => v),
     flowchart: main.exportData(),
+    modules: modulesRef.current.map(m => ({ ...m.info, flowchart: m.diagram.exportData() })),
   });
 
   const hasWork = () => {
     const w = collectWork();
-    return w.variables.length > 0 || w.flowchart.nodes.length > 0
+    return w.variables.length > 0 || w.flowchart.nodes.length > 0 || (w.modules?.length ?? 0) > 0
       || w.cases.flat().some(Boolean) || Object.values(w.step1).some(Boolean);
   };
 
@@ -386,7 +561,7 @@ export function App() {
     setVars(work.variables.map(v => ({
       id: ++varSeq,
       name: String(v.name ?? ''),
-      type: v.type == '文字' || v.type == '清單' ? v.type : '數字',
+      type: v.type == '文字' || v.type == '清單' || v.type == '二維清單' ? v.type : '數字',
       init: String(v.init ?? '0'),
       desc: String(v.desc ?? ''),
     })));
@@ -394,6 +569,14 @@ export function App() {
     varStore.var_list.name = [];
     syncVarList();
     main.loadData(work.flowchart);
+    sheetRef.current = 0;
+    replaceModules((work.modules ?? []).map(m => ({
+      info: {
+        name: String(m.name ?? ''),
+        params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字' })),
+      },
+      fill: d => d.loadData(m.flowchart),
+    })));
     // 第四步要重新執行，所以最多回到第三步
     clickTab(Math.min(Math.max(work.page ?? 0, 0), 2));
   }
@@ -499,9 +682,10 @@ export function App() {
         </div>
       </div>
 
-      <NodeDialog request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} />
+      <NodeDialog request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} modules={modules.map(m => m.info)} />
+      <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
-        open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} onApply={applyBlocks}
+        open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
         vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init }))}
       />
 
@@ -588,8 +772,33 @@ export function App() {
                 {t('看程式', 'See code')}（{targetName(getTarget())}）
               </button>
               <span className="canvas_hint" />
-              <button id="clear_canvas" onClick={clickClear}>{t('清空流程圖', 'Clear all')}</button>
+              <button id="clear_canvas" onClick={clickClear}>{sheet == 0 ? t('清空流程圖', 'Clear all') : t('清空這個模組', 'Clear this module')}</button>
             </div>
+            {/* 主程式和每個模組各一張流程圖 */}
+            <div className="sheet_tabs" role="tablist">
+              <button role="tab" aria-selected={sheet == 0} className={sheet == 0 ? 'selected' : ''} onClick={() => showSheet(0)}>{t('主程式', 'Main program')}</button>
+              {modules.map(m => (
+                <button key={m.id} role="tab" aria-selected={sheet == m.id} className={sheet == m.id ? 'selected' : ''} onClick={() => showSheet(m.id)}>
+                  {t('模組：', 'Module: ')}{m.info.name}
+                </button>
+              ))}
+              <button className="sheet_add" onClick={newModule}>{t('＋ 新增模組', '+ New module')}</button>
+            </div>
+            {sheet != 0 && (() => {
+              const m = modules.find(x => x.id == sheet);
+              if (!m) return null;
+              return (
+                <div className="module_bar">
+                  <span>
+                    {t('定義', 'Define')} <b>{m.info.name}</b>
+                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
+                  </span>
+                  <span className="muted">{t('從「開始」做到「結束」，做完回到執行它的地方', 'Runs from Start to End, then goes back to where it was run')}</span>
+                  <button onClick={() => editModule(m)}>{t('修改名稱、參數', 'Edit name, parameters')}</button>
+                  <button onClick={() => deleteModule(m)}>{t('刪除模組', 'Delete module')}</button>
+                </div>
+              );
+            })()}
             <div className="canvas_body">
               <div id="toolbox">
                 {BLOCK_TOOLS.map(toolButton)}
@@ -615,10 +824,11 @@ export function App() {
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
           varNames={varStore.var_list.name}
+          sheetName={modules.length ? runSheetName : ''}
         />
       </div>
 
-      <PrintView visible={printing} data={printData} imgSrc={printImg} />
+      <PrintView visible={printing} data={printData} imgSrc={printImg} modules={printModules} />
 
       <div id="footer">
         <div className="contact">

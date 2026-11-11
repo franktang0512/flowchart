@@ -20,9 +20,11 @@ interface Props {
   /** 學生在第二步填的測資：[輸入, 輸出, 測試重點] × 3 */
   cases: string[];
   varNames: string[];
+  /** 有模組時：畫布上現在是哪一張流程圖（主程式或某個模組） */
+  sheetName: string;
 }
 
-export function RunArea({ visible, canvasRef, run, error, partial, step, onStep, which, onWhich, cases, varNames }: Props) {
+export function RunArea({ visible, canvasRef, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName }: Props) {
   useLang();
   const total = run?.totalStep ?? 0;
   const output = run?.output[step] ?? '';
@@ -38,6 +40,7 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
       <div className="card canvas_card run_canvas_card">
         <div className="canvas_head">
           <h5 className="card_title" style={{ margin: 0 }}><span className="step_badge">4</span>{t('測試執行並除錯', 'Run and Check')}</h5>
+          {sheetName && <span className="run_sheet">{t('現在在', 'Now in')}：{sheetName}</span>}
         </div>
         <div className="canvas_body">
           <div className="canvas_wrap">
@@ -104,13 +107,23 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
             {values && varNames.map(name => {
               const v = values[name];
               const isList = Array.isArray(v);
+              const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
               return (
                 <div key={name} className={'var_box' + (isList ? ' is_list' : '')}>
                   <span className="var_box_name">{name}</span>
-                  <span className={'var_box_value' + (isList ? ' is_list' : '')}>{isList ? <ListValue items={v} prev={prevValues?.[name]} /> : String(v)}</span>
+                  <span className={'var_box_value' + (isList ? ' is_list' : '')}>
+                    {isGrid ? <GridValue rows={v as unknown[][]} prev={prevValues?.[name]} /> : isList ? <ListValue items={v} prev={prevValues?.[name]} /> : String(v)}
+                  </span>
                 </div>
               );
             })}
+            {/* 在模組裡：參數的值（只有執行到模組裡才有） */}
+            {values && Object.keys(values).filter(name => !varNames.includes(name)).map(name => (
+              <div key={'param_' + name} className="var_box is_param">
+                <span className="var_box_name">{name}<small>{t('（參數）', ' (parameter)')}</small></span>
+                <span className="var_box_value">{String(values[name])}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -128,6 +141,31 @@ function changedIndex(items: unknown[], prev: unknown): number {
     if (k >= prev.length || items[k] !== prev[k]) return k;
   }
   return items.length < prev.length ? items.length - 1 : -1;
+}
+
+/** 二維清單的值：畫成表格，上面和左邊標索引（從 0 開始）；這一步改到的格子標出來，太大可以捲動 */
+function GridValue({ rows, prev }: { rows: unknown[][]; prev: unknown }) {
+  const old = Array.isArray(prev) ? prev as unknown[][] : null;
+  // 剛建立（大小變了）就不標；不然標出跟上一步不一樣的格子
+  const sameShape = old != null && old.length == rows.length && old.every((r, i) => Array.isArray(r) && r.length == rows[i].length);
+  const cols = Math.max(0, ...rows.map(r => r.length));
+  return (
+    <span className="grid_value">
+      <table>
+        <thead>
+          <tr><th></th>{Array.from({ length: cols }, (_, c) => <th key={c}>{c}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r}>
+              <th>{r}</th>
+              {row.map((cell, c) => <td key={c} className={sameShape && old![r][c] !== cell ? 'changed' : ''}>{String(cell)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </span>
+  );
 }
 
 /** 清單的值：一列排開，每一項標上位置（積木從 1、C++ 從 0 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */

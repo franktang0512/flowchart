@@ -1,0 +1,54 @@
+{
+  "title": "計算機檢查括號",
+  "question": "計算機算之前，要先檢查算式的括號有沒有配好。算式裡有小括號 ( ) 和中括號 [ ]。\n請輸入一個算式（中間沒有空格），配好了輸出「括號正確」，沒配好輸出「括號錯誤」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "(1+2)*[3-(4+5)]",
+      "output": "括號正確",
+      "note": ""
+    },
+    {
+      "input": "(1+2]",
+      "output": "括號錯誤",
+      "note": "( 跟 ] 不是一對"
+    },
+    {
+      "input": "((2+3)",
+      "output": "括號錯誤",
+      "note": "最後還剩一個 ( 沒有配到"
+    },
+    {
+      "input": "3+4)",
+      "output": "括號錯誤",
+      "note": "看到 ) 的時候 stack 是空的"
+    }
+  ],
+  "en": {
+    "title": "Check the Brackets",
+    "question": "Before a calculator works, it checks if the brackets match. There are ( ) and [ ].\nInput a math expression (no spaces). Output \"OK\" if they match, or \"Wrong\" if not.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "(1+2)*[3-(4+5)]",
+        "output": "OK",
+        "note": ""
+      },
+      {
+        "input": "(1+2]",
+        "output": "Wrong",
+        "note": "( and ] do not match"
+      },
+      {
+        "input": "((2+3)",
+        "output": "Wrong",
+        "note": "One ( is left"
+      },
+      {
+        "input": "3+4)",
+        "output": "Wrong",
+        "note": "The stack is empty when we see )"
+      }
+    ]
+  }
+}

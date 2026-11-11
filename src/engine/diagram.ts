@@ -87,6 +87,8 @@ export class Diagram {
   editText = false;
   /** 正在操作（拖曳、開著對話框）時為 true，此時點畫布不會新增積木 */
   pause = false;
+  /** 有好幾張流程圖（主程式、模組）時，只有畫面上這一張處理鍵盤（Delete、複製貼上） */
+  active = true;
   private nodesToMove: NodeToMove[] = [];
   private linksToMove: number[] = [];
   /** 正在拖選取箭頭上的哪個點 */
@@ -105,11 +107,17 @@ export class Diagram {
     // 畫布在畫面上的大小會跟著版面變（例如左邊變數表變長），
     // 內部像素大小要跟著改，不然圖會被拉伸，滑鼠也會對不到連接點
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.myCanvas && this.fitCanvasSize()) this.draw();
+      if (this.active && this.myCanvas && this.fitCanvasSize()) this.draw();
     });
   }
 
   private readonly resizeObserver: ResizeObserver;
+
+  /** 不再用這張流程圖（刪掉模組）：拿掉鍵盤和大小的監聽 */
+  dispose() {
+    document.removeEventListener('keydown', this.keydown);
+    this.resizeObserver.disconnect();
+  }
 
   /** 讓畫布的內部像素大小等於畫面上的大小（不含邊框）；有改變時回傳 true */
   private fitCanvasSize() {
@@ -350,7 +358,13 @@ export class Diagram {
     };
   }
 
+  /** 這個滑鼠事件是不是給這張流程圖的（同一個畫布可能輪流放主程式和模組） */
+  private mine(ev: MouseEvent) {
+    return this.active && ev.currentTarget == this.myCanvas;
+  }
+
   private down = (ev: MouseEvent) => {
+    if (!this.mine(ev)) return;
     this.pause = true;
     if (this.editText) {
       this.editText = false;
@@ -453,6 +467,7 @@ export class Diagram {
   };
 
   private move = (ev: MouseEvent) => {
+    if (!this.mine(ev)) return;
     const mouseC = this.mouseCoords(ev);
     switch (this.dragging) {
       case 'all':
@@ -640,7 +655,8 @@ export class Diagram {
     }
   }
 
-  private up = () => {
+  private up = (ev: MouseEvent) => {
+    if (!this.mine(ev)) return;
     if (this.dragging != null) {
       if (this.dragging == 'newlink') {
         if (this.linkDestNode != null) {
@@ -661,6 +677,7 @@ export class Diagram {
   };
 
   private keydown = (ev: KeyboardEvent) => {
+    if (!this.active) return;
     if (ev.keyCode == 46) {
       // Delete：刪除選取的積木（連同它的箭頭）或箭頭。
       // 刪掉的位置留 null，其他積木的 index 才不會跑掉（箭頭是用 index 記住兩端積木的）
@@ -688,6 +705,7 @@ export class Diagram {
   };
 
   private dblclick = (ev: MouseEvent) => {
+    if (!this.mine(ev)) return;
     if (this.selNode != null) {
       this.pause = true;
       this.hooks.editNode(this, this.selNode);

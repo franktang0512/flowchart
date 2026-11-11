@@ -8,6 +8,7 @@ import { getCodeVar, type VarStore } from './decoder';
 import type { Diagram } from './diagram';
 import type { FigureName } from './figures';
 import type { Point } from './link';
+import { callText } from './modules';
 import type { FlowNode } from './node';
 import type { Expr, Stmt } from './structure';
 
@@ -87,7 +88,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
     switch (s.kind) {
       case 'input': {
         const k = s.index ? exprText(s.index) : '';
-        const text = s.place == 'insert' ? `輸入 ${s.target} 插入第 ${k} 項` : s.place == 'replace' ? `輸入 ${s.target}[${k}]` : `輸入 ${s.target}`;
+        const k2 = s.index2 ? `[${exprText(s.index2)}]` : '';
+        const text = s.place == 'insert' ? `輸入 ${s.target} 插入第 ${k} 項` : s.place == 'replace' ? `輸入 ${s.target}[${k}]${k2}` : `輸入 ${s.target}`;
         return { kind: 'node', node: node(text, 'Parallelogram') };
       }
       case 'output':
@@ -95,13 +97,15 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
       case 'rect': {
         const v = s.value ? exprText(s.value) : '';
         const k = s.index ? exprText(s.index) : '';
+        const k2 = s.index2 ? exprText(s.index2) : '';
         const text = {
           設為: ` ${s.target} 設為 ${v}`,
           加入: ` ${s.target} 加入 ${v}`,
           插入: ` ${s.target} 在第 ${k} 項插入 ${v}`,
-          替換: ` ${s.target}[${k}] 設為 ${v}`,
+          替換: ` ${s.target}[${k}]${k2 ? `[${k2}]` : ''} 設為 ${v}`,
           刪除: ` ${s.target} 刪除第 ${k} 項`,
           清空: ` ${s.target} 刪除所有項目`,
+          建立: ` ${s.target} 建立 ${k} 列 ${k2} 行`,
         }[s.action] + (ROUNDING_TEXT[s.round] ?? '');
         return { kind: 'node', node: node(text, 'Rectangle', s.round) };
       }
@@ -111,6 +115,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
         return { kind: 'loop', loop: node(`${exprText(s.times)}次`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
       case 'until':
         return { kind: 'loop', loop: node(exprText(s.cond, true), 'While_Loop'), body: items(s.body), enter: '假', exit: '真' };
+      case 'call':
+        return { kind: 'node', node: node(callText(s.name, s.args.map(a => exprText(a))), 'Function') };
     }
   };
 

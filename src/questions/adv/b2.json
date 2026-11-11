@@ -1,0 +1,44 @@
+{
+  "title": "忘記行李箱密碼",
+  "question": "行李箱的密碼鎖有 3 個數字（每個 0 到 9），你只記得：3 個數字加起來是 s，而且由左到右越來越大。\n請輸入 s，由小到大輸出所有可能的密碼（3 個數字連在一起，例如 015），最後輸出「共 幾 種」。\n想想看：如果中間的數字一定要比左邊大，內層迴圈可以從哪裡開始試，少試很多次？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "6",
+      "output": "015\n024\n123\n共 3 種",
+      "note": ""
+    },
+    {
+      "input": "3",
+      "output": "012\n共 1 種",
+      "note": "只有 0、1、2"
+    },
+    {
+      "input": "2",
+      "output": "共 0 種",
+      "note": "找不到"
+    }
+  ],
+  "en": {
+    "title": "Forgot the Lock Code",
+    "question": "A suitcase lock has 3 digits (each 0 to 9). You only remember: the 3 digits add up to s, and they get bigger from left to right.\nInput s. Output every possible code from small to big (3 digits together, like 015). At the end, output \"Total: \" and the number.\nThink: If the middle digit must be bigger than the left one, where can the inner loop start? How many tries does that save?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "6",
+        "output": "015\n024\n123\nTotal: 3",
+        "note": ""
+      },
+      {
+        "input": "3",
+        "output": "012\nTotal: 1",
+        "note": "Only 0, 1, 2"
+      },
+      {
+        "input": "2",
+        "output": "Total: 0",
+        "note": "None"
+      }
+    ]
+  }
+}

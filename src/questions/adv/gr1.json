@@ -1,0 +1,44 @@
+{
+  "title": "捷運最少坐幾站",
+  "question": "捷運有 n 個車站，編號 0 到 n - 1；有 m 段軌道，每段連接兩個車站，兩個方向都能坐。請輸入 n、m，再輸入每段軌道連接的兩個車站，最後輸入起點和終點，輸出最少要坐幾站；到不了就輸出「到不了」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "6 6 0 1 1 2 2 3 0 4 4 3 3 5 0 5",
+      "output": "3",
+      "note": "0 → 4 → 3 → 5"
+    },
+    {
+      "input": "6 6 0 1 1 2 2 3 0 4 4 3 3 5 1 4",
+      "output": "2",
+      "note": "1 → 0 → 4"
+    },
+    {
+      "input": "5 3 0 1 1 2 3 4 0 4",
+      "output": "到不了",
+      "note": "0、1、2 跟 3、4 沒有連在一起"
+    }
+  ],
+  "en": {
+    "title": "Fewest MRT Stops",
+    "question": "An MRT has n stations, numbered 0 to n - 1. There are m tracks. Each track joins two stations, both ways. Input n and m, then the two stations of each track, then the start and the end. Output the fewest stops. If you cannot get there, output \"Cannot get there\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "6 6 0 1 1 2 2 3 0 4 4 3 3 5 0 5",
+        "output": "3",
+        "note": "0 → 4 → 3 → 5"
+      },
+      {
+        "input": "6 6 0 1 1 2 2 3 0 4 4 3 3 5 1 4",
+        "output": "2",
+        "note": "1 → 0 → 4"
+      },
+      {
+        "input": "5 3 0 1 1 2 3 4 0 4",
+        "output": "Cannot get there",
+        "note": "0, 1, 2 are not joined to 3, 4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "title": "圖書館找書",
+  "question": "圖書館的書照書號由小到大排在架上。請輸入 8 本書的書號（已經由小到大）存進清單，再輸入要找的書號。\n輸出「找到了」或「找不到」，再輸出「比了 幾 次」。\n請用二分搜尋：每次看範圍正中間的那一本，位置 = (左 + 右) / 2，無條件捨去。\n想想看：跟上一題一個一個找比起來，少比幾次？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "102 215 233 347 410 528 691 750 691",
+      "output": "找到了\n比了 3 次",
+      "note": ""
+    },
+    {
+      "input": "102 215 233 347 410 528 691 750 347",
+      "output": "找到了\n比了 1 次",
+      "note": "第一次就看到正中間那本"
+    },
+    {
+      "input": "102 215 233 347 410 528 691 750 300",
+      "output": "找不到\n比了 3 次",
+      "note": "找不到"
+    }
+  ],
+  "en": {
+    "title": "Find a Book",
+    "question": "Library books are sorted by number, small to big. Input 8 book numbers (already sorted) into a list. Then input the number to find.\nOutput \"Found\" or \"Not found\". Then output \"Checks: \" and how many you checked.\nUse binary search: each time, look at the middle book of the range. Position = (left + right) / 2, round down.\nThink: How many fewer checks than checking one by one?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "102 215 233 347 410 528 691 750 691",
+        "output": "Found\nChecks: 3",
+        "note": ""
+      },
+      {
+        "input": "102 215 233 347 410 528 691 750 347",
+        "output": "Found\nChecks: 1",
+        "note": "The middle book on the first check"
+      },
+      {
+        "input": "102 215 233 347 410 528 691 750 300",
+        "output": "Not found\nChecks: 3",
+        "note": "Not found"
+      }
+    ]
+  }
+}
