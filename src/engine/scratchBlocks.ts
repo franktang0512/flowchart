@@ -267,6 +267,14 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
       variable_blocks: style('#FF8C1A', '#FF8000', '#DB6E00'),
       list_blocks: style('#FD6723', '#ea580c', '#c2410c'),
     },
+    // 編輯模式的工具箱分類顏色
+    categoryStyles: {
+      event_category: { colour: '#5CB1D6' },
+      control_category: { colour: '#FFAB19' },
+      calculation_category: { colour: '#59C059' },
+      variable_category: { colour: '#FF8C1A' },
+      list_category: { colour: '#FD6723' },
+    },
     componentStyles: workspace,
     fontStyle: { weight: 'bold' },
     startHats: true,
@@ -279,4 +287,114 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
     startHats: false,
   });
   return { scratch, blockly };
+}
+
+// ---------------- 編輯模式的工具箱（只放流程圖做得到的積木） ----------------
+
+/** 空格裡預設的白色小積木 */
+const text = (v: string) => ({ shadow: { type: 'scratch_text', fields: { TEXT: v } } });
+const num = (v: number) => ({ shadow: { type: 'math_number', fields: { NUM: v } } });
+const block = (type: string, inputs?: Record<string, unknown>) => ({ kind: 'block', type, ...(inputs ? { inputs } : {}) });
+
+/** Scratch 的工具箱：分類跟練習網頁一樣；變數、清單是動態的（看目前有哪些變數） */
+export const scratchToolbox = () => ({
+  kind: 'categoryToolbox',
+  contents: [
+    {
+      kind: 'category', name: '事件', categorystyle: 'event_category', contents: [
+        block('event_whenflagclicked'),
+        block('event_askandwait', { TEXT: text('') }),
+        block('event_answer'),
+        block('event_say', { TEXT: text('Hello!') }),
+      ],
+    },
+    {
+      kind: 'category', name: '控制', categorystyle: 'control_category', contents: [
+        block('scratch_if'),
+        block('scratch_ifElse'),
+        block('scratch_repeat_ext', { TIMES: text('10') }),
+        block('scratch_whileUntil'),
+      ],
+    },
+    {
+      kind: 'category', name: '運算', categorystyle: 'calculation_category', contents: [
+        block('scratch_math_arithmetic', { A: text(''), B: text('') }),
+        block('math_modulo', { DIVIDEND: text(''), DIVISOR: text('') }),
+        block('math_round', { NUM: text('') }),
+        block('scratch_logic_compare', { A: text(''), B: text('50') }),
+        block('logic_operation'),
+        block('logic_negate'),
+        block('scratch_string_join', { TEXT0: text('apple'), TEXT1: text('banana') }),
+        block('scratch_string_char_at', { STRING: text('apple'), INDEX: text('1') }),
+        block('scratch_string_contains', { STRING1: text('apple'), STRING2: text('a') }),
+        block('scratch_length', { VALUE: text('apple') }),
+      ],
+    },
+    { kind: 'category', name: '變數', categorystyle: 'variable_category', custom: 'SCRATCH_VARIABLES' },
+    { kind: 'category', name: '清單', categorystyle: 'list_category', custom: 'SCRATCH_LISTS' },
+  ],
+});
+
+/** Blockly 的工具箱：內建積木（變數用 Blockly 內建的變數分類） */
+export const blocklyToolbox = (zh: boolean) => ({
+  kind: 'categoryToolbox',
+  contents: [
+    { kind: 'category', name: zh ? '邏輯' : 'Logic', categorystyle: 'logic_category', contents: [block('controls_if'), block('logic_compare'), block('logic_operation'), block('logic_negate')] },
+    { kind: 'category', name: zh ? '迴圈' : 'Loops', categorystyle: 'loop_category', contents: [block('controls_repeat_ext', { TIMES: num(10) }), block('controls_whileUntil')] },
+    {
+      kind: 'category', name: zh ? '數學' : 'Math', categorystyle: 'math_category', contents: [
+        block('math_number'), block('math_arithmetic', { A: num(1), B: num(1) }), block('math_modulo', { DIVIDEND: num(64), DIVISOR: num(10) }),
+        block('math_round', { NUM: num(3.1) }), block('math_single', { NUM: num(9) }),
+      ],
+    },
+    {
+      kind: 'category', name: zh ? '文字' : 'Text', categorystyle: 'text_category', contents: [
+        block('text'), block('text_join'), block('text_length'), block('text_indexOf'), block('text_charAt'),
+        block('text_print', { TEXT: { shadow: { type: 'text', fields: { TEXT: 'abc' } } } }),
+        block('text_prompt_ext', { TEXT: { shadow: { type: 'text', fields: { TEXT: '' } } } }),
+      ],
+    },
+    {
+      kind: 'category', name: zh ? '清單' : 'Lists', categorystyle: 'list_category', contents: [
+        block('lists_create_empty'), block('lists_length'), block('lists_indexOf'), block('lists_getIndex'), block('lists_setIndex'),
+      ],
+    },
+    { kind: 'category', name: zh ? '變數' : 'Variables', categorystyle: 'variable_category', custom: 'VARIABLE' },
+  ],
+});
+
+/** 編輯模式：Scratch 的「變數」「清單」分類列出目前的變數，並有「建立變數」「建立清單」按鈕 */
+export function setupScratchEditing(Blockly: B, workspace: B) {
+  const create = (type: string) => (button: B) => Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), undefined, type);
+  workspace.registerButtonCallback('CREATE_SCRATCH_VARIABLE', create(''));
+  workspace.registerButtonCallback('CREATE_SCRATCH_LIST', create('list'));
+  const ref = (v: B, type: string) => ({ name: v.name, type });
+
+  workspace.registerToolboxCategoryCallback('SCRATCH_VARIABLES', (ws: B) => {
+    const vars: B[] = ws.getVariablesOfType('');
+    const items: unknown[] = [{ kind: 'button', text: '建立變數', callbackkey: 'CREATE_SCRATCH_VARIABLE' }];
+    if (vars.length) items.push({ kind: 'block', type: 'scratch_variables_set', fields: { VAR: ref(vars[0], '') }, inputs: { VALUE: text('0') } });
+    for (const v of vars) items.push({ kind: 'block', type: 'scratch_variables_get', fields: { VAR: ref(v, '') } });
+    return items;
+  });
+
+  workspace.registerToolboxCategoryCallback('SCRATCH_LISTS', (ws: B) => {
+    const lists: B[] = ws.getVariablesOfType('list');
+    const items: unknown[] = [{ kind: 'button', text: '建立清單', callbackkey: 'CREATE_SCRATCH_LIST' }];
+    if (!lists.length) return items;
+    const LIST = ref(lists[0], 'list');
+    for (const v of lists) items.push({ kind: 'block', type: 'scratch_list_get', fields: { LIST: ref(v, 'list') } });
+    items.push(
+      { kind: 'block', type: 'scratch_list_add', fields: { LIST }, inputs: { ITEM: text('thing') } },
+      { kind: 'block', type: 'scratch_list_remove', fields: { LIST }, inputs: { INDEX: text('1') } },
+      { kind: 'block', type: 'scratch_list_empty', fields: { LIST } },
+      { kind: 'block', type: 'scratch_list_insert', fields: { LIST }, inputs: { ITEM: text('thing'), INDEX: text('1') } },
+      { kind: 'block', type: 'scratch_list_set', fields: { LIST }, inputs: { INDEX: text('1'), ITEM: text('thing') } },
+      { kind: 'block', type: 'scratch_list_get_item', fields: { LIST }, inputs: { INDEX: text('1') } },
+      { kind: 'block', type: 'scratch_list_indexof', fields: { LIST }, inputs: { ITEM: text('thing') } },
+      { kind: 'block', type: 'scratch_list_length', fields: { LIST } },
+      { kind: 'block', type: 'scratch_list_contain', fields: { LIST }, inputs: { ITEM: text('thing') } },
+    );
+    return items;
+  });
 }

@@ -560,9 +560,27 @@ input, textarea, select, button {
     border-radius: 6px;
     padding: 2px 12px;
 }
-/* 看程式：Scratch / Blockly 切換（樣式跟中英切換一樣） */
-.code_mode {
-    align-self: flex-start;
+/* 看程式：Scratch / Blockly 切換（樣式跟中英切換一樣）、編輯積木的按鈕 */
+.code_toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.code_toolbar .muted {
+    flex: 1;
+}
+.code_edit,
+.code_apply {
+    border: 1px solid var(--green-dark);
+    background: #fff;
+    color: var(--green-dark);
+    border-radius: 8px;
+    padding: 3px 14px;
+}
+.code_apply {
+    background: var(--green-dark);
+    color: #fff;
 }
 .code_blockly {
     flex: 1;

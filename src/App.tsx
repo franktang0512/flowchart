@@ -12,6 +12,8 @@ import { VarTable, type VarRow } from './components/VarTable';
 import { connectorState } from './engine/connector';
 import { buildRun, createVarStore, FlowError, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
+import type { FromBlocks } from './engine/fromBlockly';
+import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
 import { fitRowOnInput } from './textareaSizing';
@@ -293,6 +295,21 @@ export function App() {
     },
   });
 
+  // ---------------- 看程式：積木改好後重畫流程圖 ----------------
+  const applyBlocks = (result: FromBlocks) => {
+    // 變數表：積木裡的變數照積木的型別和初始值（原本的說明留著），積木沒用到的變數也留著
+    const old = new Map(varsRef.current.map(v => [v.name.trim(), v]));
+    const rows: VarRow[] = result.vars.map(v => ({
+      id: old.get(v.name)?.id ?? ++varSeq, name: v.name, type: v.type, init: v.init, desc: old.get(v.name)?.desc ?? '',
+    }));
+    const names = new Set(result.vars.map(v => v.name));
+    setVars([...rows, ...varsRef.current.filter(v => !names.has(v.name.trim()))]);
+    syncVarList();
+    buildFlowchart(main, result.program, varStore);
+    main.draw();
+    setCodeOpen(false);
+  };
+
   // ---------------- 第一步：從輸入/輸出說明自動建立變數 ----------------
   const createRow = (name = '', desc = '') => {
     const row: VarRow = { id: ++varSeq, name, type: '數字', init: '0', desc };
@@ -484,7 +501,7 @@ export function App() {
 
       <NodeDialog request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} />
       <CodeView
-        open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main}
+        open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} onApply={applyBlocks}
         vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init }))}
       />
 
