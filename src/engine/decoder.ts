@@ -6,6 +6,8 @@
 //                       成績[i] 設為 x     → __set(成績, "成績", 積木編號, i, x)
 //                       長度(成績)         → __len(...)
 //                       成績 加入 x        → __push(...)：把 x 加到清單最後
+//                       成績 在第 k 項插入 x → __insert(...)：k 可以是 1 到 長度+1
+//                       成績 刪除第 k 項    → __remove(...)
 //                       輸入 成績          → 把讀到的值加到清單最後
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
@@ -143,7 +145,8 @@ const runtimeMessages = () => ({
   listToText: t('清單不能直接存進文字變數「{name}」。', 'A list cannot go into the text variable "{name}".'),
   wholeList: t('「{name}」是清單，要改其中一項請寫 {name}[第幾項]。', '"{name}" is a list. To change one item, write {name}[item number].'),
   notList: t('「{name}」不是清單，不能用 [第幾項]。', '"{name}" is not a list. You cannot use [ ].'),
-  notListPush: t('「{name}」不是清單，不能「加到清單最後」。', '"{name}" is not a list. You cannot add to it.'),
+  notListEdit: t('「{name}」不是清單，不能加入、插入或刪除。', '"{name}" is not a list. You cannot add, insert or remove.'),
+  insertRange: t('清單「{name}」現在有 {len} 項，只能插在第 1 到第 {max} 項，沒有第 {k} 項（插在第 {max} 項就是加到最後）。', 'The list "{name}" has {len} items. You can insert at item 1 to item {max}. There is no item {k}.'),
   listInList: t('不能把整個清單加進清單「{name}」，請一次加一項。', 'You cannot add a whole list to "{name}". Add one item at a time.'),
   outOfRange: t('清單「{name}」只有 {len} 項，沒有第 {k} 項（清單從第 1 項開始）。', 'The list "{name}" has only {len} items. There is no item {k}. (Lists start at item 1.)'),
   emptyList: t('清單「{name}」是空的，沒有第 {k} 項。', 'The list "{name}" is empty. There is no item {k}.'),
@@ -198,9 +201,21 @@ function __index(list, name, i, k) {
 function __at(list, name, i, k) { return list[__index(list, name, i, k)]; }
 function __set(list, name, i, k, v) { list[__index(list, name, i, k)] = v; }
 function __push(list, name, i, v) {
-  if (!Array.isArray(list)) __err('notListPush', i, { name: name });
+  if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
   if (Array.isArray(v)) __err('listInList', i, { name: name });
   list.push(v);
+}
+function __insert(list, name, i, k, v) {
+  if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
+  if (Array.isArray(v)) __err('listInList', i, { name: name });
+  if (!(Number.isInteger(k) && k >= 1 && k <= list.length + 1)) {
+    __err('insertRange', i, { name: name, len: list.length, max: list.length + 1, k: k });
+  }
+  list.splice(k - 1, 0, v);
+}
+function __remove(list, name, i, k) {
+  if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
+  list.splice(__index(list, name, i, k), 1);
 }
 function __len(v, i) {
   if (!Array.isArray(v)) __err('lenNotList', i, {});
@@ -362,10 +377,12 @@ class CodeGenerator {
         return { code, next: l.next };
       }
       case 'Rectangle': {
-        const { target, action, expr: rest } = splitRectangle(node.text);
+        const { target, action, index, expr: rest } = splitRectangle(node.text);
         const value = (node.data || '') + '(' + expr(rest.split('(取')[0]) + ')';
-        const code = action == '加入'
-          ? `__push(${target}, ${JSON.stringify(target)}, ${i}, ${value});\n`
+        const name = JSON.stringify(target);
+        const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${value});\n`
+          : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${value});\n`
+          : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
           : this.assign(target, value, i);
         this.checkSyntax(node, code);
         return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };

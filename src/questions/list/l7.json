@@ -1,0 +1,44 @@
+{
+  "title": "去掉最低分",
+  "question": "請輸入 5 個分數存進清單，找出最低分並把它從清單刪除（最低分不只一個時，只刪除最前面的那一個），再輸出剩下的清單，最後輸出剩下分數的平均（四捨五入）。\n提示：先用迴圈找出最低分是第幾項，再用「計算」積木的「刪除」。刪除後清單只剩 4 項。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "60 70 80 90 100",
+      "output": "70 80 90 100\n85",
+      "note": "刪除第 1 項的 60，剩下 340 分，平均 85"
+    },
+    {
+      "input": "55 90 72 88 61",
+      "output": "90 72 88 61\n78",
+      "note": "刪除 55，剩下 311 分，平均 77.75，四捨五入是 78"
+    },
+    {
+      "input": "80 80 50 50 90",
+      "output": "80 80 50 90\n75",
+      "note": "有兩個 50，只刪除前面那一個（第 3 項）"
+    }
+  ],
+  "en": {
+    "title": "Drop the Lowest",
+    "question": "Input 5 scores into a list. Find the lowest score and remove it from the list. (If two scores are the lowest, remove only the first one.) Output the list. Then output the average of the other scores (round the number).\nTip: Use a loop to find the item number of the lowest score. Then use \"Remove\" in the Math block. After that, the list has 4 items.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "60 70 80 90 100",
+        "output": "70 80 90 100\n85",
+        "note": "Remove 60 (item 1). Total 340. Average 85"
+      },
+      {
+        "input": "55 90 72 88 61",
+        "output": "90 72 88 61\n78",
+        "note": "Remove 55. Total 311. Average 77.75. Round: 78"
+      },
+      {
+        "input": "80 80 50 50 90",
+        "output": "80 80 50 90\n75",
+        "note": "There are two 50s. Remove only the first one (item 3)"
+      }
+    ]
+  }
+}

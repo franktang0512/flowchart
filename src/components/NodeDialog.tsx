@@ -1,6 +1,7 @@
 // 新增/編輯積木、選箭頭標籤、清空流程圖時跳出的對話框（舊版 shapes.js 的 node_model）。
 // 版面要跟舊版一模一樣，所以元素之間的空白（{' '}）與 <p> 的巢狀方式都照舊版 HTML 被瀏覽器解析後的結果。
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { RectAction } from '../engine/labels';
 import { t, useLang } from '../i18n';
 
 export type DialogKind =
@@ -16,14 +17,38 @@ export interface DialogForm {
   doingSomething: string;
   /** 輸入/輸出積木的提示文字：「變數：」或「變數或字串：」 */
   ioText: string;
-  /** undefined = 預設（行內）；舊版切換後會設成 block / none */
-  varSelectDisplay?: 'block' | 'none';
-  varSelectOutputDisplay: 'block' | 'none';
+  /** undefined = 預設（行內）；舊版切換後會設成 inline-block / none */
+  varSelectDisplay?: 'inline-block' | 'none';
+  varSelectOutputDisplay: 'inline-block' | 'none';
   /** 迴圈：顯示「達成某個條件」(while) 還是「執行完幾次」(for) 的輸入欄 */
   showWhile: boolean;
-  /** 計算積木：「設為」一般的設定，或「加入」把值加到清單最後 */
-  rectAction: '設為' | '加入';
+  /** 計算積木：「設為」一般的設定；清單才有的「加入」（加到最後）、「插入」、「刪除」 */
+  rectAction: RectAction;
+  /** 計算積木「插入」「刪除」的第幾項 */
+  rectIndex: string;
 }
+
+const RECT_ACTIONS: [RectAction, () => string][] = [
+  ['設為', () => t('設定變數', 'Set')],
+  ['加入', () => t('加到清單最後', 'Add to list')],
+  ['插入', () => t('插入', 'Insert')],
+  ['刪除', () => t('刪除', 'Remove')],
+];
+
+const RECT_HINT: Record<RectAction, () => string> = {
+  設為: () => t('將變數內的值設為...', 'Set a variable to...'),
+  加入: () => t('把值加到清單的最後面...', 'Add a value to the end of a list...'),
+  插入: () => t('把值插到清單的第幾項，原本那項和後面的都往後移...', 'Put a value into a list. The items after it move back...'),
+  刪除: () => t('刪除清單的第幾項，後面的都往前移...', 'Remove one item from a list. The items after it move up...'),
+};
+
+/** 值的輸入欄前面的字（刪除沒有值） */
+const RECT_VERB: Record<RectAction, () => string> = {
+  設為: () => t('設為', 'to'),
+  加入: () => t('加入', 'add'),
+  插入: () => t('插入', 'insert'),
+  刪除: () => '',
+};
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
   Circle: '開始',
@@ -47,6 +72,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   varSelectOutputDisplay: 'none',
   showWhile: false,
   rectAction: '設為',
+  rectIndex: '',
 });
 
 export interface DialogRequest {
@@ -144,8 +170,8 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
     case 'Parallelogram':
       body = (
         <>
-          {radio('輸入', t('輸入', 'Input'), () => set({ ioText: '變數：', varSelectDisplay: 'block', varSelectOutput: '', varSelectOutputDisplay: 'none' }))}{' '}
-          {radio('輸出', t('輸出', 'Output'), () => set({ ioText: '變數或字串：', varSelectDisplay: 'none', varSelect: '', varSelectOutputDisplay: 'block' }))}{' '}
+          {radio('輸入', t('輸入', 'Input'), () => set({ ioText: '變數：', varSelectDisplay: 'inline-block', varSelectOutput: '', varSelectOutputDisplay: 'none' }))}{' '}
+          {radio('輸出', t('輸出', 'Output'), () => set({ ioText: '變數或字串：', varSelectDisplay: 'none', varSelect: '', varSelectOutputDisplay: 'inline-block' }))}{' '}
           <br /><br />
           <p id="io_text">{f.ioText == '變數或字串：' ? t('變數或字串：', 'Variable or "text": ') : t('變數：', 'Variable: ')}</p>
           <p>
@@ -206,20 +232,32 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
     case 'Rectangle':
       body = (
         <>
-          <p id="hint">{f.rectAction == '加入' ? t('把值加到清單的最後面...', 'Add a value to the end of a list...') : t('將變數內的值設為...', 'Set a variable to...')}</p>{' '}
+          <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
           <p className="rect_action">
-            <label><input type="radio" name="rect_action" checked={f.rectAction == '設為'} onChange={() => set({ rectAction: '設為' })} />{t('設定變數', 'Set')}</label>{' '}
-            <label><input type="radio" name="rect_action" checked={f.rectAction == '加入'} onChange={() => set({ rectAction: '加入' })} />{t('加到清單最後', 'Add to list')}</label>
+            {RECT_ACTIONS.map(([action, label]) => (
+              <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({ rectAction: action })} />{label()}</label>
+            ))}
           </p>
-          {f.rectAction == '加入' ? t('清單：', 'List: ') : t('變數：', 'Variable: ')}<input className="var_select" id="var_select" style={{ width: '50%' }} value={f.varSelect} onChange={e => set({ varSelect: e.target.value })} />
-          <br /><br /> {f.rectAction == '加入' ? t('加入', 'add') : t('設為', 'to')} {codeInput}{' '}
-          <br /><br />
-          <p>{t('捨去進位？', 'Round?')}{' '}
-            {radio('', t('不需要', 'No'))}{' '}
-            {radio('Math.round', t('四捨五入', 'Round'))}{' '}
-            <br />{radio('Math.floor', t('無條件捨去', 'Round down'))}{' '}
-            {radio('Math.ceil', t('無條件進位', 'Round up'))}{' '}
-          </p>
+          {f.rectAction == '設為' ? t('變數：', 'Variable: ') : t('清單：', 'List: ')}<input className="var_select" id="var_select" style={{ width: '50%' }} value={f.varSelect} onChange={e => set({ varSelect: e.target.value })} />
+          {(f.rectAction == '插入' || f.rectAction == '刪除') && (
+            <>
+              <br /><br /> {f.rectAction == '插入' ? t('插在第', 'At item') : t('刪除第', 'Remove item')}{' '}
+              <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
+              {t('項', '')}
+            </>
+          )}
+          {f.rectAction != '刪除' && (
+            <>
+              <br /><br /> {RECT_VERB[f.rectAction]()} {codeInput}{' '}
+              <br /><br />
+              <p>{t('捨去進位？', 'Round?')}{' '}
+                {radio('', t('不需要', 'No'))}{' '}
+                {radio('Math.round', t('四捨五入', 'Round'))}{' '}
+                <br />{radio('Math.floor', t('無條件捨去', 'Round down'))}{' '}
+                {radio('Math.ceil', t('無條件進位', 'Round up'))}{' '}
+              </p>
+            </>
+          )}
           <p><br />{buttons}</p>
         </>
       );

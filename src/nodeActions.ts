@@ -15,21 +15,28 @@ const ROUNDING_TEXT: Record<string, string> = {
 
 const sharedConnectors = createConnectors();
 
-/** 計算積木：「 x 設為 運算式(取…)」或「 清單 加入 運算式(取…)」，以及它用到的變數 */
+/** 計算積木的文字（格式見 splitRectangle）以及它用到的變數 */
 function rectangleText(vars: VarStore, f: DialogForm) {
-  let text = (f.varSelect ? ' ' + f.varSelect : '') + ' ' + f.rectAction + ' ' + f.code;
+  const target = f.varSelect ? ' ' + f.varSelect : '';
+  let text = f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
+    : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
+    : `${target} ${f.rectAction} ${f.code}`;
   const nodeVar = getCodeVar(vars, text);
   if (!nodeVar.includes(f.varSelect || '')) nodeVar.push(f.varSelect || '');
-  text += ROUNDING_TEXT[f.radio] ?? '';
+  // 刪除沒有值，不用捨去進位
+  if (f.rectAction != '刪除') text += ROUNDING_TEXT[f.radio] ?? '';
   return { text, nodeVar };
 }
 
 function rectangleValid(vars: VarStore, f: DialogForm) {
-  if (f.rectAction == '加入' && !vars.type_var_list.array.includes(f.varSelect.trim())) {
-    alert(t(`「${f.varSelect.trim()}」不是清單：只有型別是「清單」的變數才能「加到清單最後」。`, `"${f.varSelect.trim()}" is not a list. Only list variables can use "Add to list".`));
+  if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
+  const list = f.varSelect.trim();
+  if (!vars.type_var_list.array.includes(list)) {
+    alert(t(`「${list}」不是清單：只有型別是「清單」的變數才能加入、插入或刪除。`, `"${list}" is not a list. Only list variables can add, insert or remove.`));
     return false;
   }
-  return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
+  if (f.rectAction != '加入' && !checkVar(vars, f.rectIndex, true)) return false;
+  return f.rectAction == '刪除' || checkVar(vars, f.code, true);
 }
 
 /** 輸入/輸出積木：回傳積木文字，檢查沒過回傳 null */
@@ -135,13 +142,13 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
         return {
           kind: 'Parallelogram',
           initial: rest
-            ? { radio, ioText: '變數或字串：', varSelectOutput: rest, varSelectOutputDisplay: 'block', varSelectDisplay: 'none' }
+            ? { radio, ioText: '變數或字串：', varSelectOutput: rest, varSelectOutputDisplay: 'inline-block', varSelectDisplay: 'none' }
             : { radio, ioText: '變數或字串：' },
         };
       }
       return {
         kind: 'Parallelogram',
-        initial: rest ? { radio, varSelect: rest, varSelectDisplay: 'block', varSelectOutputDisplay: 'none' } : { radio },
+        initial: rest ? { radio, varSelect: rest, varSelectDisplay: 'inline-block', varSelectOutputDisplay: 'none' } : { radio },
       };
     }
     case 'Diamond':
@@ -151,13 +158,14 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
     case 'While_Loop':
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
     case 'Rectangle': {
-      const { target, action, expr } = splitRectangle(text);
+      const { target, action, index, expr } = splitRectangle(text);
       return {
         kind: 'Rectangle',
         initial: {
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
+          rectIndex: index,
           varSelect: target,
           code: expr.split('(取')[0],
         },

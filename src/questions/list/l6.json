@@ -1,0 +1,44 @@
+{
+  "title": "插隊",
+  "question": "請先輸入 4 個數字存進清單，再輸入位置 k 和一個數字 x，把 x 插到清單的第 k 項，最後輸出整個清單。\n提示：「計算」積木選「插入」。插進去之後，原本第 k 項和後面的數字都會往後移一格。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3 5 8 9 2 7",
+      "output": "3 7 5 8 9",
+      "note": "清單是 [3, 5, 8, 9]，把 7 插到第 2 項"
+    },
+    {
+      "input": "10 20 30 40 1 5",
+      "output": "5 10 20 30 40",
+      "note": "插到第 1 項，就是排到最前面"
+    },
+    {
+      "input": "1 2 3 4 5 0",
+      "output": "1 2 3 4 0",
+      "note": "清單有 4 項，插到第 5 項就是加到最後"
+    }
+  ],
+  "en": {
+    "title": "Cut in Line",
+    "question": "Input 4 numbers into a list. Then input a place k and a number x. Put x into the list at item k. Then output the whole list.\nTip: In the Math block, choose \"Insert\". The item at k and the items after it move back.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3 5 8 9 2 7",
+        "output": "3 7 5 8 9",
+        "note": "The list is [3, 5, 8, 9]. Put 7 at item 2"
+      },
+      {
+        "input": "10 20 30 40 1 5",
+        "output": "5 10 20 30 40",
+        "note": "Item 1 is the front of the list"
+      },
+      {
+        "input": "1 2 3 4 5 0",
+        "output": "1 2 3 4 0",
+        "note": "The list has 4 items. Item 5 is the end of the list"
+      }
+    ]
+  }
+}

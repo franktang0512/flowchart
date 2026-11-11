@@ -21,7 +21,7 @@
   ],
   "en": {
     "title": "Square List",
-    "question": "Input a number n. Put 1×1, 2×2, ... n×n at the end of a list, one by one. Then output the whole list.\nTip: In the Process block, choose \"Add to list\". It puts a value at the end of the list.",
+    "question": "Input a number n. Put 1×1, 2×2, ... n×n at the end of a list, one by one. Then output the whole list.\nTip: In the Math block, choose \"Add to list\". It puts a value at the end of the list.",
     "array": [],
     "test_case": [
       {
