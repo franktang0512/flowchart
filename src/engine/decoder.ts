@@ -9,6 +9,7 @@
 //                       成績 在第 k 項插入 x → __insert(...)：k 可以是 1 到 長度+1
 //                       成績 刪除第 k 項    → __remove(...)
 //                       輸入 成績          → 把讀到的值加到清單最後
+//                       輸入 成績[k]       → 把讀到的值存進第 k 項（第 k 項要已經存在）
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
@@ -338,7 +339,13 @@ class CodeGenerator {
           const v = parts.slice(1).join(' ').trim();
           if (!v) throw new FlowError(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), i);
           const name = JSON.stringify(v);
-          if (this.isList(v)) code = `${v}.push(__inList(input_list, ${i}, ${name}));\n`;
+          const item = listItemTarget(v);
+          // 輸入 成績[k]：跟計算積木一樣從第 1 項開始，超出範圍會提示
+          if (item && this.isList(item.list)) {
+            const list = JSON.stringify(item.list);
+            code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), __inList(input_list, ${i}, ${list}));\n`;
+          }
+          else if (this.isList(v)) code = `${v}.push(__inList(input_list, ${i}, ${name}));\n`;
           else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
           else code = `${v} = __inNum(input_list, ${i}, ${name});\n`;
         }
