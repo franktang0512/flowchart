@@ -560,6 +560,17 @@ input, textarea, select, button {
     border-radius: 6px;
     padding: 2px 12px;
 }
+/* Blockly 的輸入框、下拉選單放的那一層：蓋滿整個畫面（跟 Blockly 算位置用的座標一樣），
+   本身不擋滑鼠，裡面的輸入框、選單才可以點 */
+.blockly_layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+.blockly_layer > * {
+    pointer-events: auto;
+}
 /* 看程式：Scratch / Blockly 切換（樣式跟中英切換一樣）、編輯積木的按鈕 */
 .code_toolbar {
     display: flex;

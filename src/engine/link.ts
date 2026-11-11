@@ -162,6 +162,8 @@ export class Link {
     const t = this.segments[this.indexText];
     const t0 = this.segments[this.indexText - 1];
     ctx.beginPath();
+    // 文字一律黑色（不設的話會沿用上一個畫的東西的顏色，例如積木的白底，字就看不到）
+    ctx.fillStyle = 'black';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(displayLinkText(this.text), (t.x + t0.x) / 2, (t.y + t0.y) / 2);

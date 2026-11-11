@@ -54,6 +54,7 @@ function loadBlockly(): Promise<Loaded> {
 }
 
 const BLOCK_MODES: [BlockMode, string][] = [['scratch', 'Scratch'], ['blockly', 'Blockly']];
+const BLOCKLY_LAYER = 'blockly_layer';
 
 interface Props {
   open: boolean;
@@ -88,6 +89,8 @@ export function CodeView({ open, onClose, diagram, vars, onApply }: Props) {
         <button onClick={onClose}>{t('關閉', 'Close')}</button>
       </div>
       {open && (target == 'cpp' ? <CppCode diagram={diagram} vars={vars()} /> : <BlocklyCode diagram={diagram} vars={vars()} onApply={onApply} />)}
+      {/* Blockly 的輸入框、下拉選單放這裡：蓋滿整個畫面、不擋滑鼠（見 .blockly_layer） */}
+      <div id={BLOCKLY_LAYER} className="blockly_layer" />
     </dialog>
   );
 }
@@ -153,8 +156,10 @@ function BlocklyCode({ diagram, vars, onApply }: { diagram: Diagram; vars: VarIn
     loadBlockly().then(({ Blockly, themes }) => {
       if (cancelled || !boxRef.current) return;
       try {
-        // 下拉選單、輸入框要放在視窗（dialog）裡面，不然會被視窗蓋住看不到
-        Blockly.setParentContainer(boxRef.current.closest('dialog') ?? document.body);
+        // 下拉選單、輸入框要放在視窗（dialog）裡面，不然會被視窗蓋住看不到；
+        // 但 Blockly 用整個畫面的座標擺它們，所以放在蓋滿畫面的那一層（直接放 dialog 裡會偏掉 dialog 的位置）。
+        // Blockly 只在第一次 inject 前設定有效，之後都是同一層
+        Blockly.setParentContainer(document.getElementById(BLOCKLY_LAYER) ?? document.body);
         const zh = getLang() != 'en';
         workspace = Blockly.inject(boxRef.current, {
           // 看的時候 readOnly：不能拖積木、沒有工具箱；編輯時才有工具箱和垃圾桶
