@@ -1,5 +1,5 @@
 // 第四步：逐步執行流程圖，看每一步的變數與輸出
-import type { Ref } from 'react';
+import { useEffect, useRef, type Ref } from 'react';
 import type { RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
 
@@ -29,6 +29,8 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
   const expected = cases[which * 3 + 1];
   const correct = atEnd && output.replaceAll(/\s/g, '') == expected.replaceAll(/\s/g, '');
   const values = run?.var[step];
+  // 上一步的值：清單跟它比較，才知道這一步改了哪一格
+  const prevValues = step > 0 ? run?.var[step - 1] : undefined;
 
   return (
     <div id="run_code_area" className="stage" style={{ display: visible ? undefined : 'none' }}>
@@ -100,10 +102,11 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
           <div id="variableTable" className="var_boxes">
             {values && varNames.map(name => {
               const v = values[name];
+              const isList = Array.isArray(v);
               return (
-                <div key={name} className="var_box">
+                <div key={name} className={'var_box' + (isList ? ' is_list' : '')}>
                   <span className="var_box_name">{name}</span>
-                  <span className="var_box_value">{Array.isArray(v) ? <ListValue items={v} /> : String(v)}</span>
+                  <span className={'var_box_value' + (isList ? ' is_list' : '')}>{isList ? <ListValue items={v} prev={prevValues?.[name]} /> : String(v)}</span>
                 </div>
               );
             })}
@@ -114,13 +117,43 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
   );
 }
 
-/** 清單的值：每一項標上第幾項（從 1 開始） */
-function ListValue({ items }: { items: unknown[] }) {
+/**
+ * 這一步改了清單的哪一格：跟上一步比，第一個不一樣的格子（添加、插入、替換、刪除都適用）。
+ * 刪掉最後一項時前面都一樣，回傳最後一格；沒有改變回傳 -1。
+ */
+function changedIndex(items: unknown[], prev: unknown): number {
+  if (!Array.isArray(prev)) return -1;
+  for (let k = 0; k < items.length; k++) {
+    if (k >= prev.length || items[k] !== prev[k]) return k;
+  }
+  return items.length < prev.length ? items.length - 1 : -1;
+}
+
+/** 清單的值：一列排開，每一項標上第幾項（從 1 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */
+function ListValue({ items, prev }: { items: unknown[]; prev: unknown }) {
+  const scrollerRef = useRef<HTMLSpanElement>(null);
+  const changedRef = useRef<HTMLSpanElement>(null);
+  const changed = changedIndex(items, prev);
+
+  useEffect(() => {
+    const box = scrollerRef.current;
+    const cell = changedRef.current;
+    if (!box || !cell) return;
+    // 只捲清單這一列（不用 scrollIntoView，才不會連整頁一起捲動）
+    const left = cell.offsetLeft;
+    const right = left + cell.offsetWidth;
+    if (left < box.scrollLeft || right > box.scrollLeft + box.clientWidth) {
+      box.scrollTo({ left: left - (box.clientWidth - cell.offsetWidth) / 2, behavior: 'smooth' });
+    }
+  });
+
   if (!items.length) return <span className="muted">{t('（空清單）', '(empty list)')}</span>;
   return (
-    <span className="list_value">
+    <span className="list_value" ref={scrollerRef}>
       {items.map((item, k) => (
-        <span key={k} className="list_item"><small>{k + 1}</small>{String(item)}</span>
+        <span key={k} ref={k == changed ? changedRef : undefined} className={'list_item' + (k == changed ? ' changed' : '')}>
+          <small>{k + 1}</small>{String(item)}
+        </span>
       ))}
     </span>
   );

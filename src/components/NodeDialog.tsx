@@ -1,6 +1,7 @@
 // 新增/編輯積木、選箭頭標籤、清空流程圖時跳出的對話框（舊版 shapes.js 的 node_model）。
 // 版面要跟舊版一模一樣，所以元素之間的空白（{' '}）與 <p> 的巢狀方式都照舊版 HTML 被瀏覽器解析後的結果。
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
 import { t, useLang } from '../i18n';
 
@@ -105,12 +106,35 @@ export interface DialogRequest {
   onDismiss?: () => void;
 }
 
+/** 變數表裡各型別的變數名稱，給下拉選單用 */
+export type VarTypes = VarStore['type_var_list'];
+
 interface Props {
   request: DialogRequest | null;
   onClose: () => void;
+  varTypes: VarTypes;
 }
 
-export function NodeDialog({ request, onClose }: Props) {
+/**
+ * 選變數的下拉選單（像 Scratch 一樣用選的，不會打錯字）。groups 是 [分組標題, 變數名稱]。
+ * 舊作品裡填的值不在選項裡（例如 成績[2]）時，也放進選項，打開修改才不會被清掉。
+ */
+function VarPicker({ id, value, onChange, groups }: { id: string; value: string; onChange: (v: string) => void; groups: [string, string[]][] }) {
+  const names = groups.flatMap(([, list]) => list);
+  return (
+    <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
+      <option value="" disabled>{names.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
+      {value && !names.includes(value) && <option value={value}>{value}</option>}
+      {groups.filter(([, list]) => list.length).map(([label, list]) => (
+        <optgroup key={label} label={label}>
+          {list.map(name => <option key={name} value={name}>{name}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+export function NodeDialog({ request, onClose, varTypes }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -129,12 +153,12 @@ export function NodeDialog({ request, onClose }: Props) {
         onClose();
       }}
     >
-      {request && <DialogBody key={request.id} request={request} onClose={onClose} />}
+      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} />}
     </dialog>
   );
 }
 
-function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () => void }) {
+function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes }) {
   const { kind } = request;
   useLang();
   const [f, setF] = useState<DialogForm>(() => ({ ...defaultForm(kind), ...request.initial }));
@@ -192,16 +216,26 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
           <br /><br />
           <p id="io_text">{f.ioText == '變數或字串：' ? t('變數或字串：', 'Variable or "text": ') : t('變數：', 'Variable: ')}</p>
           <p>
-            <input
-              className="var_select" id="var_select" value={f.varSelect}
-              style={f.varSelectDisplay ? { display: f.varSelectDisplay } : undefined}
-              onChange={e => set({ varSelect: e.target.value })}
-            />
-            <input
-              className="var_select" id="var_select_output" value={f.varSelectOutput}
-              style={{ display: f.varSelectOutputDisplay }}
-              onChange={e => set({ varSelectOutput: e.target.value })}
-            />{' '}
+            {f.radio == '輸入'
+              ? (
+                // 輸入：用選的。清單另外一組，標題就說明輸入的值會添加到最後，學生才知道可以直接輸入到清單
+                <VarPicker
+                  id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
+                  groups={[
+                    [t('變數', 'Variables'), [...varTypes.number, ...varTypes.text]],
+                    [t('清單（輸入的值會添加到最後）', 'Lists (the value goes to the end)'), varTypes.array],
+                  ]}
+                />
+              )
+              : (
+                <input
+                  className="var_select" id="var_select_output" value={f.varSelectOutput}
+                  onChange={e => set({ varSelectOutput: e.target.value })}
+                />
+              )}{' '}
+            {f.radio == '輸入' && varTypes.array.includes(f.varSelect) && (
+              <span className="dialog_note">{t(`輸入的值會添加到清單「${f.varSelect}」的最後面`, `The value will go to the end of the list "${f.varSelect}".`)}</span>
+            )}
             <br /><br />{buttons}
           </p>
         </>
@@ -254,10 +288,20 @@ function DialogBody({ request, onClose }: { request: DialogRequest; onClose: () 
           <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
           <p className="rect_action">
             {RECT_ACTIONS.map(([action, label]) => (
-              <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({ rectAction: action })} />{label()}</label>
+              <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({
+                rectAction: action,
+                // 「設定變數」選數字/文字，其他選清單：換到另一種時，原本選的已經不適用
+                ...((action == '設為') != (f.rectAction == '設為') ? { varSelect: '' } : {}),
+              })} />{label()}</label>
             ))}
           </p>
-          {f.rectAction == '設為' ? t('變數：', 'Variable: ') : t('清單：', 'List: ')}<input className="var_select" id="var_select" style={{ width: '50%' }} value={f.varSelect} onChange={e => set({ varSelect: e.target.value })} />
+          {f.rectAction == '設為' ? t('變數：', 'Variable: ') : t('清單：', 'List: ')}
+          <VarPicker
+            id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
+            groups={f.rectAction == '設為'
+              ? [[t('變數', 'Variables'), [...varTypes.number, ...varTypes.text]]]
+              : [[t('清單', 'Lists'), varTypes.array]]}
+          />
           {indexLabel && (
             <>
               <br /><br /> {indexLabel()}{' '}

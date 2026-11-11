@@ -476,7 +476,7 @@ export function App() {
         </div>
       </div>
 
-      <NodeDialog request={dialog} onClose={() => setDialog(null)} />
+      <NodeDialog request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>
         <div id="page_set">

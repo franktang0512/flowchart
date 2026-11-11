@@ -632,20 +632,42 @@ input, textarea, select, button {
     overflow-wrap: anywhere;
     cursor: default;
 }
-/* 第四步：清單的值 */
+/* 第四步：清單的值。清單占一整列，項目排成一列不換行，太長就在框裡左右捲動 */
+.var_box.is_list {
+    flex: 1 1 100%;
+    min-width: 0;
+}
+.var_box_value.is_list {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-start;
+}
 .list_value {
+    position: relative; /* 讓格子的 offsetLeft 以這一列為準，才算得出要捲到哪裡 */
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 4px 0;
 }
 .list_item {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 4px;
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 0 8px;
     background: #fff;
+    white-space: nowrap;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+/* 這一步改到的格子 */
+.list_item.changed {
+    background: #fff4c2;
+    border-color: #e0b100;
 }
 .list_item small {
     color: var(--muted);
@@ -675,6 +697,21 @@ input, textarea, select, button {
     border: 1px solid var(--line);
     border-radius: 8px;
     margin: 4px 0;
+}
+#node_info select {
+    min-width: 50%;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin: 4px 0;
+    background: #fff;
+}
+/* 選了清單時的說明（輸入的值會添加到最後） */
+#node_info .dialog_note {
+    display: block;
+    margin-top: 6px;
+    color: var(--green-dark);
+    font-size: 0.9rem;
 }
 #node_info input[type=radio] {
     margin: 0 4px 0 10px;
