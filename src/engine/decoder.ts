@@ -12,7 +12,8 @@
 //                       成績 刪除第 k 項    → __remove(...)
 //                       成績 刪除所有項目   → __clear(...)
 //                       輸入 成績          → 把讀到的值加到清單最後
-//                       輸入 成績[k]       → 把讀到的值存進第 k 項（第 k 項要已經存在）
+//                       輸入 成績[k]       → 把讀到的值存進第 k 項（替換，第 k 項要已經存在）
+//                       輸入 成績 插入第 k 項 → 把讀到的值插到第 k 項
 //   文字（從第 1 個字開始） 名字[i]、長度(名字) → 跟清單一樣用 __at、__len，但不能改其中一個字
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
@@ -382,8 +383,15 @@ class CodeGenerator {
           if (!v) throw new FlowError(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), i);
           const name = JSON.stringify(v);
           const item = listItemTarget(v);
-          // 輸入 成績[k]：跟計算積木一樣從第 1 項開始，超出範圍會提示
-          if (item && this.isVar(item.list)) {
+          const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
+          // 輸入 成績 插入第 k 項：跟計算積木的「插入」一樣，k 可以是 1 到 長度+1
+          if (insert) {
+            const list = insert[1].trim();
+            const listName = JSON.stringify(list);
+            code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), __inList(input_list, ${i}, ${listName}));\n`;
+          }
+          // 輸入 成績[k]：替換第 k 項，跟計算積木一樣從第 1 項開始，超出範圍會提示
+          else if (item && this.isVar(item.list)) {
             const list = JSON.stringify(item.list);
             code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), __inList(input_list, ${i}, ${list}));\n`;
           }

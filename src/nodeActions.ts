@@ -45,10 +45,17 @@ function rectangleValid(vars: VarStore, f: DialogForm) {
   return !hasValue(f) || checkVar(vars, f.code, true);
 }
 
-/** 輸入/輸出積木：回傳積木文字，檢查沒過回傳 null */
+/**
+ * 輸入/輸出積木：回傳積木文字，檢查沒過回傳 null。輸入到清單的寫法：
+ *   「輸入 清單」添加到最後、「輸入 清單 插入第 k 項」、「輸入 清單[k]」替換第 k 項
+ */
 function ioText(vars: VarStore, f: DialogForm): string | null {
-  if (f.radio == '輸入' && checkVar(vars, f.varSelect, false)) {
-    return f.radio + (f.varSelect ? ' ' + f.varSelect : '');
+  if (f.radio == '輸入') {
+    if (!checkVar(vars, f.varSelect, false)) return null;
+    if (f.ioTarget != '清單' || f.ioPlace == '加入') return '輸入 ' + f.varSelect;
+    if (!checkVar(vars, f.rectIndex, true)) return null;
+    const k = f.rectIndex.trim();
+    return f.ioPlace == '插入' ? `輸入 ${f.varSelect} 插入第 ${k} 項` : `輸入 ${f.varSelect}[${k}]`;
   }
   if (checkVar(vars, f.varSelectOutput, true)) {
     return f.radio + (f.varSelectOutput ? ' ' + f.varSelectOutput : '');
@@ -152,9 +159,15 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
             : { radio, ioText: '變數或字串：' },
         };
       }
+      // 輸入到清單的某一項：拆出清單和第幾項（存到變數還是清單，對話框再依變數表判斷）
+      const insert = /^(.*?) 插入第 (.*) 項$/s.exec(rest);
+      const item = /^(.+?)\[(.*)\]$/s.exec(rest);
+      const place: Partial<DialogForm> = insert ? { varSelect: insert[1].trim(), ioPlace: '插入', rectIndex: insert[2].trim() }
+        : item ? { varSelect: item[1].trim(), ioPlace: '替換', rectIndex: item[2].trim() }
+        : { varSelect: rest };
       return {
         kind: 'Parallelogram',
-        initial: rest ? { radio, varSelect: rest, varSelectDisplay: 'inline-block', varSelectOutputDisplay: 'none' } : { radio },
+        initial: rest ? { radio, ...place, varSelectDisplay: 'inline-block', varSelectOutputDisplay: 'none' } : { radio },
       };
     }
     case 'Diamond':

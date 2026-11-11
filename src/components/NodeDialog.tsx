@@ -25,8 +25,12 @@ export interface DialogForm {
   showWhile: boolean;
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
-  /** 計算積木「插入」「替換」「刪除」的第幾項 */
+  /** 第幾項：計算積木的「插入」「替換」「刪除」，輸入到清單的「插入」「替換」 */
   rectIndex: string;
+  /** 輸入積木要存到變數還是清單；'' = 還沒選（先選類型才出現下拉選單） */
+  ioTarget: '' | '變數' | '清單';
+  /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
+  ioPlace: '加入' | '插入' | '替換';
 }
 
 // 清單操作的名稱照 Scratch 的清單積木，下一堂改用 Scratch 時說法一樣
@@ -91,6 +95,8 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   showWhile: false,
   rectAction: '設為',
   rectIndex: '',
+  ioTarget: '',
+  ioPlace: '加入',
 });
 
 export interface DialogRequest {
@@ -116,23 +122,25 @@ interface Props {
 }
 
 /**
- * 選變數的下拉選單（像 Scratch 一樣用選的，不會打錯字）。groups 是 [分組標題, 變數名稱]。
- * 舊作品裡填的值不在選項裡（例如 成績[2]）時，也放進選項，打開修改才不會被清掉。
+ * 選變數的下拉選單（像 Scratch 一樣用選的，不會打錯字），只列出一種類型的變數。
+ * 舊作品裡填的值不在選項裡時，也放進選項，打開修改才不會被清掉。
  */
-function VarPicker({ id, value, onChange, groups }: { id: string; value: string; onChange: (v: string) => void; groups: [string, string[]][] }) {
-  const names = groups.flatMap(([, list]) => list);
+function VarPicker({ id, value, onChange, names }: { id: string; value: string; onChange: (v: string) => void; names: string[] }) {
   return (
     <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
       <option value="" disabled>{names.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
       {value && !names.includes(value) && <option value={value}>{value}</option>}
-      {groups.filter(([, list]) => list.length).map(([label, list]) => (
-        <optgroup key={label} label={label}>
-          {list.map(name => <option key={name} value={name}>{name}</option>)}
-        </optgroup>
-      ))}
+      {names.map(name => <option key={name} value={name}>{name}</option>)}
     </select>
   );
 }
+
+/** 輸入到清單時，下面那行說明 */
+const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string> = {
+  加入: list => t(`輸入的值會添加到清單「${list}」的最後面`, `The value goes to the end of the list "${list}".`),
+  插入: (list, k) => t(`輸入的值會插到清單「${list}」的第 ${k || '?'} 項，原本那項和後面的都往後移`, `The value goes to item ${k || '?'} of "${list}". The items after it move back.`),
+  替換: (list, k) => t(`輸入的值會換掉清單「${list}」的第 ${k || '?'} 項`, `The value replaces item ${k || '?'} of "${list}".`),
+};
 
 export function NodeDialog({ request, onClose, varTypes }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -161,7 +169,14 @@ export function NodeDialog({ request, onClose, varTypes }: Props) {
 function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes }) {
   const { kind } = request;
   useLang();
-  const [f, setF] = useState<DialogForm>(() => ({ ...defaultForm(kind), ...request.initial }));
+  const [f, setF] = useState<DialogForm>(() => {
+    const form = { ...defaultForm(kind), ...request.initial };
+    // 打開已經畫好的輸入積木：依變數表判斷原本存到變數還是清單
+    if (form.radio == '輸入' && !form.ioTarget && form.varSelect) {
+      form.ioTarget = form.ioPlace != '加入' || varTypes.array.includes(form.varSelect) ? '清單' : '變數';
+    }
+    return form;
+  });
   const set = (patch: Partial<DialogForm>) => setF(prev => ({ ...prev, ...patch }));
 
   const yes = () => {
@@ -214,29 +229,54 @@ function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; on
           {radio('輸入', t('輸入', 'Input'), () => set({ ioText: '變數：', varSelectDisplay: 'inline-block', varSelectOutput: '', varSelectOutputDisplay: 'none' }))}{' '}
           {radio('輸出', t('輸出', 'Output'), () => set({ ioText: '變數或字串：', varSelectDisplay: 'none', varSelect: '', varSelectOutputDisplay: 'inline-block' }))}{' '}
           <br /><br />
-          <p id="io_text">{f.ioText == '變數或字串：' ? t('變數或字串：', 'Variable or "text": ') : t('變數：', 'Variable: ')}</p>
-          <p>
-            {f.radio == '輸入'
-              ? (
-                // 輸入：用選的。清單另外一組，標題就說明輸入的值會添加到最後，學生才知道可以直接輸入到清單
-                <VarPicker
-                  id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
-                  groups={[
-                    [t('變數', 'Variables'), [...varTypes.number, ...varTypes.text]],
-                    [t('清單（輸入的值會添加到最後）', 'Lists (the value goes to the end)'), varTypes.array],
-                  ]}
-                />
-              )
-              : (
-                <input
-                  className="var_select" id="var_select_output" value={f.varSelectOutput}
-                  onChange={e => set({ varSelectOutput: e.target.value })}
-                />
-              )}{' '}
-            {f.radio == '輸入' && varTypes.array.includes(f.varSelect) && (
-              <span className="dialog_note">{t(`輸入的值會添加到清單「${f.varSelect}」的最後面`, `The value will go to the end of the list "${f.varSelect}".`)}</span>
+          {f.radio == '輸入'
+            ? (
+              // 輸入：先選存到變數還是清單，才出現那一類的下拉選單；清單還可以選放在哪裡
+              <>
+                <p className="io_choice">
+                  {t('存到：', 'Save to: ')}
+                  <label><input type="radio" name="io_target" checked={f.ioTarget == '變數'} onChange={() => set({ ioTarget: '變數', varSelect: '' })} />{t('變數', 'Variable')}</label>
+                  <label><input type="radio" name="io_target" checked={f.ioTarget == '清單'} onChange={() => set({ ioTarget: '清單', varSelect: '' })} />{t('清單', 'List')}</label>
+                </p>
+                {f.ioTarget && (
+                  <p>
+                    <VarPicker
+                      id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
+                      names={f.ioTarget == '清單' ? varTypes.array : [...varTypes.number, ...varTypes.text]}
+                    />
+                  </p>
+                )}
+                {f.ioTarget == '清單' && (
+                  <>
+                    <p className="io_choice">
+                      {t('放在：', 'Put it: ')}
+                      <label><input type="radio" name="io_place" checked={f.ioPlace == '加入'} onChange={() => set({ ioPlace: '加入' })} />{t('最後面', 'at the end')}</label>
+                      <label><input type="radio" name="io_place" checked={f.ioPlace == '插入'} onChange={() => set({ ioPlace: '插入' })} />{t('插入到第幾項', 'insert at item')}</label>
+                      <label><input type="radio" name="io_place" checked={f.ioPlace == '替換'} onChange={() => set({ ioPlace: '替換' })} />{t('替換第幾項', 'replace item')}</label>
+                    </p>
+                    {f.ioPlace != '加入' && (
+                      <p>
+                        {t('第', 'Item')} <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} /> {t('項', '')}
+                      </p>
+                    )}
+                    {f.varSelect && <span className="dialog_note">{IO_NOTE[f.ioPlace](f.varSelect, f.rectIndex.trim())}</span>}
+                  </>
+                )}
+              </>
+            )
+            : (
+              <>
+                <p id="io_text">{t('變數或字串：', 'Variable or "text": ')}</p>
+                <p>
+                  <input
+                    className="var_select" id="var_select_output" value={f.varSelectOutput}
+                    onChange={e => set({ varSelectOutput: e.target.value })}
+                  />
+                </p>
+              </>
             )}
-            <br /><br />{buttons}
+          <p>
+            {buttons}
           </p>
         </>
       );
@@ -298,9 +338,7 @@ function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; on
           {f.rectAction == '設為' ? t('變數：', 'Variable: ') : t('清單：', 'List: ')}
           <VarPicker
             id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
-            groups={f.rectAction == '設為'
-              ? [[t('變數', 'Variables'), [...varTypes.number, ...varTypes.text]]]
-              : [[t('清單', 'Lists'), varTypes.array]]}
+            names={f.rectAction == '設為' ? [...varTypes.number, ...varTypes.text] : varTypes.array}
           />
           {indexLabel && (
             <>

@@ -57,16 +57,24 @@ function rectangleLabel(text: string, en: boolean): string {
   }
 }
 
+/** 輸入積木上顯示的字：輸入到清單某一項時，照 Scratch 的說法寫出插入/替換 */
+function ioLabel(text: string, en: boolean): string {
+  const insert = /^輸入 (.*?) 插入第 (.*) 項$/s.exec(text);
+  if (insert) return en ? `Input → insert at ${insert[2]} of ${insert[1]}` : `輸入 → 插入到 ${insert[1]} 的第 ${insert[2]} 項`;
+  const item = /^輸入 (.+?)\[(.*)\]$/s.exec(text);
+  if (item) return en ? `Input → replace item ${item[2]} of ${item[1]}` : `輸入 → 替換 ${item[1]} 的第 ${item[2]} 項`;
+  return en ? text.replace(/^輸入/, 'Input').replace(/^輸出/, 'Output') : text;
+}
+
 /** 積木上顯示的字 */
 export function displayNodeText(text: string, figure: FigureName): string {
   if (!text) return text;
   if (figure == 'Rectangle') return rectangleLabel(text, getLang() == 'en');
+  if (figure == 'Parallelogram') return ioLabel(text, getLang() == 'en');
   if (getLang() != 'en') return text;
   switch (figure) {
     case 'Circle':
       return text == '開始' ? 'Start' : text == '結束' ? 'End' : text;
-    case 'Parallelogram':
-      return text.replace(/^輸入/, 'Input').replace(/^輸出/, 'Output');
     case 'For_Loop':
       return text.endsWith('次') ? `repeat ${text.slice(0, -1)}` : text;
     default:

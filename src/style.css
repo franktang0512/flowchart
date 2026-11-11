@@ -706,7 +706,12 @@ input, textarea, select, button {
     margin: 4px 0;
     background: #fff;
 }
-/* 選了清單時的說明（輸入的值會添加到最後） */
+/* 輸入積木：存到變數/清單、放在清單哪裡 */
+#node_info .io_choice label {
+    margin-right: 6px;
+    white-space: nowrap;
+}
+/* 選了清單時的說明（輸入的值會放到哪裡） */
 #node_info .dialog_note {
     display: block;
     margin-top: 6px;
