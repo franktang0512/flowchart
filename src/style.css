@@ -100,6 +100,40 @@ input, textarea, select, button {
     background: var(--green-dark);
     color: #fff;
 }
+/* 題目頁標頭：目前的學習目標（積木 / C++） */
+.target_badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 12px;
+    border-radius: 999px;
+    background: var(--green-dark);
+    color: #fff;
+    font-size: 0.85rem;
+    cursor: default;
+}
+/* 首頁：目前的學習目標，可以換 */
+.target_now {
+    margin: 0 0 4px;
+}
+.target_now .muted {
+    margin: 0 6px 0 2px;
+}
+.link_button {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--green-dark);
+    text-decoration: underline;
+    cursor: pointer;
+}
+/* 選學習目標的卡片是按鈕，樣式跟課程卡片一樣 */
+.target_card {
+    width: 100%;
+    border: none;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
 #student_info {
     display: flex;
     align-items: center;

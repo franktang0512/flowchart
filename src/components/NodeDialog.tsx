@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
 import { t, useLang } from '../i18n';
+import { byTarget, itemWord } from '../target';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -39,28 +40,31 @@ const RECT_ACTIONS: [RectAction, () => string][] = [
   ['加入', () => t('添加', 'Add')],
   ['插入', () => t('插入', 'Insert')],
   ['替換', () => t('替換', 'Replace')],
-  ['刪除', () => t('刪除第幾項', 'Delete item')],
+  ['刪除', () => byTarget(t('刪除第幾項', 'Delete item'), t('刪除某個索引', 'Delete at index'))],
   ['清空', () => t('刪除所有項目', 'Delete all')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
   設為: () => t('將變數內的值設為...', 'Set a variable to...'),
   加入: () => t('把值添加到清單的最後面...', 'Add a value to the end of a list...'),
-  插入: () => t('把值插到清單的第幾項，原本那項和後面的都往後移...', 'Put a value into a list. The items after it move back...'),
-  替換: () => t('把清單的第幾項換成新的值...', 'Change one item of a list...'),
-  刪除: () => t('刪除清單的第幾項，後面的都往前移...', 'Delete one item from a list. The items after it move up...'),
+  插入: () => t(`把值插到清單的${byTarget('第幾項', '某個索引')}，原本那項和後面的都往後移...`, 'Put a value into a list. The items after it move back...'),
+  替換: () => t(`把清單的${byTarget('第幾項', '某個索引')}換成新的值...`, 'Change one item of a list...'),
+  刪除: () => t(`刪除清單的${byTarget('第幾項', '某個索引')}，後面的都往前移...`, 'Delete one item from a list. The items after it move up...'),
   清空: () => t('刪除清單的所有項目，清單會變成空的...', 'Delete all items. The list will be empty...'),
 };
 
-/** 「第幾項」欄位前面的字（沒有這欄的是 null） */
+/** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
 const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   設為: null,
   加入: null,
-  插入: () => t('插到第', 'At item'),
-  替換: () => t('替換第', 'Item'),
-  刪除: () => t('刪除第', 'Delete item'),
+  插入: () => byTarget(t('插到第', 'At item'), t('插到索引', 'At index')),
+  替換: () => byTarget(t('替換第', 'Item'), t('替換索引', 'Index')),
+  刪除: () => byTarget(t('刪除第', 'Delete item'), t('刪除索引', 'Delete index')),
   清空: null,
 };
+
+/** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
+const indexSuffix = () => byTarget(t('項', ''), '');
 
 /** 值的輸入欄前面的字（沒有值的是 null） */
 const RECT_VERB: Record<RectAction, (() => string) | null> = {
@@ -138,8 +142,8 @@ function VarPicker({ id, value, onChange, names }: { id: string; value: string; 
 /** 輸入到清單時，下面那行說明 */
 const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string> = {
   加入: list => t(`輸入的值會添加到清單「${list}」的最後面`, `The value goes to the end of the list "${list}".`),
-  插入: (list, k) => t(`輸入的值會插到清單「${list}」的第 ${k || '?'} 項，原本那項和後面的都往後移`, `The value goes to item ${k || '?'} of "${list}". The items after it move back.`),
-  替換: (list, k) => t(`輸入的值會換掉清單「${list}」的第 ${k || '?'} 項`, `The value replaces item ${k || '?'} of "${list}".`),
+  插入: (list, k) => t(`輸入的值會插到清單「${list}」的${itemWord(k || '?')}，原本那項和後面的都往後移`, `The value goes to ${itemWord(k || '?')} of "${list}". The items after it move back.`),
+  替換: (list, k) => t(`輸入的值會換掉清單「${list}」的${itemWord(k || '?')}`, `The value replaces ${itemWord(k || '?')} of "${list}".`),
 };
 
 export function NodeDialog({ request, onClose, varTypes }: Props) {
@@ -251,12 +255,12 @@ function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; on
                     <p className="io_choice">
                       {t('放在：', 'Put it: ')}
                       <label><input type="radio" name="io_place" checked={f.ioPlace == '加入'} onChange={() => set({ ioPlace: '加入' })} />{t('最後面', 'at the end')}</label>
-                      <label><input type="radio" name="io_place" checked={f.ioPlace == '插入'} onChange={() => set({ ioPlace: '插入' })} />{t('插入到第幾項', 'insert at item')}</label>
-                      <label><input type="radio" name="io_place" checked={f.ioPlace == '替換'} onChange={() => set({ ioPlace: '替換' })} />{t('替換第幾項', 'replace item')}</label>
+                      <label><input type="radio" name="io_place" checked={f.ioPlace == '插入'} onChange={() => set({ ioPlace: '插入' })} />{byTarget(t('插入到第幾項', 'insert at item'), t('插入到某個索引', 'insert at index'))}</label>
+                      <label><input type="radio" name="io_place" checked={f.ioPlace == '替換'} onChange={() => set({ ioPlace: '替換' })} />{byTarget(t('替換第幾項', 'replace item'), t('替換某個索引', 'replace index'))}</label>
                     </p>
                     {f.ioPlace != '加入' && (
                       <p>
-                        {t('第', 'Item')} <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} /> {t('項', '')}
+                        {byTarget(t('第', 'Item'), t('索引', 'Index'))} <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} /> {indexSuffix()}
                       </p>
                     )}
                     {f.varSelect && <span className="dialog_note">{IO_NOTE[f.ioPlace](f.varSelect, f.rectIndex.trim())}</span>}
@@ -344,7 +348,7 @@ function DialogBody({ request, onClose, varTypes }: { request: DialogRequest; on
             <>
               <br /><br /> {indexLabel()}{' '}
               <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
-              {t('項', '')}
+              {indexSuffix()}
             </>
           )}
           {verb && (

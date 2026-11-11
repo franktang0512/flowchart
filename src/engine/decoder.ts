@@ -2,7 +2,8 @@
 //
 // 學生的寫法 → 產生的程式：
 //   數字/文字變數        n、name            → 一般的 JavaScript 變數，存值時會檢查型別
-//   清單（從第 1 項開始） 成績[i]           → __at(成績, "成績", 積木編號, i)
+// 清單和文字的位置：學習目標是積木時從 1 開始，C++ 時從 0 開始（執行時的 __BASE，見 target.ts）
+//   清單                 成績[i]           → __at(成績, "成績", 積木編號, i)
 //                       成績[i] 設為 x     → __set(成績, "成績", 積木編號, i, x)
 //                       長度(成績)         → __len(...)
 //                       項目編號(成績, x)   → __find(...)：x 在第幾項，找不到是 0（跟 Scratch 一樣）
@@ -17,6 +18,7 @@
 //   文字（從第 1 個字開始） 名字[i]、長度(名字) → 跟清單一樣用 __at、__len，但不能改其中一個字
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
+import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle } from './labels';
 import type { FlowNode } from './node';
@@ -154,6 +156,22 @@ const label = (node: FlowNode) => {
 const arrowName = (text: string) => displayLinkText(text);
 
 /** 執行時錯誤訊息的範本：{name} {v} {len} {k} 會換成實際的值 */
+// 位置超出範圍的說明：積木說「第 k 項」（從 1 開始），C++ 說「索引 k」（從 0 開始）。{max} 是最後一個可以用的位置
+const BLOCKS_RANGE_MESSAGES = () => ({
+  outOfRange: t('清單「{name}」只有 {len} 項，沒有第 {k} 項（清單從第 1 項開始）。', 'The list "{name}" has only {len} items. There is no item {k}. (Lists start at item 1.)'),
+  emptyList: t('清單「{name}」是空的，沒有第 {k} 項。', 'The list "{name}" is empty. There is no item {k}.'),
+  textOutOfRange: t('文字「{name}」只有 {len} 個字，沒有第 {k} 個字（從第 1 個字開始）。', 'The text "{name}" has only {len} letters. There is no letter {k}. (Start at letter 1.)'),
+  emptyText: t('文字「{name}」是空的，沒有第 {k} 個字。', 'The text "{name}" is empty. There is no letter {k}.'),
+  insertRange: t('清單「{name}」現在有 {len} 項，只能插在第 1 到第 {max} 項，沒有第 {k} 項（插在第 {max} 項就是加到最後）。', 'The list "{name}" has {len} items. You can insert at item 1 to item {max}. There is no item {k}.'),
+});
+const CPP_RANGE_MESSAGES = () => ({
+  outOfRange: t('清單「{name}」有 {len} 項，索引只能是 0 到 {max}，沒有索引 {k}（C++ 的索引從 0 開始）。', 'The list "{name}" has {len} items. The index must be 0 to {max}. There is no index {k}. (In C++, the index starts at 0.)'),
+  emptyList: t('清單「{name}」是空的，沒有索引 {k}。', 'The list "{name}" is empty. There is no index {k}.'),
+  textOutOfRange: t('文字「{name}」有 {len} 個字，索引只能是 0 到 {max}，沒有索引 {k}（C++ 的索引從 0 開始）。', 'The text "{name}" has {len} letters. The index must be 0 to {max}. There is no index {k}. (In C++, the index starts at 0.)'),
+  emptyText: t('文字「{name}」是空的，沒有索引 {k}。', 'The text "{name}" is empty. There is no index {k}.'),
+  insertRange: t('清單「{name}」現在有 {len} 項，插入的索引只能是 0 到 {max}，沒有索引 {k}（插在索引 {max} 就是加到最後）。', 'The list "{name}" has {len} items. You can insert at index 0 to {max}. There is no index {k}.'),
+});
+
 const runtimeMessages = () => ({
   noInput: t('測資的輸入不夠：執行到「輸入 {name}」時，已經沒有資料可以讀了。', 'Not enough test input: nothing is left to read at "Input {name}".'),
   inputNotNum: t('測資裡的「{v}」不是數字，不能存進數字變數「{name}」。如果要存文字，請把「{name}」的型別改成文字。', '"{v}" in the test input is not a number. It cannot go into the number variable "{name}". To keep words, change the type of "{name}" to Text.'),
@@ -163,22 +181,19 @@ const runtimeMessages = () => ({
   listToText: t('清單不能直接存進文字變數「{name}」。', 'A list cannot go into the text variable "{name}".'),
   wholeList: t('「{name}」是清單，要改其中一項請寫 {name}[第幾項]。', '"{name}" is a list. To change one item, write {name}[item number].'),
   notList: t('「{name}」不是清單也不是文字，不能用 [第幾項]。', '"{name}" is not a list or text. You cannot use [ ].'),
-  textOutOfRange: t('文字「{name}」只有 {len} 個字，沒有第 {k} 個字（從第 1 個字開始）。', 'The text "{name}" has only {len} letters. There is no letter {k}. (Start at letter 1.)'),
-  emptyText: t('文字「{name}」是空的，沒有第 {k} 個字。', 'The text "{name}" is empty. There is no letter {k}.'),
+  ...(getTarget() == 'cpp' ? CPP_RANGE_MESSAGES() : BLOCKS_RANGE_MESSAGES()),
   textItemSet: t('「{name}」是文字，不能只改其中一個字：可以用 + 把字接起來，存成新的文字。', '"{name}" is text. You cannot change one letter. Use + to join letters into new text.'),
   notListEdit: t('「{name}」不是清單，不能加入、插入或刪除。', '"{name}" is not a list. You cannot add, insert or remove.'),
-  insertRange: t('清單「{name}」現在有 {len} 項，只能插在第 1 到第 {max} 項，沒有第 {k} 項（插在第 {max} 項就是加到最後）。', 'The list "{name}" has {len} items. You can insert at item 1 to item {max}. There is no item {k}.'),
   listInList: t('不能把整個清單加進清單「{name}」，請一次加一項。', 'You cannot add a whole list to "{name}". Add one item at a time.'),
-  outOfRange: t('清單「{name}」只有 {len} 項，沒有第 {k} 項（清單從第 1 項開始）。', 'The list "{name}" has only {len} items. There is no item {k}. (Lists start at item 1.)'),
-  emptyList: t('清單「{name}」是空的，沒有第 {k} 項。', 'The list "{name}" is empty. There is no item {k}.'),
   lenNotList: t('長度( ) 的括號裡要放清單或文字。', 'Put a list or text inside length( ).'),
   findNotList: t('項目編號( ) 和 包含( ) 的括號裡，第一個要放清單或文字，例如 包含(名單, "Amy")。', 'The first thing inside indexof( ) or contains( ) must be a list or text. Example: contains(names, "Amy").'),
   countNotNum: t('迴圈的次數不是數字。', 'The loop count is not a number.'),
 });
 
-// 執行時用到的小工具：存值時檢查型別、清單從第 1 項開始。錯誤會標出是哪個積木（i）
+// 執行時用到的小工具：存值時檢查型別、清單的位置從 __BASE 開始（積木 1、C++ 0）。錯誤會標出是哪個積木（i）
 const runtime = () => `
 var __M = ${JSON.stringify(runtimeMessages())};
+var __BASE = ${indexBase()};
 function __err(key, i, vars) {
   var m = __M[key];
   for (var k in vars) m = m.split('{' + k + '}').join(vars[k]);
@@ -216,11 +231,11 @@ function __list(v, i, name) {
 function __index(list, name, i, k) {
   var isText = typeof list == 'string';
   if (!Array.isArray(list) && !isText) __err('notList', i, { name: name });
-  if (!(Number.isInteger(k) && k >= 1 && k <= list.length)) {
+  if (!(Number.isInteger(k) && k >= __BASE && k < list.length + __BASE)) {
     var key = isText ? (list.length ? 'textOutOfRange' : 'emptyText') : (list.length ? 'outOfRange' : 'emptyList');
-    __err(key, i, { name: name, len: list.length, k: k });
+    __err(key, i, { name: name, len: list.length, max: list.length - 1 + __BASE, k: k });
   }
-  return k - 1;
+  return k - __BASE;
 }
 function __at(list, name, i, k) { return list[__index(list, name, i, k)]; }
 function __set(list, name, i, k, v) {
@@ -235,10 +250,10 @@ function __push(list, name, i, v) {
 function __insert(list, name, i, k, v) {
   if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
   if (Array.isArray(v)) __err('listInList', i, { name: name });
-  if (!(Number.isInteger(k) && k >= 1 && k <= list.length + 1)) {
-    __err('insertRange', i, { name: name, len: list.length, max: list.length + 1, k: k });
+  if (!(Number.isInteger(k) && k >= __BASE && k <= list.length + __BASE)) {
+    __err('insertRange', i, { name: name, len: list.length, max: list.length + __BASE, k: k });
   }
-  list.splice(k - 1, 0, v);
+  list.splice(k - __BASE, 0, v);
 }
 function __remove(list, name, i, k) {
   if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
@@ -248,13 +263,14 @@ function __len(v, i) {
   if (!Array.isArray(v) && typeof v != 'string') __err('lenNotList', i, {});
   return v.length;
 }
+// 找不到：積木回傳 0（跟 Scratch 一樣），C++ 回傳 -1（0 是第一個索引）
 function __find(list, v, i) {
-  if (typeof list == 'string') return list.indexOf(String(v)) + 1;
+  if (typeof list == 'string') return list.indexOf(String(v)) + __BASE;
   if (!Array.isArray(list)) __err('findNotList', i, {});
-  for (var k = 0; k < list.length; k++) if (list[k] == v) return k + 1;
-  return 0;
+  for (var k = 0; k < list.length; k++) if (list[k] == v) return k + __BASE;
+  return __BASE - 1;
 }
-function __has(list, v, i) { return __find(list, v, i) > 0; }
+function __has(list, v, i) { return __find(list, v, i) >= __BASE; }
 function __clear(list, name, i) {
   if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
   list.length = 0;

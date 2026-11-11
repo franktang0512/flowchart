@@ -2,6 +2,7 @@
 // 題目寫成 "資料夾/檔名"，對應 src/questions/資料夾/檔名.json，網址是 ?w=資料夾&h=檔名。
 // 要調整課程名稱、單元、題目順序、隱藏某題，都只要改這個檔案。
 import { link } from './i18n';
+import type { Target } from './target';
 
 export interface Unit {
   name: string;
@@ -15,6 +16,8 @@ export interface Course {
   name: string;
   nameEn: string;
   description?: string;
+  /** 只給某個學習目標看（例如題目提示寫的是從第 1 項開始）；沒寫就是兩種都適用 */
+  target?: Target;
   units: Unit[];
 }
 
@@ -33,6 +36,7 @@ export const COURSES: Course[] = [
   {
     id: 'list',
     name: '清單', nameEn: 'Lists',
+    target: 'blocks',
     units: [
       { name: '認識清單', nameEn: 'Meet the list', questions: ['list/l1', 'list/l2'] },
       { name: '清單與迴圈', nameEn: 'Lists and loops', questions: ['list/l3', 'list/l4'] },

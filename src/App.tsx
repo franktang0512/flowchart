@@ -16,6 +16,7 @@ import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './quest
 import { fitRowOnInput } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
 import { getLang, link, onLangChange, t, useLang } from './i18n';
+import { getTarget, targetName } from './target';
 import { useCommit } from './useCommit';
 import { downloadWorkFile, makeWorkFile, parseWorkFile, pickTextFile, stashPendingImport, takePendingImport, type WorkContent, type WorkFile } from './workFile';
 
@@ -445,6 +446,8 @@ export function App() {
           {t('電子式學習單', 'Flowchart Worksheet')}
         </a>
         <LangToggle />
+        {/* 目前的學習目標（清單從 1 還是 0 開始）；要換請回首頁 */}
+        <span className="target_badge" title={t('要更換請回到首頁', 'Change it on the home page')}>{targetName(getTarget())}</span>
         </div>
         <div id="student_info">
           <label>{t('班級', 'Class')}<input id="class" placeholder={t('必填', 'Required')} ref={classRef} /></label>

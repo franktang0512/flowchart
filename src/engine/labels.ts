@@ -1,6 +1,7 @@
 // 積木和箭頭上的字：存起來的一律是中文（程式靠它判斷怎麼執行），英文模式只在畫的時候換成英文。
 // 計算積木的清單操作，中英文都在畫的時候換成 Scratch 積木的說法。
 import { getLang } from '../i18n';
+import { itemWord } from '../target';
 import type { FigureName } from './figures';
 
 const ROUNDING: [string, string][] = [
@@ -49,9 +50,9 @@ function rectangleLabel(text: string, en: boolean): string {
   const value = expr.trim() + round;
   switch (action) {
     case '加入': return en ? `add ${value} to ${target}` : `添加 ${value} 到 ${target}`;
-    case '插入': return en ? `insert ${value} at ${index} of ${target}` : `插入 ${value} 到 ${target} 的第 ${index} 項`;
-    case '替換': return en ? `replace item ${index} of ${target} with ${value}` : `替換 ${target} 的第 ${index} 項為 ${value}`;
-    case '刪除': return en ? `delete ${index} of ${target}` : `刪除 ${target} 的第 ${index} 項`;
+    case '插入': return en ? `insert ${value} at ${itemWord(index)} of ${target}` : `插入 ${value} 到 ${target} 的${itemWord(index)}`;
+    case '替換': return en ? `replace ${itemWord(index)} of ${target} with ${value}` : `替換 ${target} 的${itemWord(index)} 為 ${value}`;
+    case '刪除': return en ? `delete ${itemWord(index)} of ${target}` : `刪除 ${target} 的${itemWord(index)}`;
     case '清空': return en ? `delete all of ${target}` : `刪除 ${target} 的所有項目`;
     default: return en ? `set ${target} to ${value}` : text;
   }
@@ -60,9 +61,9 @@ function rectangleLabel(text: string, en: boolean): string {
 /** 輸入積木上顯示的字：輸入到清單某一項時，照 Scratch 的說法寫出插入/替換 */
 function ioLabel(text: string, en: boolean): string {
   const insert = /^輸入 (.*?) 插入第 (.*) 項$/s.exec(text);
-  if (insert) return en ? `Input → insert at ${insert[2]} of ${insert[1]}` : `輸入 → 插入到 ${insert[1]} 的第 ${insert[2]} 項`;
+  if (insert) return en ? `Input → insert at ${itemWord(insert[2])} of ${insert[1]}` : `輸入 → 插入到 ${insert[1]} 的${itemWord(insert[2])}`;
   const item = /^輸入 (.+?)\[(.*)\]$/s.exec(text);
-  if (item) return en ? `Input → replace item ${item[2]} of ${item[1]}` : `輸入 → 替換 ${item[1]} 的第 ${item[2]} 項`;
+  if (item) return en ? `Input → replace ${itemWord(item[2])} of ${item[1]}` : `輸入 → 替換 ${item[1]} 的${itemWord(item[2])}`;
   return en ? text.replace(/^輸入/, 'Input').replace(/^輸出/, 'Output') : text;
 }
 

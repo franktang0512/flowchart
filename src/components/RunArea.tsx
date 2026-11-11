@@ -2,6 +2,7 @@
 import { useEffect, useRef, type Ref } from 'react';
 import type { RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
+import { indexBase } from '../target';
 
 interface Props {
   visible: boolean;
@@ -129,7 +130,7 @@ function changedIndex(items: unknown[], prev: unknown): number {
   return items.length < prev.length ? items.length - 1 : -1;
 }
 
-/** 清單的值：一列排開，每一項標上第幾項（從 1 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */
+/** 清單的值：一列排開，每一項標上位置（積木從 1、C++ 從 0 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */
 function ListValue({ items, prev }: { items: unknown[]; prev: unknown }) {
   const scrollerRef = useRef<HTMLSpanElement>(null);
   const changedRef = useRef<HTMLSpanElement>(null);
@@ -152,7 +153,7 @@ function ListValue({ items, prev }: { items: unknown[]; prev: unknown }) {
     <span className="list_value" ref={scrollerRef}>
       {items.map((item, k) => (
         <span key={k} ref={k == changed ? changedRef : undefined} className={'list_item' + (k == changed ? ' changed' : '')}>
-          <small>{k + 1}</small>{String(item)}
+          <small>{k + indexBase()}</small>{String(item)}
         </span>
       ))}
     </span>

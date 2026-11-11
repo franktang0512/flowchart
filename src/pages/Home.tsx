@@ -1,9 +1,10 @@
-// 首頁：選課程 → 看這門課的題目 → 點題目進入學習單
+// 首頁：選學習目標（積木或 C++）→ 選課程 → 看這門課的題目 → 點題目進入學習單
 import { useEffect, useState } from 'react';
 import { LangToggle } from '../components/LangToggle';
 import { COURSES, questionHref, type Course } from '../courses';
 import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
+import { setTarget, targetName, useTarget, type Target } from '../target';
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -33,14 +34,55 @@ function Shell({ children }: { children: React.ReactNode }) {
 const questionCount = (c: Course) => c.units.reduce((n, u) => n + u.questions.length, 0);
 const courseName = (c: { name: string; nameEn: string }) => t(c.name, c.nameEn);
 
+/** 學習目標的選項：名稱、說明、清單從哪裡開始 */
+const TARGET_CHOICES: { target: Target; desc: () => string; index: () => string }[] = [
+  {
+    target: 'blocks',
+    desc: () => t('Scratch、Blockly 這類積木程式', 'Block coding, like Scratch and Blockly'),
+    index: () => t('清單從第 1 項開始', 'Lists start at item 1'),
+  },
+  {
+    target: 'cpp',
+    desc: () => t('陣列、vector 等 C++ 寫法', 'C++ arrays and vectors'),
+    index: () => t('索引從 0 開始', 'Index starts at 0'),
+  },
+];
+
+/** 進入課程前先選要學哪一種程式 */
+function TargetChooser() {
+  return (
+    <>
+      <h4 className="home_heading">{t('你要學哪一種程式？', 'What do you want to learn?')}</h4>
+      <div className="home_courses">
+        {TARGET_CHOICES.map(c => (
+          <button key={c.target} className="home_card target_card" onClick={() => setTarget(c.target)}>
+            <div className="home_card_title">{targetName(c.target)}</div>
+            <div className="home_card_desc">{c.desc()}</div>
+            <div className="home_card_meta">{c.index()}</div>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function CourseList() {
   const lang = useLang();
+  const target = useTarget();
   useEffect(() => { document.title = t('電子式學習單', 'Flowchart Worksheet'); }, [lang]);
+  if (!target) return <Shell><TargetChooser /></Shell>;
   return (
     <Shell>
+      <p className="target_now">
+        {t('學習目標：', 'Learning: ')}<strong>{targetName(target)}</strong>
+        <span className="muted">（{TARGET_CHOICES.find(c => c.target == target)!.index()}）</span>
+        <button className="link_button" onClick={() => setTarget(target == 'cpp' ? 'blocks' : 'cpp')}>
+          {t(`改成${targetName(target == 'cpp' ? 'blocks' : 'cpp')}`, `Switch to ${targetName(target == 'cpp' ? 'blocks' : 'cpp')}`)}
+        </button>
+      </p>
       <h4 className="home_heading">{t('選擇課程', 'Choose a course')}</h4>
       <div className="home_courses">
-        {COURSES.map(c => (
+        {COURSES.filter(c => !c.target || c.target == target).map(c => (
           <a key={c.id} className="home_card" href={link(`?course=${encodeURIComponent(c.id)}`)}>
             <div className="home_card_title">{courseName(c)}</div>
             {c.description && <div className="home_card_desc">{c.description}</div>}
