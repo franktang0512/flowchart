@@ -79,7 +79,10 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
         </select>
       </td>
       <td>
-        {isListType(row.type)
+        {row.type == '清單' && getTarget() != 'cpp'
+          // 積木（Scratch / Blockly）的清單跟 Scratch 一樣，數字、文字都能放，不用先決定型別（C++ 才要選）
+          ? <span className="muted list_any" title={t('清單一開始是空的，數字和文字都可以放', 'The list starts empty. It can hold numbers and text.')}>{t('數字、文字都可以', 'Numbers or text')}</span>
+          : isListType(row.type)
           ? (
             // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>）
             <select

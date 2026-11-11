@@ -1161,3 +1161,9 @@ input, textarea, select, button {
     background: #fff4c2;
     border-color: #e0b100;
 }
+
+/* 積木的清單：數字、文字都可以放，不用選 */
+.list_any {
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
