@@ -59,8 +59,10 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
           className="var_input" value={row.type}
           onChange={e => {
             const type = e.target.value as VarRow['type'];
-            // 預設的初始值跟著型別換：數字是 0，文字是空的
-            const init = type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
+            // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字
+            const init = type == '清單' ? (row.init == '文字' ? '文字' : '數字')
+              : row.type == '清單' ? (type == '數字' ? '0' : '')
+              : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
             onChange(row.id, { type, init });
             onCommit();
           }}
@@ -70,7 +72,20 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
           <option value="清單">{t('清單', 'List')}</option>
         </select>
       </td>
-      <td>{row.type == '清單' ? <input className="var_input" disabled placeholder={t('空清單', 'Empty list')} /> : <input {...text('init')} />}</td>
+      <td>
+        {row.type == '清單'
+          ? (
+            // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>）
+            <select
+              className="var_input" value={row.init == '文字' ? '文字' : '數字'} title={t('清單一開始是空的，這裡選裡面要裝什麼', 'The list starts empty. Choose what it holds.')}
+              onChange={e => { onChange(row.id, { init: e.target.value }); onCommit(); }}
+            >
+              <option value="數字">{t('裝數字', 'Numbers')}</option>
+              <option value="文字">{t('裝文字', 'Text')}</option>
+            </select>
+          )
+          : <input {...text('init')} />}
+      </td>
       <td><input {...text('desc')} /></td>
       <td><button className="delete_var" title={t('刪除這個變數', 'Delete this variable')} aria-label={t('刪除', 'Delete')} onClick={() => onDelete(row.id)}><TrashIcon /></button></td>
     </tr>

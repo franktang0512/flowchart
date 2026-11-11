@@ -48,10 +48,10 @@ const isFunc = (name: string) => Object.prototype.hasOwnProperty.call(FUNCTIONS,
 const FUNC_CALL = (i: number) => new RegExp(`__(len|find|has)_${i}\\(`);
 const LOGIC_WORDS = ['and', 'or', 'not'];
 
-type Token = { type: 'string' | 'number' | 'name' | 'op'; text: string };
+export type Token = { type: 'string' | 'number' | 'name' | 'op'; text: string };
 
 /** 把運算式切成一個一個的單位：字串、數字、名稱、符號（且、或、非 當成符號） */
-function tokenize(str: string): Token[] {
+export function tokenize(str: string): Token[] {
   const tokens: Token[] = [];
   const re = /\s+|("[^"]*"|'[^']*')|(\d+(?:\.\d+)?)|((?:(?![且或非])[\p{L}_$])(?:(?![且或非])[\p{L}\p{N}_$])*)|(.)/gu;
   for (const m of str.matchAll(re)) {

@@ -484,6 +484,87 @@ input, textarea, select, button {
     border-color: var(--bad-line);
     color: #c0392b;
 }
+/* 「看程式」按鈕（流程圖標題旁邊） */
+#show_code {
+    border: 1px solid var(--green-dark);
+    background: #fff;
+    color: var(--green-dark);
+    border-radius: 8px;
+    padding: 3px 12px;
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+#show_code:hover {
+    background: var(--green-dark);
+    color: #fff;
+}
+/* 「看程式」視窗：只能看，不能改 */
+#code_view {
+    width: min(1000px, 92vw);
+    height: min(720px, 88vh);
+    border: none;
+    border-radius: 14px;
+    padding: 18px 22px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+#code_view[open] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+#code_view::backdrop {
+    background: rgba(0, 0, 0, 0.3);
+}
+.code_view_head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.code_view_head .muted {
+    flex: 1;
+}
+.code_view_head button {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 8px;
+    padding: 3px 14px;
+}
+.code_view_body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+}
+.code_cpp {
+    height: 100%;
+    margin: 0;
+    overflow: auto;
+    padding: 14px 16px;
+    background: #1f2430;
+    color: #e6e6e6;
+    border-radius: 10px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    tab-size: 4;
+}
+.code_copy {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    border: 1px solid #555;
+    background: #2d3342;
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 12px;
+}
+.code_blockly {
+    flex: 1;
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+}
 .canvas_body {
     flex: 1;
     min-height: 0;

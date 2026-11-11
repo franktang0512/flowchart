@@ -3,6 +3,7 @@
 //   第三步 定義變數、設計流程：左邊變數＋題目，右邊流程圖畫布
 //   第四步 測試執行並除錯：逐步執行流程圖
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { CodeView } from './components/CodeView';
 import { NodeDialog, type DialogRequest } from './components/NodeDialog';
 import { PrintView, type PrintData } from './components/PrintView';
 import { QuestionPanel } from './components/QuestionPanel';
@@ -81,6 +82,8 @@ export function App() {
   const [vars, setVarsState] = useState<VarRow[]>([]);
   const [cases, setCases] = useState<string[]>(() => Array(9).fill(''));
   const [dialog, setDialog] = useState<DialogRequest | null>(null);
+  /** 「看程式」視窗開著嗎 */
+  const [codeOpen, setCodeOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [printData, setPrintData] = useState<PrintData | null>(null);
   const [printImg, setPrintImg] = useState<string>();
@@ -480,6 +483,10 @@ export function App() {
       </div>
 
       <NodeDialog request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} />
+      <CodeView
+        open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init }))}
+      />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>
         <div id="page_set">
@@ -560,6 +567,9 @@ export function App() {
           <div id="right_div" className="card canvas_card" style={{ display: page == 2 ? undefined : 'none' }}>
             <div className="canvas_head">
               <h5 className="card_title" style={{ margin: 0 }}>{t('流程圖', 'Flowchart')}</h5>
+              <button id="show_code" onClick={() => setCodeOpen(true)} title={t('看看流程圖變成程式的樣子', 'See your flowchart as code')}>
+                {t('看程式', 'See code')}（{targetName(getTarget())}）
+              </button>
               <span className="canvas_hint" />
               <button id="clear_canvas" onClick={clickClear}>{t('清空流程圖', 'Clear all')}</button>
             </div>
