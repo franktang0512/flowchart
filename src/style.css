@@ -125,6 +125,17 @@ input, textarea, select, button {
     font: inherit;
     cursor: pointer;
 }
+/* 還在準備、先不能選的學習目標（例如 Python） */
+.target_card:disabled,
+.target_card:disabled:hover {
+    background: var(--panel);
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.lang_toggle button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 #student_info {
     display: flex;
     align-items: center;

@@ -35,21 +35,31 @@ function Shell({ children }: { children: React.ReactNode }) {
 const questionCount = (c: Course) => c.units.reduce((n, u) => n + u.questions.length, 0);
 const courseName = (c: { name: string; nameEn: string }) => t(c.name, c.nameEn);
 
-/** 學習目標的選項：名稱、說明、清單從哪裡開始 */
-const TARGET_CHOICES: { target: Target; desc: () => string; index: () => string }[] = [
+/** 學習目標的選項：名稱、說明、清單從哪裡開始；沒有 target 的是還在準備、先不能選的 */
+const TARGET_CHOICES: { key: string; target?: Target; name: () => string; desc: () => string; index: () => string }[] = [
   {
+    key: 'blocks',
     target: 'blocks',
+    name: () => targetName('blocks'),
     desc: () => t('Scratch、Blockly 這類積木程式', 'Block coding, like Scratch and Blockly'),
     index: () => t('清單從第 1 項開始', 'Lists start at item 1'),
   },
   {
+    key: 'python',
+    name: () => 'Python',
+    desc: () => t('串列（list）等 Python 寫法', 'Python lists'),
+    index: () => t('準備中', 'Coming soon'),
+  },
+  {
+    key: 'cpp',
     target: 'cpp',
+    name: () => targetName('cpp'),
     desc: () => t('陣列、vector 等 C++ 寫法', 'C++ arrays and vectors'),
     index: () => t('索引從 0 開始', 'Index starts at 0'),
   },
 ];
 
-/** 左上角的「積木 / C++」切換（跟中英切換放在一起，隨時可以換）；還沒選過時不顯示，等學生先選 */
+/** 左上角的「積木 / Python / C++」切換（跟中英切換放在一起，隨時可以換）；還沒選過時不顯示，等學生先選 */
 function TargetToggle() {
   const target = useTarget();
   if (!target) return null;
@@ -57,10 +67,10 @@ function TargetToggle() {
     <div className="lang_toggle" role="group" aria-label={t('學習目標', 'Learning')}>
       {TARGET_CHOICES.map(c => (
         <button
-          key={c.target} className={target == c.target ? 'selected' : ''} aria-pressed={target == c.target}
-          title={c.index()} onClick={() => setTarget(c.target)}
+          key={c.key} className={target == c.target ? 'selected' : ''} aria-pressed={target == c.target}
+          disabled={!c.target} title={c.index()} onClick={() => c.target && setTarget(c.target)}
         >
-          {targetName(c.target)}
+          {c.name()}
         </button>
       ))}
     </div>
@@ -74,8 +84,8 @@ function TargetChooser() {
       <h4 className="home_heading">{t('你要學哪一種程式？', 'What do you want to learn?')}</h4>
       <div className="home_courses">
         {TARGET_CHOICES.map(c => (
-          <button key={c.target} className="home_card target_card" onClick={() => setTarget(c.target)}>
-            <div className="home_card_title">{targetName(c.target)}</div>
+          <button key={c.key} className="home_card target_card" disabled={!c.target} onClick={() => c.target && setTarget(c.target)}>
+            <div className="home_card_title">{c.name()}</div>
             <div className="home_card_desc">{c.desc()}</div>
             <div className="home_card_meta">{c.index()}</div>
           </button>

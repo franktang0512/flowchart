@@ -16,7 +16,8 @@ const NEGATE: Record<string, string> = { '==': '!=', '!=': '==', '<': '>=', '<='
 export function toCpp(program: Stmt[], varList: VarInfo[]): string {
   const vars = new Map(varList.map(v => [v.name, v]));
   const doubles = findDoubles(program, varList);
-  const uses = { indexOf: false, inputNumber: false, inputText: false, cmath: false };
+  // 用到哪些東西：最後只 #include 有用到的
+  const uses = { indexOf: false, inputNumber: false, inputText: false, cmath: false, string: false };
 
   /** 數字變數是 int 還是 double */
   const numType = (name: string) => (doubles.has(name) ? 'double' : 'int');
@@ -52,6 +53,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[]): string {
         if (e.fn == 'len') return `${expr(a, 9)}.${isText ? 'length' : 'size'}()`;
         if (!b) return '0';
         if (isText) {
+          uses.string = true;
           return e.fn == 'find' ? `(int) ${expr(a, 9)}.find(${expr(b)})` : wrap(`${expr(a, 9)}.find(${expr(b)}) != string::npos`, 3, parent);
         }
         uses.indexOf = true;
@@ -85,6 +87,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[]): string {
   /** 接文字的一邊 */
   const strPart = (e: Expr, left: boolean) => {
     const ty = typeOf(e);
+    uses.string = true;
     if (ty == 'num') return `to_string(${expr(e)})`;
     if (ty == 'char') return `string(1, ${expr(e)})`;
     if (left && e.t == 'str') return `string(${expr(e)})`;
@@ -156,8 +159,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[]): string {
         switch (s.action) {
           case '設為': {
             const v = vars.get(s.target);
-            const needString = v?.type == '文字' && s.value && typeOf(s.value) == 'num';
-            emit(depth, `${s.target} = ${needString ? `to_string(${value})` : value};`);
+            const numToText = v?.type == '文字' && s.value && typeOf(s.value) == 'num';
+            if (numToText) uses.string = true;
+            emit(depth, `${s.target} = ${numToText ? `to_string(${value})` : value};`);
             break;
           }
           case '加入': emit(depth, `${s.target}.push_back(${value});`); break;
@@ -207,7 +211,12 @@ export function toCpp(program: Stmt[], varList: VarInfo[]): string {
   if (uses.inputNumber) decls.push(`${INDENT}int inputNumber;   // ${tmpNote}`);
   if (uses.inputText) decls.push(`${INDENT}string inputText;  // ${tmpNote}`);
 
-  const head = ['#include <iostream>', '#include <string>', '#include <vector>'];
+  // 有文字變數、裝文字的清單或用到 string 的寫法才要 <string>；有清單才要 <vector>
+  const needString = uses.string || varList.some(v => v.type == '文字' || (v.type == '清單' && elemType(v.name) == 'string'));
+  const needVector = uses.indexOf || varList.some(v => v.type == '清單');
+  const head = ['#include <iostream>'];
+  if (needString) head.push('#include <string>');
+  if (needVector) head.push('#include <vector>');
   if (uses.cmath) head.push('#include <cmath>');
   head.push('using namespace std;', '');
   if (uses.indexOf) {
