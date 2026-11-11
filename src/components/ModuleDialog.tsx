@@ -75,7 +75,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
         </p>
       ))}
       <p><button onClick={() => setParams([...params, { name: '', type: '數字' }])}>{t('＋ 加一個參數', '+ Add a parameter')}</button></p>
-      <p className="dialog_note">{t('參數在模組裡只能拿來用、不能改。要把結果帶回主程式，請存到變數表裡的變數。', 'Inside the module you can use a parameter but not change it. To bring a result back, save it in a variable from the table.')}</p>
+      <p className="dialog_note">{t('參數在模組裡只能拿來用、不能改。要把結果帶回主流程，請存到變數表裡的變數。', 'Inside the module you can use a parameter but not change it. To bring a result back, save it in a variable from the table.')}</p>
       {problem && <p className="run_error">{problem}</p>}
       <p>
         <button id="hint_yes" onClick={save}>{t('確認', 'OK')}</button>{' '}

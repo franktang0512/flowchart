@@ -423,7 +423,7 @@ export function App() {
     }
     d.stepHighlight = where.node;
     d.draw();
-    setRunSheetName(where.sheet == 0 ? t('主程式', 'Main program') : t('模組：', 'Module: ') + (modulesRef.current[where.sheet - 1]?.info.name ?? ''));
+    setRunSheetName(where.sheet == 0 ? t('主流程', 'Main flow') : t('模組：', 'Module: ') + (modulesRef.current[where.sheet - 1]?.info.name ?? ''));
   }, [run, runError, step, page, lang]);
 
   // ---------------- 畫布：點一下新增積木 ----------------
@@ -776,7 +776,7 @@ export function App() {
             </div>
             {/* 主程式和每個模組各一張流程圖 */}
             <div className="sheet_tabs" role="tablist">
-              <button role="tab" aria-selected={sheet == 0} className={sheet == 0 ? 'selected' : ''} onClick={() => showSheet(0)}>{t('主程式', 'Main program')}</button>
+              <button role="tab" aria-selected={sheet == 0} className={sheet == 0 ? 'selected' : ''} onClick={() => showSheet(0)}>{t('主流程', 'Main flow')}</button>
               {modules.map(m => (
                 <button key={m.id} role="tab" aria-selected={sheet == m.id} className={sheet == m.id ? 'selected' : ''} onClick={() => showSheet(m.id)}>
                   {t('模組：', 'Module: ')}{m.info.name}
