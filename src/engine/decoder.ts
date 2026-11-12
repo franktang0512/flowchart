@@ -21,7 +21,7 @@ import { t } from '../i18n';
 import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
-import { GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
+import { cppNameProblem, GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { exprType, parseExpr, type Expr, type ExprType, type VarInfo } from './structure';
 
@@ -1006,6 +1006,19 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
 
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');
+  // C++：名稱只能用英文（舊作品、從別的語言換過來的還留著中文名稱時，在這裡說明）
+  const cppNames: [string, string][] = [
+    ...names.map(n => [t('變數', 'Variable'), n] as [string, string]),
+    ...modules.flatMap(m => [
+      [t('模組', 'Module'), m.info.name] as [string, string],
+      ...m.info.params.map(p => [t(`模組「${m.info.name}」的參數`, `Parameter of "${m.info.name}"`), p.name] as [string, string]),
+      ...(m.info.locals ?? []).filter(v => v.name.trim()).map(v => [t(`模組「${m.info.name}」的區域變數`, `Local variable of "${m.info.name}"`), v.name.trim()] as [string, string]),
+    ]),
+  ];
+  for (const [what, n] of cppNames) {
+    const why = cppNameProblem(n);
+    if (why) throw new FlowError(`${what}：${why}${t('請到第三步改名字（流程圖裡用到的地方會跟著改）。', ' Rename it in step 3 (the flowchart changes with it).')}`);
+  }
   // 變數跟模組或參數同名：流程圖上分不出是哪一個，請學生改名（建立模組時會擋，但之後才新增的變數要在這裡擋）
   for (const m of modules) {
     if (names.includes(m.info.name)) {

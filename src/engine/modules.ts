@@ -96,6 +96,29 @@ export const usesName = (text: string, name: string) => {
   return found;
 };
 
+/** C++ 已經用掉的字（關鍵字、會寫進程式的名稱），不能拿來當變數、模組、參數的名字 */
+const CPP_RESERVED = new Set([
+  'and', 'auto', 'bool', 'break', 'case', 'catch', 'char', 'cin', 'class', 'const', 'continue', 'cout', 'default', 'delete', 'do',
+  'double', 'else', 'endl', 'enum', 'false', 'float', 'for', 'fmod', 'if', 'include', 'indexOf', 'inputFloat', 'inputNumber', 'inputText',
+  'int', 'long', 'main', 'namespace', 'new', 'not', 'or', 'private', 'public', 'return', 'short', 'signed', 'sizeof', 'static', 'std',
+  'string', 'struct', 'switch', 'template', 'this', 'throw', 'to_string', 'true', 'try', 'typename', 'unsigned', 'using', 'vector', 'void', 'while',
+]);
+
+/**
+ * C++ 的名稱：只能用英文字母、數字、底線，不能用數字開頭，也不能是 C++ 已經用掉的字。
+ * 新的編譯器可以用中文，但很多學校的環境（舊版 Dev-C++、線上評測）會錯，所以 C++ 一律不給用中文。
+ * 沒問題（或學習目標不是 C++）回傳 null
+ */
+export function cppNameProblem(name: string): string | null {
+  if (getTarget() != 'cpp' || !name) return null;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    return t(`「${name}」不能當 C++ 的名稱：C++ 只能用英文字母、數字和底線（_），不能用中文或空白，也不能用數字開頭。例如 money、distance、total_fee。`,
+      `"${name}" cannot be a C++ name. Use English letters, numbers and _ only (no spaces), and do not start with a number. For example: money, distance, total_fee.`);
+  }
+  if (CPP_RESERVED.has(name)) return t(`「${name}」是 C++ 已經用掉的字，請換一個名字。`, `"${name}" is already used by C++. Choose another name.`);
+  return null;
+}
+
 /** 名稱可以用的字：中英文、數字、底線，不能用數字開頭 */
 export const isName = (s: string) => /^[\p{L}_][\p{L}\p{N}_]*$/u.test(s);
 

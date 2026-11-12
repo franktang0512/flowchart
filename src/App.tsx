@@ -14,7 +14,7 @@ import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, cppType, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, typeLabel, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
+import { callText, cppNameProblem, cppType, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, typeLabel, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -207,6 +207,8 @@ export function App() {
 
   /** 模組或參數的名字能不能用：不能跟變數、其他模組、清單的函式撞名 */
   const nameProblem = (editing: AppModule | null) => (name: string, kind: 'module' | 'param'): string | null => {
+    const cpp = cppNameProblem(name);
+    if (cpp) return cpp;
     // 參數可以跟全域變數同名（模組裡指的是參數）；模組的名字不行
     if (kind == 'module' && varStore.var_list.name.includes(name)) return t(`「${name}」已經是變數的名字了，請換一個。`, `"${name}" is already a variable. Choose another name.`);
     if (kind == 'module' && modulesRef.current.some(m => m.info.locals?.some(v => v.name.trim() == name))) return t(`「${name}」已經是模組的區域變數了，請換一個。`, `"${name}" is already a local variable. Choose another name.`);
@@ -329,6 +331,19 @@ export function App() {
     showSheet(0);
   };
 
+  /**
+   * 變數改名：流程圖裡每個用到舊名的積木（輸入、輸出、計算、判斷、迴圈、執行模組…）都換成新名。
+   * 看積木上的字找（不看 node.variables：從積木轉回來的、舊作品檔的積木不一定記了用到哪些變數）
+   */
+  const renameInDiagram = (d: Diagram, from: string, to: string) => {
+    for (const node of d.nodes) {
+      if (!node || !usesName(node.text, from)) continue;
+      node.text = renameInText(node.text, from, to);
+      node.variables = [...new Set([...(node.variables ?? []).filter(v => v != from), to])];
+      d.fitNode(node);
+    }
+  };
+
   /** 改模組的區域變數；rename 是改名（舊名, 新名）：這個模組的流程圖裡用到的地方也跟著改 */
   const setLocals = (id: number, locals: LocalVar[], rename?: [string, string]) => {
     const m = moduleOf2(id);
@@ -336,13 +351,7 @@ export function App() {
     if (rename && rename[0] && rename[1] && rename[0] != rename[1]) {
       const [from, to] = rename;
       const d = m.diagram;
-      for (const node of d.nodes) {
-        if (node?.variables?.includes(from)) {
-          node.variables = node.variables.map(v => (v == from ? to : v));
-          node.text = renameInText(node.text, from, to);
-          d.fitNode(node);
-        }
-      }
+      renameInDiagram(d, from, to);
       d.draw();
     }
     setModules(modulesRef.current.map(x => (x.id == id ? { ...x, info: { ...x.info, locals } } : x)));
@@ -371,23 +380,28 @@ export function App() {
    * 跟模組的參數、區域變數同名可以：模組裡寫這個名字指的是模組自己的，主流程指的是全域變數
    */
   const globalVarProblem = (name: string): string | null => {
-    if (modulesRef.current.some(m => m.info.name == name)) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
+    const cpp = cppNameProblem(name);
+    if (cpp) return cpp;
+    if (modulesRef.current.some(m => m.info.name == name)) return sameName(t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`));
     return null;
   };
   /** 區域變數的名字：不能跟模組、這個模組的參數、這個模組的其他區域變數一樣（跟全域變數一樣可以） */
   const localVarProblem = (m: AppModule, name: string, id: number, rows: LocalVar[]): string | null => {
-    if (modulesRef.current.some(x => x.info.name == name)) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
-    if (m.info.params.some(p => p.name == name)) return t(`「${name}」已經是這個模組的參數了`, `"${name}" is already a parameter of this module`);
-    if (rows.some(v => v.id != id && v.name.trim() == name)) return t(`已經有叫「${name}」的區域變數了`, `There is already a local variable called "${name}"`);
+    const cpp = cppNameProblem(name);
+    if (cpp) return cpp;
+    if (modulesRef.current.some(x => x.info.name == name)) return sameName(t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`));
+    if (m.info.params.some(p => p.name == name)) return sameName(t(`「${name}」已經是這個模組的參數了`, `"${name}" is already a parameter of this module`));
+    if (rows.some(v => v.id != id && v.name.trim() == name)) return sameName(t(`已經有叫「${name}」的區域變數了`, `There is already a local variable called "${name}"`));
     return null;
   };
-  const sameNameAlert = (why: string) => alert(why + t('：名字一樣的話，流程圖上分不出是哪一個，請換一個名字。', '. With the same name you cannot tell them apart in the flowchart. Choose another name.'));
+  /** 撞名的說明後面加上為什麼不行 */
+  const sameName = (why: string) => why + t('：名字一樣的話，流程圖上分不出是哪一個，請換一個名字。', '. With the same name you cannot tell them apart in the flowchart. Choose another name.');
   /** 變數表的輸入框確定時：名字不能用就改回原本的名字 */
   const commitVars = () => {
     // 只看這次改過名字的列（原本就撞名的舊作品，第四步執行時會說明）
     const bad = varsRef.current.find(r => r.name.trim() && r.name.trim() != committedVarNames.current.get(r.id)?.trim() && globalVarProblem(r.name.trim()));
     if (bad) {
-      sameNameAlert(globalVarProblem(bad.name.trim())!);
+      alert(globalVarProblem(bad.name.trim())!);
       const old = committedVarNames.current.get(bad.id) ?? '';
       setVars(varsRef.current.map(v => (v.id == bad.id ? { ...v, name: old.trim() == bad.name.trim() ? '' : old } : v)));
     }
@@ -424,13 +438,7 @@ export function App() {
           }
           continue;
         }
-        for (const node of d.nodes) {
-          if (node?.variables?.includes(replaced[0])) {
-            node.variables = node.variables.map(v => v == replaced[0] ? added[0] : v);
-            node.text = renameInText(node.text, replaced[0], added[0]);
-            d.fitNode(node);
-          }
-        }
+        renameInDiagram(d, replaced[0], added[0]);
       }
       currentDiagram().draw();
     }
@@ -928,7 +936,7 @@ export function App() {
                     onLocals: (next: LocalVar[], rename?: [string, string]) => setLocals(m.id, next, rename),
                     localProblem: (name: string, id: number, rows: LocalVar[]) => localVarProblem(m, name, id, rows),
                     onParam: (k: number, patch: Partial<ParamInfo>) => editParam(m, k, patch),
-                    onProblem: sameNameAlert,
+                    onProblem: (why: string) => alert(why),
                   };
                 })()}
               />

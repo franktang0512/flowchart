@@ -7,7 +7,7 @@ import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
 import { applyBlocklyMessages, blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
 import { ScratchProcDialog } from './ScratchProcDialog';
-import { GLOBAL_PREFIX, type ParamInfo } from '../engine/modules';
+import { cppNameProblem, GLOBAL_PREFIX, type ParamInfo } from '../engine/modules';
 import type { ModuleSource } from '../engine/modules';
 import { structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
@@ -87,14 +87,47 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
 
   useEffect(() => {
     const dialog = ref.current!;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      // 每次打開都從畫面中間開始（上次拖到哪裡、拉多大都不留）
+      dialog.style.left = dialog.style.top = dialog.style.margin = dialog.style.width = dialog.style.height = '';
+      dialog.showModal();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
+
+  /** 拖曳標題列移動視窗：學生可以把程式移到旁邊，對照流程圖看 */
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button != 0 || (e.target as HTMLElement).closest('button')) return;
+    const dialog = ref.current!;
+    const head = e.currentTarget;
+    const box = dialog.getBoundingClientRect();
+    const dx = e.clientX - box.left, dy = e.clientY - box.top;
+    // 改成用 left / top 決定位置（原本是置中的 margin: auto）
+    dialog.style.margin = '0';
+    dialog.style.left = box.left + 'px';
+    dialog.style.top = box.top + 'px';
+    head.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      // 標題列至少留一點在畫面裡，才拉得回來
+      const x = Math.min(Math.max(ev.clientX - dx, 80 - box.width), window.innerWidth - 80);
+      const y = Math.min(Math.max(ev.clientY - dy, 0), window.innerHeight - 40);
+      dialog.style.left = x + 'px';
+      dialog.style.top = y + 'px';
+    };
+    const up = () => {
+      head.removeEventListener('pointermove', move);
+      head.removeEventListener('pointerup', up);
+      head.removeEventListener('pointercancel', up);
+    };
+    head.addEventListener('pointermove', move);
+    head.addEventListener('pointerup', up);
+    head.addEventListener('pointercancel', up);
+  };
 
   const target = getTarget();
   return (
     <dialog id="code_view" ref={ref} onCancel={onClose}>
-      <div className="code_view_head">
+      <div className="code_view_head" onPointerDown={startDrag} title={t('拖曳這裡可以移動視窗；右下角可以拉大縮小', 'Drag here to move. Drag the bottom-right corner to resize.')}>
         <h5 className="card_title" style={{ margin: 0 }}>
           {t('看程式', 'See the code')}<span className="target_badge">{targetName(target)}</span>
         </h5>
@@ -156,10 +189,20 @@ function CppCode({ diagram, vars, modules }: { diagram: Diagram; vars: VarInfo[]
       alert(t('瀏覽器不允許複製，請自己選取程式碼再按 Ctrl+C。', 'The browser blocked copying. Select the code and press Ctrl+C.'));
     }
   };
+  // C++ 的名稱只能用英文（第三步改名時會擋；這裡提醒還留著中文名稱的舊作品）
+  const badNames = [...vars.map(v => v.name), ...mods.flatMap(m => [m.name, ...m.params.map(p => p.name), ...(m.locals ?? []).map(v => v.name.trim()).filter(Boolean)])]
+    .filter(n => cppNameProblem(n));
   return (
     <div className="code_view_body">
-      <button className="code_copy" onClick={copy}>{copied ? t('已複製', 'Copied') : t('複製', 'Copy')}</button>
-      <pre className="code_cpp"><code>{code}</code></pre>
+      {badNames.length > 0 && (
+        <p className="run_error code_name_warning">
+          {t(`這些名稱 C++ 不能用：${badNames.join('、')}。C++ 的名稱只能用英文字母、數字和底線，請到第三步改名字（流程圖裡用到的地方會跟著改）。`, `C++ cannot use these names: ${badNames.join(', ')}. Use English letters, numbers and _ only. Rename them in step 3.`)}
+        </p>
+      )}
+      <div className="code_cpp_wrap">
+        <button className="code_copy" onClick={copy}>{copied ? t('已複製', 'Copied') : t('複製', 'Copy')}</button>
+        <pre className="code_cpp"><code>{code}</code></pre>
+      </div>
     </div>
   );
 }
