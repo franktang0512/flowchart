@@ -1,12 +1,22 @@
 // 第四步：逐步執行流程圖，看每一步的變數與輸出
-import { useEffect, useRef, type Ref } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
 import { indexBase } from '../target';
 
+/** 第四步的一張流程圖：主流程、一層一層執行進來的模組，最後一張是正在執行的 */
+export interface RunPane {
+  key: string;
+  title: string;
+  /** 正在執行的那一張（其他張標出「執行模組」的積木） */
+  running: boolean;
+  /** 畫到這張畫布上（只是畫，不能改） */
+  draw: (canvas: HTMLCanvasElement) => void;
+}
+
 interface Props {
   visible: boolean;
-  canvasRef: Ref<HTMLCanvasElement>;
+  panes: RunPane[];
   run: RunResult | null;
   /** 流程圖沒辦法執行的原因 */
   error: string | null;
@@ -22,13 +32,11 @@ interface Props {
   varNames: string[];
   /** 有模組時：畫布上現在是哪一張流程圖（主流程或某個模組） */
   sheetName: string;
-  /** 在模組裡時：是從哪一張流程圖執行進來的（左邊再放一張畫布，標出執行模組的那個積木）；不在模組裡是 null */
-  callerName: string | null;
-  callerCanvasRef: Ref<HTMLCanvasElement>;
 }
 
-export function RunArea({ visible, canvasRef, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName, callerName, callerCanvasRef }: Props) {
+export function RunArea({ visible, panes, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName }: Props) {
   useLang();
+  const split = useSplit(panes, visible);
   const total = run?.totalStep ?? 0;
   const output = run?.output[step] ?? '';
   const atEnd = run != null && step == total;
@@ -65,21 +73,27 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
         <div className="canvas_head">
           <h5 className="card_title" style={{ margin: 0 }}><span className="step_badge">4</span>{t('測試執行並除錯', 'Run and Check')}</h5>
           {sheetName && <span className="run_sheet">{t('現在在', 'Now in')}：{sheetName}</span>}
+          <span className="muted run_readonly">{t('這裡只能看；要修改流程圖，請回到第三步。', 'View only. To change the flowchart, go back to step 3.')}</span>
         </div>
-        {/* 在模組裡：左邊是執行進來的地方（標出執行模組的積木），右邊是正在執行的模組 */}
-        <div className={'canvas_body run_split' + (callerName ? ' split' : '')}>
-          <div className="run_pane run_caller" style={{ display: callerName ? undefined : 'none' }}>
-            <span className="run_pane_title">{t('從這裡執行進來：', 'Called from: ')}{callerName}</span>
-            <div className="canvas_wrap">
-              <canvas id="my_canvas_caller" ref={callerCanvasRef}></canvas>
+        {/* 一層一層執行進來的流程圖並排（左邊是主流程，最右邊是正在執行的）；中間的分隔線可以拖曳調整寬度 */}
+        <div className="canvas_body run_split" ref={split.box}>
+          {panes.map((p, k) => (
+            <div key={p.key} className="run_pane_group" style={{ flex: `${split.weight(k)} 1 0` }}>
+              {k > 0 && (
+                <div
+                  className="run_divider" role="separator" aria-orientation="vertical"
+                  title={t('拖曳調整寬度', 'Drag to resize')}
+                  onPointerDown={e => split.startDrag(e, k - 1)}
+                />
+              )}
+              <div className={'run_pane' + (p.running ? '' : ' run_caller')}>
+                {panes.length > 1 && <span className="run_pane_title">{p.title}</span>}
+                <div className="canvas_wrap">
+                  <canvas ref={el => { split.canvases.current[k] = el; }}></canvas>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="run_pane">
-            {callerName && <span className="run_pane_title">{t('正在執行：', 'Running: ')}{sheetName}</span>}
-            <div className="canvas_wrap">
-              <canvas id="my_canvas_show" ref={canvasRef}></canvas>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -136,12 +150,12 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
         </div>
 
         <div className="card">
-          <p className="section_label" style={{ marginTop: 0 }}>{callerName ? t('主流程的變數', 'Main-flow variables') : t('變數', 'Variables')}</p>
+          <p className="section_label" style={{ marginTop: 0 }}>{panes.length > 1 ? t('主流程的變數', 'Main-flow variables') : t('變數', 'Variables')}</p>
           <div id="variableTable" className="var_boxes">
             {values && varNames.map(name => varBox(name))}
           </div>
           {/* 在模組裡：這個模組自己的（參數），只有執行到模組裡才有，跟全域變數分開 */}
-          {values && callerName && (
+          {values && panes.length > 1 && (
             <div className="run_module_vars">
               <p className="section_label">{sheetName}{t(' 的參數和區域變數（只有這個模組裡有）', ': parameters and local variables (only in this module)')}</p>
               <div className="var_boxes">
@@ -221,4 +235,63 @@ function ListValue({ items, prev }: { items: unknown[]; prev: unknown }) {
       ))}
     </span>
   );
+}
+
+/**
+ * 並排的流程圖：每張的寬度比例（拖曳分隔線調整）、畫布、換步驟或改大小時重畫。
+ * 比例記在第幾張（不是哪一個模組），跳進跳出模組時調好的寬度不會一直被重設
+ */
+function useSplit(panes: RunPane[], visible: boolean) {
+  const box = useRef<HTMLDivElement>(null);
+  const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
+  const [weights, setWeights] = useState<number[]>([]);
+  const weight = (k: number) => weights[k] ?? 1;
+  const latest = useRef(panes);
+  latest.current = panes;
+  const redraw = () => latest.current.forEach((p, k) => {
+    const c = canvases.current[k];
+    if (c && c.clientWidth > 0) p.draw(c);
+  });
+  // 每次畫面更新（換步驟、換測資、拖曳寬度）都重畫
+  useLayoutEffect(redraw);
+  // 視窗或分隔線改變大小時重畫
+  useEffect(() => {
+    if (!box.current) return;
+    const ro = new ResizeObserver(redraw);
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => { if (visible) redraw(); }, [visible]);
+
+  /** 拖曳第 k 張和第 k+1 張中間的分隔線 */
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>, k: number) => {
+    const groups = box.current?.children;
+    const a = groups?.[k] as HTMLElement | undefined, b = groups?.[k + 1] as HTMLElement | undefined;
+    if (!a || !b) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const x0 = e.clientX;
+    const wa = a.getBoundingClientRect().width, wb = b.getBoundingClientRect().width;
+    const sum = weight(k) + weight(k + 1);
+    const base = [...weights];
+    const move = (ev: PointerEvent) => {
+      // 每張至少留 60px
+      const da = Math.min(Math.max(wa + ev.clientX - x0, 60), wa + wb - 60);
+      const next = [...base];
+      for (let i = 0; i <= k + 1; i++) next[i] ??= 1;
+      next[k] = (sum * da) / (wa + wb);
+      next[k + 1] = sum - next[k];
+      setWeights(next);
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+  return { box, canvases, weight, startDrag };
 }

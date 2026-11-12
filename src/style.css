@@ -1175,7 +1175,33 @@ input, textarea, select, button {
 
 /* ---------- 第四步：在模組裡時，左右兩張流程圖（從哪裡執行進來／正在執行的模組） ---------- */
 .run_split {
-    gap: 8px;
+    gap: 0;
+}
+/* 一張流程圖（左邊有分隔線的話連分隔線一起） */
+.run_pane_group {
+    display: flex;
+    min-width: 0;
+}
+/* 分隔線：拖曳調整左右兩張的寬度 */
+.run_divider {
+    flex: 0 0 12px;
+    cursor: col-resize;
+    position: relative;
+    touch-action: none;
+}
+.run_divider::before {
+    content: '';
+    position: absolute;
+    top: 22px;
+    bottom: 0;
+    left: 4px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--line);
+}
+.run_divider:hover::before,
+.run_divider:active::before {
+    background: var(--green-dark);
 }
 .run_pane {
     flex: 1;
@@ -1417,4 +1443,8 @@ input, textarea, select, button {
   border-radius: 6px;
   background: #fff;
   padding: 6px 18px;
+}
+.run_readonly {
+    margin-left: auto;
+    font-size: 0.85rem;
 }

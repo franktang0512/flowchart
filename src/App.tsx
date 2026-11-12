@@ -8,7 +8,7 @@ import { ModuleDialog, type ModuleRequest } from './components/ModuleDialog';
 import { NodeDialog, type DialogRequest } from './components/NodeDialog';
 import { PrintView, type PrintData } from './components/PrintView';
 import { QuestionPanel } from './components/QuestionPanel';
-import { RunArea } from './components/RunArea';
+import { RunArea, type RunPane } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
 import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
@@ -110,8 +110,6 @@ export function App() {
   const sheetRef = useRef(0);
   const [moduleDialog, setModuleDialog] = useState<ModuleRequest | null>(null);
   /** 第四步：目前顯示哪一張流程圖（執行到模組裡時會換過去） */
-  const [runSheetName, setRunSheetName] = useState('');
-  const shownRef = useRef<Diagram | null>(null);
   const [which, setWhich] = useState(0);
   const [run, setRun] = useState<RunResult | null>(null);
   /** 流程圖沒辦法執行時，給學生看的原因 */
@@ -125,7 +123,6 @@ export function App() {
   const myMouse = useRef({ x: 0, y: 0 });
 
   const myCanvasRef = useRef<HTMLCanvasElement>(null);
-  const showCanvasRef = useRef<HTMLCanvasElement>(null);
   const noteRef = useRef<HTMLInputElement>(null);
   const classRef = useRef<HTMLInputElement>(null);
   const numberRef = useRef<HTMLInputElement>(null);
@@ -530,11 +527,8 @@ export function App() {
       d.stepHighlight = null;
     }
     if (page == 3) {
-      // 第四步從主程式開始顯示；執行到模組裡時再換（見下面）
+      // 第四步只看不改：流程圖只畫在第四步的畫布上（見 runPanes），不接滑鼠、鍵盤；要改請回第三步
       for (const d of allDiagrams()) d.active = false;
-      main.active = true;
-      main.init(showCanvasRef.current!);
-      shownRef.current = main;
       runCase(which);
     }
     else {
@@ -549,37 +543,36 @@ export function App() {
   const sheetLabel = (sheet: number) => (sheet == 0 ? t('主流程', 'Main flow') : t('模組：', 'Module: ') + (modulesRef.current[sheet - 1]?.info.name ?? ''));
   // 這一步在模組裡的話，是從哪個積木執行進來的（一層一層的最後一個）
   const callStack = run?.stack[Math.min(step, (run?.stack.length ?? 1) - 1)] ?? [];
-  const caller = callStack.length ? { id: callStack[callStack.length - 1], depth: callStack.length } : null;
-  const callerCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // 逐步執行：標出目前執行到的積木；執行到模組裡時，畫布換成那個模組的流程圖
-  useLayoutEffect(() => {
-    if (page != 3) return;
-    // 執行成功：標出目前這一步；失敗：標出有問題的積木
-    // 執行到一半出錯時，最後一步標出出錯的積木
-    const errorStep = runError && (!run || step == run.totalStep);
-    const id = errorStep && runError.node != null ? runError.node : run ? run.step[step] ?? null : null;
-    const where = id == null ? { sheet: 0, node: null } : splitId(id);
+  // 第四步：這一步標哪個積木（執行成功：目前這一步；執行到一半出錯：最後一步標出出錯的積木）
+  const errorStep = runError && (!run || step == run.totalStep);
+  const nowId = errorStep && runError.node != null ? runError.node : run ? run.step[step] ?? null : null;
+  const nowAt = nowId == null ? { sheet: 0, node: null } : splitId(nowId);
+  /**
+   * 第四步並排的流程圖：主流程 → 一層一層執行進來的模組（標出執行模組的積木）→ 正在執行的。
+   * 太多層（遞迴）時只放主流程和最後兩層
+   */
+  const runPanes: RunPane[] = (() => {
+    if (page != 3) return [];
     const diagrams = allDiagrams();
-    const d = diagrams[where.sheet] ?? main;
-    for (const x of diagrams) {
-      x.stepHighlight = null;
-      x.active = false;
-    }
-    d.active = true;
-    if (shownRef.current != d) {
-      d.init(showCanvasRef.current!);
-      shownRef.current = d;
-    }
-    d.stepHighlight = where.node;
-    d.draw();
-    setRunSheetName(sheetLabel(where.sheet));
-    // 在模組裡：左邊畫出執行進來的那張流程圖，標出執行模組的積木
-    if (caller && callerCanvasRef.current) {
-      const c = splitId(caller.id);
-      (diagrams[c.sheet] ?? main).drawOn(callerCanvasRef.current, c.node);
-    }
-  }, [run, runError, step, page, lang]);
+    const at = (sheet: number) => diagrams[sheet] ?? main;
+    const callers = callStack.map(id => ({ ...splitId(id) }));
+    const shown = callers.length > 3 ? [callers[0], ...callers.slice(-2)] : callers;
+    const skipped = callers.length - shown.length;
+    const panes: RunPane[] = shown.map((c, k) => ({
+      key: 'p' + k,
+      title: (k == 1 && skipped ? t(`（中間還有 ${skipped} 層）`, `(${skipped} more levels) `) : '') + sheetLabel(c.sheet) + t('（從這裡執行進去）', ' (calls from here)'),
+      running: false,
+      draw: cv => at(c.sheet).drawOn(cv, c.node, true),
+    }));
+    panes.push({
+      key: 'p' + shown.length,
+      title: t('正在執行：', 'Running: ') + sheetLabel(nowAt.sheet) + (callers.length > 1 ? t(`（第 ${callers.length} 層）`, ` (level ${callers.length})`) : ''),
+      running: true,
+      draw: cv => at(nowAt.sheet).drawOn(cv, nowAt.node, true),
+    });
+    return panes;
+  })();
 
   // ---------------- 畫布：點一下新增積木 ----------------
   const clickCanvas = () => {
@@ -1045,7 +1038,7 @@ export function App() {
 
         <RunArea
           visible={page == 3}
-          canvasRef={showCanvasRef}
+          panes={runPanes}
           run={run}
           error={runError?.message ?? null}
           partial={run != null && runError != null}
@@ -1055,9 +1048,7 @@ export function App() {
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
           varNames={varStore.var_list.name}
-          sheetName={modules.length ? runSheetName : ''}
-          callerName={caller ? sheetLabel(splitId(caller.id).sheet) + (caller.depth > 1 ? t(`（第 ${caller.depth} 層）`, ` (level ${caller.depth})`) : '') : null}
-          callerCanvasRef={callerCanvasRef}
+          sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
         />
       </div>
 

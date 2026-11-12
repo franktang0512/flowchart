@@ -248,10 +248,11 @@ export class Diagram {
   }
 
   /**
-   * 把流程圖畫到另一個畫布上（只是畫，不能拖），標出 highlight 這個積木；
-   * 第四步左邊「從哪裡執行進來的」用（遞迴時兩邊是同一張流程圖，所以不能用 init 換畫布）
+   * 把流程圖畫到另一個畫布上（只是畫，不能拖、不能改），標出 highlight 這個積木。
+   * 第四步用：一張畫布一張流程圖（遞迴時好幾張是同一張流程圖，所以不能用 init 換畫布）。
+   * fit：整張流程圖縮小到放得進畫布（不放大），畫布窄的時候也看得到全部
    */
-  drawOn(canvas: HTMLCanvasElement, highlight: number | null) {
+  drawOn(canvas: HTMLCanvasElement, highlight: number | null, fit = false) {
     const saved = { ctx: this.ctx, canvas: this.myCanvas, step: this.stepHighlight, node: this.selNode, link: this.selLink };
     this.myCanvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -262,12 +263,37 @@ export class Diagram {
     this.stepHighlight = highlight;
     this.selNode = null;
     this.selLink = null;
-    this.draw();
+    const box = fit ? this.bounds() : null;
+    if (box && canvas.width > 0 && canvas.height > 0) {
+      const pad = 12;
+      // 從左上角 (0, 0) 算起，跟第三步看到的位置一樣；太大才縮小
+      const w = box.maxX + pad, h = box.maxY + pad;
+      const scale = Math.min(1, canvas.width / w, canvas.height / h);
+      this.clean();
+      this.ctx.save();
+      this.ctx.scale(scale, scale);
+      for (const node of this.nodes) if (node) node.draw(this.ctx);
+      for (const link of this.links) if (link) link.draw(this.ctx);
+      if (highlight != null) this.nodes[highlight]?.stepHighlight(this.ctx);
+      this.ctx.restore();
+    }
+    else this.draw();
     this.ctx = saved.ctx;
     this.myCanvas = saved.canvas;
     this.stepHighlight = saved.step;
     this.selNode = saved.node;
     this.selLink = saved.link;
+  }
+
+  /** 積木和箭頭佔的範圍；沒有積木是 null */
+  private bounds() {
+    const nodes = this.nodes.filter((n): n is FlowNode => n != null);
+    if (!nodes.length) return null;
+    const points = this.links.flatMap(l => (l ? l.segments : []));
+    return {
+      maxX: Math.max(...nodes.map(n => n.x + n.w), ...points.map(p => p.x)),
+      maxY: Math.max(...nodes.map(n => n.y + n.h), ...points.map(p => p.y)),
+    };
   }
 
   /** 把流程圖畫成圖片（只裁出有東西的範圍，白底、不含選取框），交作業列印用；沒有積木時回傳 null */
