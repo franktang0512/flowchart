@@ -2,7 +2,7 @@
 // 是 toBlockly 的反方向；Scratch（scratch_* 積木）和 Blockly（內建積木）兩種都看得懂。
 // 流程圖做不到的積木（例如中斷循環、函式）會丟出 BlockError，說明是哪個積木、要怎麼改。
 import { t } from '../i18n';
-import type { ModuleInfo, ParamInfo } from './modules';
+import { bareName, GLOBAL_PREFIX, type ModuleInfo, type ParamInfo } from './modules';
 import type { Expr, ModuleProgram, Stmt, VarInfo } from './structure';
 import type { BlockMode } from './toBlockly';
 
@@ -62,13 +62,16 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
   const usedAsText = new Set<string>();
 
   const field = (b: Json, name: string) => b.fields?.[name];
+  /** 正在轉換的 Scratch 函式的參數名稱 */
+  let curParams = new Set<string>();
   /** 變數欄位（存的是 { id }）→ 變數名稱 */
   const varName = (b: Json, name: string): string => {
     const f = field(b, name) as { id?: string; name?: string } | undefined;
     const v = f?.id ? varById.get(f.id) : undefined;
     const n = v?.name ?? f?.name;
     if (!n) throw new BlockError(t(`「${nameOf(b.type)}」積木還沒有選變數。`, `The "${nameOf(b.type)}" block needs a variable.`));
-    return n;
+    // Scratch 的函式裡，變數積木選的變數跟參數同名：那是主流程的變數（參數是紅色的參數積木）
+    return scratch && curParams.has(n) ? GLOBAL_PREFIX + n : n;
   };
   /** 輸入格裡的積木；空格裡只有預設的白色小積木（shadow）也算 */
   const inputBlock = (b: Json, name: string): Json | undefined => b.inputs?.[name]?.block ?? b.inputs?.[name]?.shadow;
@@ -84,7 +87,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
   };
   const listOf = (b: Json, name: string) => {
     const n = varName(b, name);
-    usedAsList.add(n);
+    usedAsList.add(bareName(n));
     return n;
   };
   /** Blockly 內建清單積木的清單放在輸入格（一個「變數」積木），不是欄位 */
@@ -92,7 +95,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
     const v = need(b, name);
     if (v.type != 'variables_get') throw new BlockError(t('清單積木裡要直接放一個清單變數。', 'Put a list variable directly in the list block.'));
     const n = varName(v, 'VAR');
-    usedAsList.add(n);
+    usedAsList.add(bareName(n));
     return n;
   };
 
@@ -249,15 +252,15 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
         const target = varName(b, 'VAR');
         const v = need(b, 'VALUE');
         if (isPrompt(v)) {
-          if (promptIsText(v)) usedAsText.add(target);
+          if (promptIsText(v)) usedAsText.add(bareName(target));
           return [{ kind: 'input', target, place: 'var' }];
         }
         if (v.type == 'lists_create_empty') {
-          usedAsList.add(target);
+          usedAsList.add(bareName(target));
           return [{ kind: 'rect', action: '清空', target, round: '' }];
         }
         const { value, round } = valueWithRound(v);
-        if (value.t == 'str') usedAsText.add(target);
+        if (value.t == 'str') usedAsText.add(bareName(target));
         return [{ kind: 'rect', action: '設為', target, value, round }];
       }
       case 'scratch_variables_change':
@@ -373,7 +376,9 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
     seen.add(d.name);
   }
   const modules: ModuleProgram[] = defs.map(d => {
+    curParams = new Set(d.names);
     const body = stmts(d.list);
+    curParams = new Set();
     if (d.tail) body.push({ kind: 'return', ...valueWithRound(d.tail) });
     // 回傳值的型別：原本的模組有的照原本，新的預設數字（回傳的是文字就是文字）
     const old = knownModules.get(d.name);
@@ -402,7 +407,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
   // 變數表：原本就有的照原本的型別；新的看用法（清單積木 → 清單，存文字 → 文字，其他 → 數字）。
   // 初始值一律用預設值（數字 0、文字空的）：toBlockly 把不是預設值的初始值寫成了最前面的積木，
   // 現在那些積木變成流程圖上的節點，變數表再留著初始值的話，下次轉成積木會重複
-  const names = [...new Set([...(saved.variables ?? []).map(v => v.name), ...usedAsList])].filter(n => !paramNames.has(n));
+  const names = [...new Set([...(saved.variables ?? []).map(v => v.name), ...usedAsList])].filter(n => scratch || !paramNames.has(n));
   const vars: VarInfo[] = names.map(name => {
     const old = known.get(name);
     const listType = (saved.variables ?? []).find(v => v.name == name)?.type == 'list' || usedAsList.has(name);

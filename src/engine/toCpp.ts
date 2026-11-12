@@ -323,25 +323,27 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     if (v.type == '文字') return `${pad}string ${v.name} = ${JSON.stringify(stripQuotes(v.init))};`;
     return `${pad}${numType(v.name)} ${v.name} = ${v.init.trim() || '0'};`;
   };
+  const tmpNote = t('輸入到清單時先暫存在這裡', 'input goes here first, then into the list');
+  /** 輸入到清單用的暫存變數：哪個函式（或 main）用到就宣告在那裡 */
+  const tmpDecls = (code: string[], pad: string) => [
+    ...(code.some(l => l.includes("inputNumber")) ? [`${pad}int inputNumber;   // ${tmpNote}`] : []),
+    ...(code.some(l => l.includes("inputText")) ? [`${pad}string inputText;  // ${tmpNote}`] : []),
+  ];
   const functions = modules.flatMap(m => {
     enter(m);
     stmts(m.body, 1);
     if (m.returns == '文字') uses.string = true;
+    const code = lines.splice(0);
     // 區域變數：寫在函式最上面，每次執行都重新從初始值開始，只有這個函式用得到
-    const locals = localsOf(m).map(v => declLine(v, INDENT));
+    const locals = [...localsOf(m).map(v => declLine(v, INDENT)), ...tmpDecls(code, INDENT)];
     const localPart = locals.length ? [`${INDENT}// ${t('區域變數：只有這個函式裡用得到', 'Local variables: only this function can use them')}`, ...locals, ''] : [];
-    return [`${retType(m)} ${m.name}(${paramCode(m)}) {`, ...localPart, ...lines.splice(0), '}', ''];
+    return [`${retType(m)} ${m.name}(${paramCode(m)}) {`, ...localPart, ...code, '}', ''];
   });
   enter(null);
   if (modules.some(m => m.params.some(p => p.type == '文字'))) uses.string = true;
 
-  // 有模組時，變數表的變數主程式和模組都要用，所以放在 main 外面（全域變數）
-  const shared = modules.length > 0;
-  const pad = shared ? '' : INDENT;
-  const decls = varList.map(v => declLine(v, pad));
-  const tmpNote = t('輸入到清單時先暫存在這裡', 'input goes here first, then into the list');
-  if (uses.inputNumber) decls.push(`${pad}int inputNumber;   // ${tmpNote}`);
-  if (uses.inputText) decls.push(`${pad}string inputText;  // ${tmpNote}`);
+  // 主流程的變數一律宣告在 main 裡面（初學先不用全域變數；模組要用的值用參數傳進去、用回傳帶出來）
+  const decls = [...varList.map(v => declLine(v, INDENT)), ...tmpDecls(body, INDENT)];
 
   // 有文字變數、裝文字的清單或用到 string 的寫法才要 <string>；有清單才要 <vector>
   const isList = (v: VarInfo) => v.type == '清單' || v.type == '二維清單';
@@ -365,13 +367,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       '',
     );
   }
-  if (shared) {
-    const globalsPart = decls.length ? ['// ' + t('全域變數（變數表）：主程式和模組都會用到，所以放在 main 外面', 'Global variables (the table): main and the modules all use them, so they are outside main'), ...decls, ''] : [];
-    // 模組之間互相執行時，要先宣告才能用
-    const protos = modules.length > 1 ? [...modules.map(m => `${retType(m)} ${m.name}(${paramCode(m)});`), ''] : [];
-    return [...head, ...globalsPart, ...protos, ...functions, 'int main() {', ...body, `${INDENT}return 0;`, '}', ''].join('\n');
-  }
-  return [...head, 'int main() {', ...decls, ...(decls.length ? [''] : []), ...body, `${INDENT}return 0;`, '}', ''].join('\n');
+  // 模組之間互相執行時，要先宣告才能用
+  const protos = modules.length > 1 ? [...modules.map(m => `${retType(m)} ${m.name}(${paramCode(m)});`), ''] : [];
+  return [...head, ...protos, ...functions, 'int main() {', ...decls, ...(decls.length ? [''] : []), ...body, `${INDENT}return 0;`, '}', ''].join('\n');
 }
 
 const stripQuotes = (s: string) => {

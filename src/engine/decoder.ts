@@ -21,7 +21,7 @@ import { t } from '../i18n';
 import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
-import { parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
+import { GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -46,19 +46,29 @@ export function localTypes(locals: LocalVar[] = []): VarStore['type_var_list'] {
   return { number: of('數字'), text: of('文字'), array: of('清單'), grid: of('二維清單') };
 }
 
-/** 模組裡用的變數清單：變數表的變數（全域），再加上這個模組的參數和區域變數 */
-export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar[] = []): VarStore {
+/**
+ * 模組裡用的變數清單：主流程的變數，再加上這個模組的參數和區域變數。
+ * - 跟參數、區域變數同名的主流程變數在模組裡被蓋住（寫這個名字指的是參數或區域變數）；
+ *   Scratch 可以寫「主流程的a」指主流程的 a（Scratch 本來就分得開：變數積木是主流程的，參數積木是參數）
+ * - C++：主流程的變數宣告在 main 裡面，模組用不到（要用的值用參數傳進來，用回傳帶出去）
+ * inModule 是 false（主流程）時照原樣
+ */
+export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar[] = [], inModule = true): VarStore {
   const named = locals.filter(v => v.name.trim() != '');
-  if (!params.length && !named.length) return vars;
+  if (!inModule) return vars;
+  const target = getTarget();
   const lt = localTypes(named);
-  // 跟參數、區域變數同名的全域變數：在模組裡被蓋住（寫這個名字指的是參數或區域變數）
   const own = new Set([...params.map(p => p.name), ...named.map(v => v.name.trim())]);
-  const g = (list: string[]) => list.filter(n => !own.has(n));
-  const globalNames = vars.var_list.name.filter(n => !own.has(n));
+  const visible = (n: string) => target != 'cpp' && !own.has(n);
+  // Scratch：被蓋住的主流程變數改叫「主流程的a」
+  const renamed = (n: string) => (target == 'scratch' && own.has(n) ? [GLOBAL_PREFIX + n] : []);
+  const g = (list: string[]) => list.flatMap(n => (visible(n) ? [n] : renamed(n)));
+  const globalNames = g(vars.var_list.name);
+  const valueOf = (n: string) => vars.var_list.value[vars.var_list.name.indexOf(n.startsWith(GLOBAL_PREFIX) ? n.slice(GLOBAL_PREFIX.length) : n)];
   return {
     var_list: {
       name: [...globalNames, ...named.map(v => v.name.trim())],
-      value: [...globalNames.map(n => vars.var_list.value[vars.var_list.name.indexOf(n)]), ...named.map(v => v.init)],
+      value: [...globalNames.map(valueOf), ...named.map(v => v.init)],
     },
     type_var_list: {
       number: [...g(vars.type_var_list.number), ...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
@@ -406,15 +416,18 @@ class CodeGenerator {
   private readonly params: ParamInfo[];
   /** 在模組裡：這個模組的區域變數（只有 C++） */
   private readonly locals: LocalVar[];
+  /** Scratch 的模組：可以用「主流程的a」（見 withParams） */
+  private readonly globalRefs: boolean;
 
   constructor(diagram: Diagram, vars: VarStore, sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = [], locals: LocalVar[] = []) {
     this.diagram = diagram;
     this.nodes = diagram.nodes;
-    this.vars = withParams(vars, params, locals);
+    this.vars = withParams(vars, params, locals, sheet > 0);
     this.sheet = sheet;
     this.modules = modules;
     this.params = params;
     this.locals = locals.filter(v => v.name.trim() != '');
+    this.globalRefs = sheet > 0 && getTarget() == 'scratch';
     // 每一步都把所有變數的值記下來。全域變數用 __globals()（寫在最外層，模組裡同名的參數蓋不到它）；
     // 在模組裡，參數和區域變數另外放在 __scope，第四步才分得開（名字可以跟全域變數一樣）
     const own = [...params.map(p => p.name), ...this.locals.map(v => v.name.trim())];
@@ -584,11 +597,13 @@ class CodeGenerator {
               // 區域變數：每次執行模組都重新從初始值開始（遞迴時每一層有自己的一份）
               + this.locals.map(v => `var ${v.name.trim()} = ${initialValue(this.vars, v.name.trim(), v.init)};\n`).join('')
               + 'var __ret;\n';
-            return { code: head + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
+            // Scratch：模組裡的「主流程的a」透過 __G 讀寫主流程的 a（參數 a 把它蓋住了，直接寫 a 拿不到）
+            const open = this.globalRefs ? 'with (__G) {\n' : '';
+            return { code: head + open + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
           }
           // 有回傳值的模組：走到結束時一定要已經「回傳」過
           const check = m.returns ? `if (__ret === undefined) __err('noReturn', ${i}, { name: ${name} });\n` : '';
-          return { code: 'total_step ++;\n' + update + check + '__depth--;\nreturn __ret;\n}\n', next: undefined };
+          return { code: 'total_step ++;\n' + update + check + '__depth--;\nreturn __ret;\n' + (this.globalRefs ? '}\n' : '') + '}\n', next: undefined };
         }
         if (node.text == '開始') {
           return { code: 'function flowchart_code(){\n' + update, next: this.nextOf(node) };
@@ -834,6 +849,20 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     for (const n of locals) {
       if (!syntaxOk(`var ${n};`)) throw new FlowError(t(`模組「${m.info.name}」的區域變數名稱「${n}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${n}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
     }
+    // C++：主流程的變數寫在 main 裡面，模組用不到（要用值就用參數傳進來，要帶回去就用回傳）
+    if (getTarget() == 'cpp') {
+      const own = new Set([...m.info.params.map(p => p.name), ...locals]);
+      const sheet = modules.indexOf(m) + 1;
+      m.diagram.nodes.forEach((node, k) => {
+        const used = node && tokenize(node.text).find(tk => tk.type == 'name' && names.includes(tk.text) && !own.has(tk.text));
+        if (used) {
+          throw new FlowError(t(
+            `模組「${m.info.name}」裡用了主流程的變數「${used.text}」：C++ 的主流程變數寫在 main 裡面，模組用不到。要用它的值，請加一個參數傳進來；要把結果帶回主流程，請用回傳。`,
+            `The module "${m.info.name}" uses "${used.text}" from the main flow. In C++ those variables are inside main, so a module cannot use them. Pass the value in as a parameter, and use a return value to bring a result back.`,
+          ), sheetId(sheet, k));
+        }
+      });
+    }
   }
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
   let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\n';
@@ -844,6 +873,11 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     if (!syntaxOk(decl)) throw new FlowError(t(`變數名稱「${name}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${name}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
     code += decl;
   }
+  // 「主流程的a」：模組裡讀寫主流程的 a（Scratch；見 withParams）
+  code += 'var __G = {' + names.map(n => {
+    const key = JSON.stringify(GLOBAL_PREFIX + n);
+    return `get ${key}() { return ${n}; }, set ${key}(v) { ${n} = v; }`;
+  }).join(', ') + '};\n';
   // 全域變數的值（寫在最外層：模組裡就算有同名的參數，這裡拿到的還是全域的）
   code += 'function __globals(){ return {' + names.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; }\n';
   code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';

@@ -136,7 +136,7 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
         </div>
 
         <div className="card">
-          <p className="section_label" style={{ marginTop: 0 }}>{callerName ? t('全域變數（變數表，主流程和模組都能用）', 'Global variables (the variable table)') : t('變數', 'Variables')}</p>
+          <p className="section_label" style={{ marginTop: 0 }}>{callerName ? t('主流程的變數', 'Main-flow variables') : t('變數', 'Variables')}</p>
           <div id="variableTable" className="var_boxes">
             {values && varNames.map(name => varBox(name))}
           </div>

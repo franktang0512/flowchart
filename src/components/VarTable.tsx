@@ -81,9 +81,11 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
             )}
           {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
           {/* 全域變數只在主流程顯示；模組這裡只列這個模組自己的 */}
-          <p className="muted global_note">{module.locals
-            ? t('主流程的變數（全域變數）在模組裡也能用，要新增或修改請回到「主流程」。', 'Main-flow (global) variables can be used here too. To add or change them, go back to the main flow.')
-            : t('Scratch / Blockly 沒有只屬於函式的變數：要用變數，請回到「主流程」新增（主流程的變數在模組裡也能用）。', 'Scratch / Blockly have no variables that belong only to a function. To use one, add it in the main flow (main-flow variables work here too).')}</p>
+          <p className="muted global_note">{getTarget() == 'cpp'
+            ? t('C++ 的主流程變數寫在 main 裡面，模組用不到：要用的值請加參數傳進來，要把結果帶回主流程請用回傳。', 'In C++ the main-flow variables are inside main, so a module cannot use them. Pass values in as parameters, and use a return value to bring a result back.')
+            : getTarget() == 'scratch'
+            ? t('Scratch 沒有只屬於函式的變數：要用變數，請回到「主流程」新增，模組裡也能用。主流程的變數跟參數同名時，選單裡會寫成「主流程的a」，指的是主流程的那個 a。', 'Scratch has no variables that belong only to a function. Add them in the main flow; modules can use them too. If one has the same name as a parameter, the menu shows it as "主流程的a".')
+            : t('Blockly 沒有只屬於函式的變數：要用變數，請回到「主流程」新增，模組裡也能用。', 'Blockly has no variables that belong only to a function. Add them in the main flow; modules can use them too.')}</p>
         </>
       )}
       {!module && (

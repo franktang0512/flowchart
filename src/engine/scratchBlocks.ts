@@ -263,8 +263,12 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
     loadExtraState(this: B & Proc, s: B) {
       loadProc(this, s);
       this.removeInput('HEAD');
-      const head = this.appendDummyInput('HEAD').appendField('定義').appendField(this.procName);
-      for (const p of this.procParams) head.appendField(`(${p.name})`);
+      this.appendDummyInput('HEAD').appendField('定義').appendField(this.procName);
+      // 跟練習網頁一樣：每個參數是一個放在定義積木上的參數小積木（shadow：不能拖走，不會重複）
+      this.procParams.forEach((p: { name: string }, k: number) => {
+        this.appendValueInput('P' + k).setCheck(null).connection.setShadowState({ type: 'scratch_proc_arg', fields: { NAME: p.name } });
+      });
+      this.setInputsInline(true);
     },
   };
   blocks.scratch_proc_call = {
@@ -286,7 +290,7 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   blocks.scratch_proc_arg = {
     init(this: B) {
       this.appendDummyInput().appendField(new Blockly.FieldLabelSerializable(''), 'NAME');
-      reporter(this, 'procedure_blocks');
+      reporter(this, 'procedure_parameter_blocks');
     },
   };
 
@@ -314,6 +318,7 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
       variable_blocks: style('#FF8C1A', '#FF8000', '#DB6E00'),
       list_blocks: style('#FD6723', '#ea580c', '#c2410c'),
       procedure_blocks: style('#FF6680', '#FF4D6A', '#FF3355'),
+      procedure_parameter_blocks: style('#FF3355', '#FF3355', '#FF3355'),
     },
     // 編輯模式的工具箱分類顏色
     categoryStyles: {

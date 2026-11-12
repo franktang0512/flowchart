@@ -7,7 +7,7 @@ import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
 import { blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
 import { ScratchProcDialog } from './ScratchProcDialog';
-import type { ParamInfo } from '../engine/modules';
+import { GLOBAL_PREFIX, type ParamInfo } from '../engine/modules';
 import type { ModuleSource } from '../engine/modules';
 import { structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
@@ -239,6 +239,11 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
   // 二維清單只有 C++ 有（Scratch 沒有），積木畫不出來
   if (vars.some(v => v.type == '二維清單')) {
     return <p className="run_error">{t('Scratch / Blockly 沒有二維清單：用到二維清單的流程圖，請把學習目標換成 C++ 再看程式。', 'Scratch / Blockly have no 2D lists. To see this flowchart as code, change the learning goal to C++.')}</p>;
+  }
+  // 「主流程的a」只有 Scratch 分得出來（Blockly 的參數跟同名變數是同一個）
+  const withGlobalRef = mode == 'blockly' && modules.find(m => m.diagram.nodes.some(n => n?.text.includes(GLOBAL_PREFIX)));
+  if (withGlobalRef) {
+    return <p className="run_error">{t(`模組「${withGlobalRef.info.name}」裡用了「${GLOBAL_PREFIX}…」：Blockly 的參數跟同名的變數是同一個，分不出來。請把參數或變數改一個名字。`, `The module "${withGlobalRef.info.name}" uses "${GLOBAL_PREFIX}…". In Blockly a parameter and a variable with the same name are the same thing. Rename one of them.`)}</p>;
   }
   // 區域變數只有 C++ 有
   const withLocals = modules.find(m => (m.info.locals ?? []).some(v => v.name.trim() != ''));

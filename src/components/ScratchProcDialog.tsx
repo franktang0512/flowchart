@@ -132,8 +132,7 @@ export function ScratchProcDialog({ Blockly, theme, existing, onConfirm, onCance
           )
           : (
             <button className="proc_big proc_add" onClick={() => { setAdding({ type: null, name: '' }); setProblem(null); }}>
-              <span className="proc_big_main">{t('添加輸入方塊', 'Add an input')}</span>
-              <span className="proc_big_sub">{t('（參數）', '(parameter)')}</span>
+              <span className="proc_big_main">{t('添加參數方塊', 'Add a parameter')}</span>
             </button>
           )}
 

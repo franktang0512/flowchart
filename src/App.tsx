@@ -14,7 +14,7 @@ import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, parseCall, splitId, type LocalVar, type ModuleInfo, type ModuleSource } from './engine/modules';
+import { callText, GLOBAL_PREFIX, parseCall, splitId, type LocalVar, type ModuleInfo, type ModuleSource } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -172,7 +172,7 @@ export function App() {
   const moduleOf2 = (id: number) => modulesRef.current.find(m => m.id == id);
   /** 在這張流程圖裡可以用的變數：模組裡還可以用它的參數 */
   const storeFor = (d: Diagram) => ({
-    ...withParams(varStore, moduleOf(d)?.info.params ?? [], moduleOf(d)?.info.locals),
+    ...withParams(varStore, moduleOf(d)?.info.params ?? [], moduleOf(d)?.info.locals, !!moduleOf(d)),
     // 有回傳值的模組可以寫在算式裡
     calls: modulesRef.current.filter(m => m.info.returns).map(m => m.info.name),
   });
@@ -350,7 +350,16 @@ export function App() {
       // 主程式和每個模組的流程圖都要改（模組裡有同名的參數或區域變數時，那個名字指的是模組自己的，不改）
       for (const d of allDiagrams()) {
         const m = moduleOf(d);
-        if (m && (m.info.params.some(p => p.name == replaced[0]) || m.info.locals?.some(v => v.name.trim() == replaced[0]))) continue;
+        if (m && (m.info.params.some(p => p.name == replaced[0]) || m.info.locals?.some(v => v.name.trim() == replaced[0]))) {
+          // 只改「主流程的舊名」（Scratch）
+          for (const node of d.nodes) {
+            if (node?.text.includes(GLOBAL_PREFIX + replaced[0])) {
+              node.text = node.text.replaceAll(GLOBAL_PREFIX + replaced[0], GLOBAL_PREFIX + added[0]);
+              d.fitNode(node);
+            }
+          }
+          continue;
+        }
         for (const node of d.nodes) {
           if (node?.variables?.includes(replaced[0])) {
             node.variables = node.variables.map(v => v == replaced[0] ? added[0] : v);
@@ -374,6 +383,7 @@ export function App() {
       canReturn: returnsIn(d),
       params: moduleOf(d)?.info.params,
       locals: moduleOf(d)?.info.locals,
+      inModule: !!moduleOf(d),
       onYes: f => editMainNode(node, d, storeFor(d), f, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
@@ -517,6 +527,7 @@ export function App() {
       canReturn: returnsIn(d),
       params: moduleOf(d)?.info.params,
       locals: moduleOf(d)?.info.locals,
+      inModule: !!moduleOf(d),
       onYes: f => addMainNode(t, d, storeFor(d), f, x, y, moduleInfos()),
       onNo: () => { d.pause = false; },
     });

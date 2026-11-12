@@ -37,6 +37,14 @@ export interface LocalVar {
   desc: string;
 }
 
+/**
+ * Scratch：模組裡「主流程的a」指的是主流程的變數 a（參數也叫 a 的時候用來分辨；
+ * Scratch 的「變數 a 設為」選的是主流程的變數，紅色參數積木 a 才是參數）
+ */
+export const GLOBAL_PREFIX = '主流程的';
+/** 「主流程的a」→ a；不是這種寫法的名字照原樣 */
+export const bareName = (name: string) => (name.startsWith(GLOBAL_PREFIX) ? name.slice(GLOBAL_PREFIX.length) : name);
+
 /** 執行、轉程式時用：模組的資料加上它的流程圖 */
 export interface ModuleSource {
   info: ModuleInfo;

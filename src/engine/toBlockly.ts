@@ -4,6 +4,7 @@
 //   blockly：Blockly 內建積木，輸入用「輸入數字/文字並顯示訊息」
 // 兩種的清單都從第 1 項開始，跟學習目標「積木」一樣，所以位置直接照抄。
 import { t } from '../i18n';
+import { bareName, GLOBAL_PREFIX } from './modules';
 import { exprType, type Expr, type ModuleProgram, type Stmt, type VarInfo } from './structure';
 
 export type BlockMode = 'scratch' | 'blockly';
@@ -31,10 +32,15 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
   let params = new Set<string>();
   const enter = (m: ModuleProgram | null) => {
     params = new Set(m?.params.map(p => p.name) ?? []);
-    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '' } as VarInfo] as const)]) : globals;
+    vars = m ? new Map([
+      ...globals,
+      // 「主流程的a」：主流程的變數 a（Scratch 模組裡跟參數同名時用來分辨）
+      ...[...globals].map(([n, v]) => [GLOBAL_PREFIX + n, v] as const),
+      ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '' } as VarInfo] as const),
+    ]) : globals;
   };
   const scratch = mode == 'scratch';
-  const varId = (name: string) => 'var_' + name;
+  const varId = (name: string) => 'var_' + bareName(name);
   const isList = (name: string) => vars.get(name)?.type == '清單';
   const isText = (e: Expr) => exprType(e, vars, modules) == 'str';
   const input = (block: Block) => ({ block });

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { localTypes, type VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
-import type { LocalVar, ModuleInfo, ParamInfo } from '../engine/modules';
+import { GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { byTarget, getTarget, itemWord } from '../target';
 
@@ -139,6 +139,8 @@ export interface DialogRequest {
   params?: ParamInfo[];
   /** 在模組裡：這個模組的區域變數（只有 C++） */
   locals?: LocalVar[];
+  /** 這個積木在模組的流程圖裡 */
+  inModule?: boolean;
 }
 
 /** 變數表裡各型別的變數名稱，給下拉選單用 */
@@ -166,7 +168,7 @@ function VarPicker({ id, value, onChange, names, params = [], locals = [] }: { i
     <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
       <option value="" disabled>{all.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
       {value && !all.includes(value) && <option value={value}>{value}</option>}
-      {grouped && names.length > 0 && <option disabled>{t('── 全域變數（大家共用）──', '── Global variables (shared) ──')}</option>}
+      {grouped && names.length > 0 && <option disabled>{t('── 主流程的變數 ──', '── Main-flow variables ──')}</option>}
       {names.map(name => <option key={name} value={name}>{name}</option>)}
       {params.length > 0 && <option disabled>{readOnly ? t('── 參數（Scratch 的參數不能改）──', '── Parameters (cannot change in Scratch) ──') : t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
       {params.map(name => <option key={'p_' + name} value={name} disabled={readOnly}>{name}</option>)}
@@ -213,8 +215,13 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
   /** 在模組裡：區域變數照型別分好；allTypes 是全域加區域（判斷選到的是哪一種用） */
   const localT = localTypes(request.locals);
   // 跟參數、區域變數同名的全域變數：在模組裡被蓋住，選單不列出來
+  // 在模組裡，主流程的變數：C++ 用不到（寫在 main 裡）；跟參數、區域變數同名的被蓋住——
+  // Scratch 改列成「主流程的a」（Scratch 分得開），Blockly 就不列
   const own = new Set([...(request.params ?? []).map(p => p.name), ...Object.values(localT).flat()]);
-  const shown = (list: string[]) => list.filter(n => !own.has(n));
+  const target = getTarget();
+  const shown = (list: string[]) => (!request.inModule ? list
+    : target == 'cpp' ? []
+    : list.flatMap(n => (!own.has(n) ? [n] : target == 'scratch' ? [GLOBAL_PREFIX + n] : [])));
   varTypes = { number: shown(varTypes.number), text: shown(varTypes.text), array: shown(varTypes.array), grid: shown(varTypes.grid) };
   const allTypes: VarTypes = {
     number: [...varTypes.number, ...localT.number],
