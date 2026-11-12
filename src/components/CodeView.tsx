@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Diagram } from '../engine/diagram';
 import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
-import { blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
+import { applyBlocklyMessages, blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
 import { ScratchProcDialog } from './ScratchProcDialog';
 import { GLOBAL_PREFIX, type ParamInfo } from '../engine/modules';
 import type { ModuleSource } from '../engine/modules';
@@ -40,20 +40,31 @@ function loadScript(src: string) {
   });
 }
 
+/** 現在載入的是哪一種語言的積木文字（Blockly.Msg） */
+let msgLang: string | null = null;
+
 function loadBlockly(): Promise<Loaded> {
   blocklyPromise ??= (async () => {
     const w = window as unknown as { Blockly?: BlocklyModule };
     if (!w.Blockly) {
-      // 順序不能換：核心 → 內建積木 → 積木上的字（中文或英文；核心本身不含英文字）
+      // 順序不能換：核心 → 內建積木 → 積木上的字（核心本身不含英文字）
       await loadScript(`${BLOCKLY}/blockly_compressed.js`);
       await loadScript(`${BLOCKLY}/blocks_compressed.js`);
-      await loadScript(`${BLOCKLY}/msg/${getLang() == 'en' ? 'en' : 'zh-hant'}.js`);
     }
     const Blockly = w.Blockly;
-    return { Blockly, themes: defineBlocks(Blockly, getLang() != 'en') };
+    return { Blockly, themes: defineBlocks(Blockly) };
   })();
   blocklyPromise.catch(() => { blocklyPromise = null; });
-  return blocklyPromise;
+  // 積木上的字跟著網頁的語言：換了語言就重新載入那個語言的字（中文 ↔ 英文會互相蓋掉）
+  return blocklyPromise.then(async loaded => {
+    const lang = getLang() == 'en' ? 'en' : 'zh-hant';
+    if (msgLang != lang) {
+      await loadScript(`${BLOCKLY}/msg/${lang}.js`);
+      msgLang = lang;
+      applyBlocklyMessages(loaded.Blockly, lang == 'zh-hant');
+    }
+    return loaded;
+  });
 }
 
 const BLOCKLY_LAYER = 'blockly_layer';
@@ -160,6 +171,7 @@ const emptyBlocks = (mode: BlockMode) => ({
 
 /** 積木：學習目標是 Scratch 就只畫 Scratch，是 Blockly 就只畫 Blockly（兩種能做的事不一樣，例如回傳值） */
 function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMode; diagram: Diagram; vars: VarInfo[]; modules: ModuleSource[]; onApply: (result: FromBlocks) => void }) {
+  const lang = useLang();
   const { program, modules: mods, error } = programOf(diagram, modules);
   const infos = modules.map(m => m.info);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -216,7 +228,8 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
       live.current = null;
       workspace?.dispose();
     };
-  }, [json, mode, editing]);
+    // 換語言時重畫（積木上的字跟著換）；正在編輯時不重畫，不然還沒套用的積木會不見
+  }, [json, mode, editing, editing ? null : lang]);
 
   const stopEditing = () => setEditing(false);
 

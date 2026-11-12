@@ -4,6 +4,7 @@
 // 所以沒有搬執行用的 JavaScript 產生器；積木的欄位名稱（VAR、LIST、ITEM、INDEX…）要跟原本的一樣。
 //
 // Blockly 是從 CDN 載入的模組（見 CodeView），所以這裡用參數拿到它。
+import { getLang } from '../i18n';
 
 // 綠旗（自己畫的簡單圖示）
 const FLAG = 'data:image/svg+xml,' + encodeURIComponent(
@@ -12,8 +13,8 @@ const FLAG = 'data:image/svg+xml,' + encodeURIComponent(
 
 type B = any;
 
-/** 註冊 Scratch 積木，並建立 Scratch / Blockly 兩種外觀（主題）；回傳兩個主題。zh：Blockly 內建積木是不是用中文 */
-export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B } {
+/** 註冊 Scratch 積木，並建立 Scratch / Blockly 兩種外觀（主題）；回傳兩個主題 */
+export function defineBlocks(Blockly: B): { scratch: B; blockly: B } {
   const blocks = Blockly.Blocks;
   const listField = () => new Blockly.FieldVariable('', undefined, ['list'], 'list');
   const varField = () => new Blockly.FieldVariable('', undefined, ['']);
@@ -31,9 +32,13 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
     b.setStyle(style);
   };
 
+  // 積木上的字跟著網頁的語言（畫積木時才決定，換語言重畫就會換）。
+  // 英文照 Scratch 英文版的說法和順序（例如「item (1) of [list]」），欄位名稱不變，存起來的積木兩種語言都能讀
+  const en = () => getLang() == 'en';
+
   blocks.event_whenflagclicked = {
     init(this: B) {
-      this.appendDummyInput().appendField('當').appendField(new Blockly.FieldImage(FLAG, 20, 20, '*')).appendField('被點擊');
+      this.appendDummyInput().appendField(en() ? 'when' : '當').appendField(new Blockly.FieldImage(FLAG, 20, 20, '*')).appendField(en() ? 'clicked' : '被點擊');
       this.setNextStatement(true, null);
       this.setColour('#FFBF00');
     },
@@ -47,22 +52,22 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   };
   blocks.event_askandwait = {
     init(this: B) {
-      this.appendValueInput('TEXT').setCheck(null).appendField('詢問');
-      this.appendDummyInput().appendField('並等待');
+      this.appendValueInput('TEXT').setCheck(null).appendField(en() ? 'ask' : '詢問');
+      this.appendDummyInput().appendField(en() ? 'and wait' : '並等待');
       statement(this, 'event_category');
       this.setColour('#5CB1D6');
     },
   };
   blocks.event_answer = {
     init(this: B) {
-      this.appendDummyInput().appendField('詢問的答案');
+      this.appendDummyInput().appendField(en() ? 'answer' : '詢問的答案');
       reporter(this, 'event_category');
       this.setColour('#5CB1D6');
     },
   };
   blocks.event_say = {
     init(this: B) {
-      this.appendValueInput('TEXT').setCheck(null).appendField('說出');
+      this.appendValueInput('TEXT').setCheck(null).appendField(en() ? 'say' : '說出');
       statement(this, 'event_category');
       this.setColour('#9966FF');
     },
@@ -70,7 +75,7 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
 
   blocks.scratch_string_join = {
     init(this: B) {
-      this.appendValueInput('TEXT0').setCheck(null).appendField('字串組合');
+      this.appendValueInput('TEXT0').setCheck(null).appendField(en() ? 'join' : '字串組合');
       this.appendValueInput('TEXT1').setCheck(null);
       reporter(this, 'calculation_blocks', 'String');
       this.setColour('#36BF36');
@@ -78,31 +83,49 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   };
   blocks.scratch_string_char_at = {
     init(this: B) {
-      this.appendValueInput('STRING').setCheck(null).appendField('字串');
-      this.appendValueInput('INDEX').setCheck(null).appendField('的第');
-      this.appendDummyInput().appendField('字');
+      if (en()) {
+        // letter (1) of (apple)
+        this.appendValueInput('INDEX').setCheck(null).appendField('letter');
+        this.appendValueInput('STRING').setCheck(null).appendField('of');
+      }
+      else {
+        this.appendValueInput('STRING').setCheck(null).appendField('字串');
+        this.appendValueInput('INDEX').setCheck(null).appendField('的第');
+        this.appendDummyInput().appendField('字');
+      }
       reporter(this, 'calculation_blocks', 'String');
     },
   };
   blocks.scratch_string_contains = {
     init(this: B) {
-      this.appendValueInput('STRING1').setCheck(null).appendField('字串');
-      this.appendValueInput('STRING2').setCheck(null).appendField('包含');
+      if (en()) {
+        // (apple) contains (a)?
+        this.appendValueInput('STRING1').setCheck(null);
+        this.appendValueInput('STRING2').setCheck(null).appendField('contains');
+        this.appendDummyInput().appendField('?');
+      }
+      else {
+        this.appendValueInput('STRING1').setCheck(null).appendField('字串');
+        this.appendValueInput('STRING2').setCheck(null).appendField('包含');
+      }
       reporter(this, 'calculation_blocks', 'Boolean');
     },
   };
   blocks.scratch_length = {
     init(this: B) {
-      this.appendValueInput('VALUE').setCheck(null).appendField('取得');
-      this.appendDummyInput().appendField('的長度');
+      if (en()) this.appendValueInput('VALUE').setCheck(null).appendField('length of');
+      else {
+        this.appendValueInput('VALUE').setCheck(null).appendField('取得');
+        this.appendDummyInput().appendField('的長度');
+      }
       reporter(this, 'calculation_blocks', 'Number');
     },
   };
 
   blocks.scratch_if = {
     init(this: B) {
-      this.appendValueInput('IF0').setCheck('Boolean').appendField('如果');
-      this.appendDummyInput().appendField('那麼');
+      this.appendValueInput('IF0').setCheck('Boolean').appendField(en() ? 'if' : '如果');
+      this.appendDummyInput().appendField(en() ? 'then' : '那麼');
       this.appendStatementInput('DO0').setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
@@ -111,26 +134,26 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   };
   blocks.scratch_ifElse = {
     init(this: B) {
-      this.appendValueInput('IF0').setCheck('Boolean').appendField('如果');
-      this.appendDummyInput().appendField('那麼');
+      this.appendValueInput('IF0').setCheck('Boolean').appendField(en() ? 'if' : '如果');
+      this.appendDummyInput().appendField(en() ? 'then' : '那麼');
       this.appendStatementInput('DO0').setCheck(null);
-      this.appendDummyInput().appendField('否則');
+      this.appendDummyInput().appendField(en() ? 'else' : '否則');
       this.appendStatementInput('ELSE').setCheck(null);
       statement(this, 'control_blocks');
     },
   };
   blocks.scratch_repeat_ext = {
     init(this: B) {
-      this.appendValueInput('TIMES').setCheck(null).appendField('重複');
-      this.appendDummyInput().appendField('次');
+      this.appendValueInput('TIMES').setCheck(null).appendField(en() ? 'repeat' : '重複');
+      if (!en()) this.appendDummyInput().appendField('次');
       this.appendStatementInput('DO').setCheck(null);
       statement(this, 'control_blocks');
     },
   };
   blocks.scratch_whileUntil = {
     init(this: B) {
-      this.appendValueInput('BOOL').setCheck('Boolean').appendField('重複')
-        .appendField(new Blockly.FieldDropdown([['直到', 'UNTIL'], ['當', 'WHILE']]), 'MODE');
+      this.appendValueInput('BOOL').setCheck('Boolean').appendField(en() ? 'repeat' : '重複')
+        .appendField(new Blockly.FieldDropdown(en() ? [['until', 'UNTIL'], ['while', 'WHILE']] : [['直到', 'UNTIL'], ['當', 'WHILE']]), 'MODE');
       this.appendStatementInput('DO').setCheck(null);
       statement(this, 'control_blocks');
     },
@@ -156,7 +179,7 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
 
   blocks.scratch_variables_set = {
     init(this: B) {
-      this.appendDummyInput().appendField('變數').appendField(varField(), 'VAR').appendField('設為');
+      this.appendDummyInput().appendField(en() ? 'set' : '變數').appendField(varField(), 'VAR').appendField(en() ? 'to' : '設為');
       this.appendValueInput('VALUE').setCheck(null);
       statement(this, 'variable_blocks');
     },
@@ -177,59 +200,91 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   };
   blocks.scratch_list_add = {
     init(this: B) {
-      this.appendValueInput('ITEM').setCheck(null).appendField('添加');
-      this.appendDummyInput().appendField('到').appendField(listField(), 'LIST');
+      this.appendValueInput('ITEM').setCheck(null).appendField(en() ? 'add' : '添加');
+      this.appendDummyInput().appendField(en() ? 'to' : '到').appendField(listField(), 'LIST');
       statement(this, 'list_blocks');
     },
   };
   blocks.scratch_list_get_item = {
     init(this: B) {
-      this.appendDummyInput().appendField(listField(), 'LIST');
-      this.appendValueInput('INDEX').setCheck(null).appendField('的第');
-      this.appendDummyInput().appendField('項');
+      if (en()) {
+        // item (1) of [list]
+        this.appendValueInput('INDEX').setCheck(null).appendField('item');
+        this.appendDummyInput().appendField('of').appendField(listField(), 'LIST');
+      }
+      else {
+        this.appendDummyInput().appendField(listField(), 'LIST');
+        this.appendValueInput('INDEX').setCheck(null).appendField('的第');
+        this.appendDummyInput().appendField('項');
+      }
       reporter(this, 'list_blocks');
     },
   };
   blocks.scratch_list_empty = {
     init(this: B) {
-      this.appendDummyInput().appendField('刪除').appendField(listField(), 'LIST').appendField('的所有項目');
+      if (en()) this.appendDummyInput().appendField('delete all of').appendField(listField(), 'LIST');
+      else this.appendDummyInput().appendField('刪除').appendField(listField(), 'LIST').appendField('的所有項目');
       statement(this, 'list_blocks');
     },
   };
   blocks.scratch_list_length = {
     init(this: B) {
-      this.appendDummyInput().appendField('清單').appendField(listField(), 'LIST').appendField('的長度');
+      if (en()) this.appendDummyInput().appendField('length of').appendField(listField(), 'LIST');
+      else this.appendDummyInput().appendField('清單').appendField(listField(), 'LIST').appendField('的長度');
       reporter(this, 'list_blocks', 'Number');
     },
   };
   blocks.scratch_list_insert = {
     init(this: B) {
-      this.appendValueInput('ITEM').setCheck(null).appendField('插入');
-      this.appendDummyInput().appendField('到').appendField(listField(), 'LIST');
-      this.appendValueInput('INDEX').setCheck(null).appendField('的第');
-      this.appendDummyInput().appendField('項');
+      if (en()) {
+        // insert (thing) at (1) of [list]
+        this.appendValueInput('ITEM').setCheck(null).appendField('insert');
+        this.appendValueInput('INDEX').setCheck(null).appendField('at');
+        this.appendDummyInput().appendField('of').appendField(listField(), 'LIST');
+      }
+      else {
+        this.appendValueInput('ITEM').setCheck(null).appendField('插入');
+        this.appendDummyInput().appendField('到').appendField(listField(), 'LIST');
+        this.appendValueInput('INDEX').setCheck(null).appendField('的第');
+        this.appendDummyInput().appendField('項');
+      }
       statement(this, 'list_blocks');
     },
   };
   blocks.scratch_list_set = {
     init(this: B) {
-      this.appendDummyInput().appendField('替換').appendField(listField(), 'LIST');
-      this.appendValueInput('INDEX').setCheck(null).appendField('的第');
-      this.appendValueInput('ITEM').setCheck(null).appendField('項為');
+      if (en()) {
+        // replace item (1) of [list] with (thing)
+        this.appendValueInput('INDEX').setCheck(null).appendField('replace item');
+        this.appendDummyInput().appendField('of').appendField(listField(), 'LIST');
+        this.appendValueInput('ITEM').setCheck(null).appendField('with');
+      }
+      else {
+        this.appendDummyInput().appendField('替換').appendField(listField(), 'LIST');
+        this.appendValueInput('INDEX').setCheck(null).appendField('的第');
+        this.appendValueInput('ITEM').setCheck(null).appendField('項為');
+      }
       statement(this, 'list_blocks');
     },
   };
   blocks.scratch_list_remove = {
     init(this: B) {
-      this.appendDummyInput().appendField('刪除').appendField(listField(), 'LIST');
-      this.appendValueInput('INDEX').setCheck(null).appendField('的第');
-      this.appendDummyInput().appendField('項');
+      if (en()) {
+        // delete (1) of [list]
+        this.appendValueInput('INDEX').setCheck(null).appendField('delete');
+        this.appendDummyInput().appendField('of').appendField(listField(), 'LIST');
+      }
+      else {
+        this.appendDummyInput().appendField('刪除').appendField(listField(), 'LIST');
+        this.appendValueInput('INDEX').setCheck(null).appendField('的第');
+        this.appendDummyInput().appendField('項');
+      }
       statement(this, 'list_blocks');
     },
   };
   blocks.scratch_list_contain = {
     init(this: B) {
-      this.appendDummyInput().appendField('清單').appendField(listField(), 'LIST').appendField('包含');
+      this.appendDummyInput().appendField(en() ? '' : '清單').appendField(listField(), 'LIST').appendField(en() ? 'contains' : '包含');
       this.appendValueInput('ITEM').setCheck(null);
       this.appendDummyInput().appendField('?');
       reporter(this, 'list_blocks', 'Boolean');
@@ -237,8 +292,15 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   };
   blocks.scratch_list_indexof = {
     init(this: B) {
-      this.appendValueInput('ITEM').setCheck(null);
-      this.appendDummyInput().appendField('在').appendField(listField(), 'LIST').appendField('裡的項目編號');
+      if (en()) {
+        // item # of (thing) in [list]
+        this.appendValueInput('ITEM').setCheck(null).appendField('item # of');
+        this.appendDummyInput().appendField('in').appendField(listField(), 'LIST');
+      }
+      else {
+        this.appendValueInput('ITEM').setCheck(null);
+        this.appendDummyInput().appendField('在').appendField(listField(), 'LIST').appendField('裡的項目編號');
+      }
       reporter(this, 'list_blocks', 'Number');
     },
   };
@@ -251,11 +313,12 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
     b.procName = s.name ?? '';
     b.procParams = (s.params ?? []).map(p => (typeof p == 'string' ? { name: p } : p));
   };
+  const define = () => (en() ? 'define' : '定義');
   blocks.scratch_proc_def = {
     init(this: B & Proc) {
       this.procName = '';
       this.procParams = [];
-      this.appendDummyInput('HEAD').appendField('定義');
+      this.appendDummyInput('HEAD').appendField(define());
       this.setNextStatement(true, null);
       this.setStyle('procedure_blocks');
     },
@@ -263,7 +326,7 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
     loadExtraState(this: B & Proc, s: B) {
       loadProc(this, s);
       this.removeInput('HEAD');
-      this.appendDummyInput('HEAD').appendField('定義').appendField(this.procName);
+      this.appendDummyInput('HEAD').appendField(define()).appendField(this.procName);
       // 跟練習網頁一樣：每個參數是一個放在定義積木上的參數小積木（shadow：不能拖走，不會重複）
       this.procParams.forEach((p: { name: string }, k: number) => {
         this.appendValueInput('P' + k).setCheck(null).connection.setShadowState({ type: 'scratch_proc_arg', fields: { NAME: p.name } });
@@ -293,12 +356,6 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
       reporter(this, 'procedure_parameter_blocks');
     },
   };
-
-  // Blockly 模式：內建積木，「設定變數」改成跟練習網頁一樣的說法
-  if (zh) {
-    Blockly.Msg.VARIABLES_SET = '將 %1 設為 %2';
-    Blockly.Msg.MATH_CHANGE_TITLE = '將 %1 的值加 %2';
-  }
 
   // 主題的顏色照練習網頁（Scratch 的配色：https://github.com/scratchfoundation/scratch-blocks/wiki/Colors）
   const style = (primary: string, secondary: string, tertiary: string) => ({ colourPrimary: primary, colourSecondary: secondary, colourTertiary: tertiary });
@@ -343,6 +400,16 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
   return { scratch, blockly };
 }
 
+/**
+ * 剛載入某個語言的積木文字（Blockly.Msg）之後：中文的「設定變數」改成跟練習網頁一樣的說法。
+ * 英文照 Blockly 原本的（載入英文檔時就蓋回去了）
+ */
+export function applyBlocklyMessages(Blockly: B, zh: boolean) {
+  if (!zh) return;
+  Blockly.Msg.VARIABLES_SET = '將 %1 設為 %2';
+  Blockly.Msg.MATH_CHANGE_TITLE = '將 %1 的值加 %2';
+}
+
 // ---------------- 編輯模式的工具箱（只放流程圖做得到的積木） ----------------
 
 /** 空格裡預設的白色小積木 */
@@ -351,11 +418,13 @@ const num = (v: number) => ({ shadow: { type: 'math_number', fields: { NUM: v } 
 const block = (type: string, inputs?: Record<string, unknown>) => ({ kind: 'block', type, ...(inputs ? { inputs } : {}) });
 
 /** Scratch 的工具箱：分類跟練習網頁一樣；變數、清單是動態的（看目前有哪些變數） */
-export const scratchToolbox = () => ({
+export const scratchToolbox = () => {
+  const zh = getLang() != 'en';
+  return {
   kind: 'categoryToolbox',
   contents: [
     {
-      kind: 'category', name: '事件', categorystyle: 'event_category', contents: [
+      kind: 'category', name: zh ? '事件' : 'Events', categorystyle: 'event_category', contents: [
         block('event_whenflagclicked'),
         block('event_askandwait', { TEXT: text('') }),
         block('event_answer'),
@@ -363,7 +432,7 @@ export const scratchToolbox = () => ({
       ],
     },
     {
-      kind: 'category', name: '控制', categorystyle: 'control_category', contents: [
+      kind: 'category', name: zh ? '控制' : 'Control', categorystyle: 'control_category', contents: [
         block('scratch_if'),
         block('scratch_ifElse'),
         block('scratch_repeat_ext', { TIMES: text('10') }),
@@ -371,7 +440,7 @@ export const scratchToolbox = () => ({
       ],
     },
     {
-      kind: 'category', name: '運算', categorystyle: 'calculation_category', contents: [
+      kind: 'category', name: zh ? '運算' : 'Operators', categorystyle: 'calculation_category', contents: [
         block('scratch_math_arithmetic', { A: text(''), B: text('') }),
         block('math_modulo', { DIVIDEND: text(''), DIVISOR: text('') }),
         block('math_round', { NUM: text('') }),
@@ -384,11 +453,12 @@ export const scratchToolbox = () => ({
         block('scratch_length', { VALUE: text('apple') }),
       ],
     },
-    { kind: 'category', name: '變數', categorystyle: 'variable_category', custom: 'SCRATCH_VARIABLES' },
-    { kind: 'category', name: '清單', categorystyle: 'list_category', custom: 'SCRATCH_LISTS' },
-    { kind: 'category', name: '函式', categorystyle: 'procedure_category', custom: 'SCRATCH_PROCEDURES' },
+    { kind: 'category', name: zh ? '變數' : 'Variables', categorystyle: 'variable_category', custom: 'SCRATCH_VARIABLES' },
+    { kind: 'category', name: zh ? '清單' : 'Lists', categorystyle: 'list_category', custom: 'SCRATCH_LISTS' },
+    { kind: 'category', name: zh ? '函式' : 'My Blocks', categorystyle: 'procedure_category', custom: 'SCRATCH_PROCEDURES' },
   ],
-});
+  };
+};
 
 /** Blockly 的工具箱：內建積木（變數用 Blockly 內建的變數分類） */
 export const blocklyToolbox = (zh: boolean) => ({
@@ -433,7 +503,7 @@ export function setupScratchEditing(Blockly: B, workspace: B, onCreateProc: (exi
 
   workspace.registerToolboxCategoryCallback('SCRATCH_VARIABLES', (ws: B) => {
     const vars: B[] = ws.getVariablesOfType('');
-    const items: unknown[] = [{ kind: 'button', text: '建立變數', callbackkey: 'CREATE_SCRATCH_VARIABLE' }];
+    const items: unknown[] = [{ kind: 'button', text: getLang() == 'en' ? 'Make a Variable' : '建立變數', callbackkey: 'CREATE_SCRATCH_VARIABLE' }];
     if (vars.length) items.push({ kind: 'block', type: 'scratch_variables_set', fields: { VAR: ref(vars[0], '') }, inputs: { VALUE: text('0') } });
     for (const v of vars) items.push({ kind: 'block', type: 'scratch_variables_get', fields: { VAR: ref(v, '') } });
     return items;
@@ -441,7 +511,7 @@ export function setupScratchEditing(Blockly: B, workspace: B, onCreateProc: (exi
 
   workspace.registerToolboxCategoryCallback('SCRATCH_LISTS', (ws: B) => {
     const lists: B[] = ws.getVariablesOfType('list');
-    const items: unknown[] = [{ kind: 'button', text: '建立清單', callbackkey: 'CREATE_SCRATCH_LIST' }];
+    const items: unknown[] = [{ kind: 'button', text: getLang() == 'en' ? 'Make a List' : '建立清單', callbackkey: 'CREATE_SCRATCH_LIST' }];
     if (!lists.length) return items;
     const LIST = ref(lists[0], 'list');
     for (const v of lists) items.push({ kind: 'block', type: 'scratch_list_get', fields: { LIST: ref(v, 'list') } });
@@ -471,7 +541,7 @@ export function setupScratchEditing(Blockly: B, workspace: B, onCreateProc: (exi
     });
   });
   workspace.registerToolboxCategoryCallback('SCRATCH_PROCEDURES', (ws: B) => {
-    const items: unknown[] = [{ kind: 'button', text: '建立函式', callbackkey: 'CREATE_SCRATCH_PROC' }];
+    const items: unknown[] = [{ kind: 'button', text: getLang() == 'en' ? 'Make a Block' : '建立函式', callbackkey: 'CREATE_SCRATCH_PROC' }];
     for (const def of ws.getBlocksByType('scratch_proc_def')) {
       const params: { name: string }[] = def.procParams;
       items.push({ kind: 'block', type: 'scratch_proc_call', extraState: { name: def.procName, params } });

@@ -154,12 +154,6 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
         </div>
 
         <div className="card">
-          <p className="section_label" style={{ marginTop: 0 }}>{t('輸出', 'Output')}</p>
-          {/* 只是給學生看的輸出畫面；最後一步跟預期輸出一樣變綠色、不一樣變紅色 */}
-          <div id="output_area" className={'output_screen' + (atEnd && !error ? (correct ? ' ok' : ' bad') : '')}>{output}</div>
-        </div>
-
-        <div className="card">
           <p className="section_label" style={{ marginTop: 0 }}>{t('測試資料', 'Test data')}</p>
           <div className="case_picker">
             {[0, 1, 2].map(i => (
@@ -193,6 +187,13 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
             {values && varNames.length == 0 && <span className="muted">{t('（沒有變數）', '(none)')}</span>}
           </div>
           {values && moduleVars.map(moduleSection)}
+        </div>
+
+        {/* 輸出放在變數下面：先看這一步變數變成什麼，再看印出了什麼 */}
+        <div className="card">
+          <p className="section_label" style={{ marginTop: 0 }}>{t('輸出', 'Output')}</p>
+          {/* 只是給學生看的輸出畫面；最後一步跟預期輸出一樣變綠色、不一樣變紅色 */}
+          <div id="output_area" className={'output_screen' + (atEnd && !error ? (correct ? ' ok' : ' bad') : '')}>{output}</div>
         </div>
       </div>
     </div>
