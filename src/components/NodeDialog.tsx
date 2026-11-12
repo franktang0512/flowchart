@@ -5,7 +5,7 @@ import type { VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
 import type { ModuleInfo, ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { byTarget, getTarget, itemWord } from '../target';
+import { byTarget, itemWord } from '../target';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -155,8 +155,7 @@ interface Props {
  * 舊作品裡填的值不在選項裡時，也放進選項，打開修改才不會被清掉。
  */
 function VarPicker({ id, value, onChange, names, params = [] }: { id: string; value: string; onChange: (v: string) => void; names: string[]; params?: string[] }) {
-  // 參數：Blockly、C++ 可以改，Scratch 不行（列出來但不能選，學生才知道參數也是一種變數）
-  const readOnly = getTarget() == 'scratch';
+  // 參數也是一種變數，流程圖裡可以改（只改到這次執行模組的那一份）
   const all = [...names, ...params];
   return (
     <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
@@ -164,8 +163,8 @@ function VarPicker({ id, value, onChange, names, params = [] }: { id: string; va
       {value && !all.includes(value) && <option value={value}>{value}</option>}
       {params.length > 0 && names.length > 0 && <option disabled>{t('── 變數表（全域）──', '── Variables (global) ──')}</option>}
       {names.map(name => <option key={name} value={name}>{name}</option>)}
-      {params.length > 0 && <option disabled>{readOnly ? t('── 參數（Scratch 的參數不能改）──', '── Parameters (cannot change in Scratch) ──') : t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
-      {params.map(name => <option key={'p_' + name} value={name} disabled={readOnly}>{name}</option>)}
+      {params.length > 0 && <option disabled>{t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
+      {params.map(name => <option key={'p_' + name} value={name}>{name}</option>)}
     </select>
   );
 }

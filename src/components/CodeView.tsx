@@ -7,7 +7,7 @@ import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
 import { blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
 import type { ModuleSource } from '../engine/modules';
-import { structure, structureModules, type VarInfo } from '../engine/structure';
+import { structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
 import { toCpp } from '../engine/toCpp';
 import { getLang, t, useLang } from '../i18n';
@@ -97,6 +97,25 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
       <div id={BLOCKLY_LAYER} className="blockly_layer" />
     </dialog>
   );
+}
+
+/** 模組裡有改參數值的地方：回傳「模組名稱」「參數名稱」（Scratch 的參數不能改，轉積木時要說明） */
+function changedParam(mods: ModuleProgram[]): { module: string; param: string } | null {
+  for (const m of mods) {
+    const names = new Set(m.params.map(p => p.name));
+    const find = (list: Stmt[]): string | null => {
+      for (const s of list) {
+        if (s.kind == 'input' && s.place == 'var' && names.has(s.target)) return s.target;
+        if (s.kind == 'rect' && s.action == '設為' && s.index == undefined && names.has(s.target)) return s.target;
+        const inner = s.kind == 'if' ? find(s.yes) ?? find(s.no) : s.kind == 'repeat' || s.kind == 'until' ? find(s.body) : null;
+        if (inner) return inner;
+      }
+      return null;
+    };
+    const param = find(m.body);
+    if (param) return { module: m.name, param };
+  }
+  return null;
 }
 
 /** 流程圖 → 結構；接得不完整時回傳錯誤說明 */
@@ -220,6 +239,13 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
   // Scratch 的自訂積木不能回傳值
   if (mode == 'scratch' && modules.some(m => m.info.returns)) {
     return <p className="run_error">{t('Scratch 的自訂積木不能回傳值：有回傳值的模組，請把學習目標換成 Blockly 或 C++ 再看程式。', 'Scratch My Blocks cannot return a value. To see modules with a return value, change the learning goal to Blockly or C++.')}</p>;
+  }
+  // Scratch 的自訂積木參數不能改（「變數 設為」只能放變數）
+  const changed = mode == 'scratch' ? changedParam(mods) : null;
+  if (changed) {
+    return <p className="run_error">{t(
+      `模組「${changed.module}」裡改了參數「${changed.param}」的值。流程圖可以這樣做，但 Scratch 的自訂積木參數不能改，所以轉不成 Scratch 積木。想看 Scratch 積木：先在變數表新增一個變數，把「${changed.param}」的值存進去，再改那個變數。`,
+      `Module "${changed.module}" changes the parameter "${changed.param}". Flowcharts allow this, but Scratch My Block parameters cannot be changed, so it cannot become Scratch blocks. To see Scratch blocks, add a variable, save "${changed.param}" in it, and change the variable instead.`)}</p>;
   }
   if (!program && !editing) {
     return (

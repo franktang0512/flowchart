@@ -1,5 +1,5 @@
 // 新增／修改模組的對話框：模組名稱、參數（名稱和型別）。
-// 參數跟 Scratch 自訂積木的參數一樣：模組裡只能拿來用，不能改；型別是數字或文字（C++ 要知道型別）。
+// 參數也是變數，模組的流程裡可以改它的值；型別是數字或文字（C++ 要知道型別）。
 import { useEffect, useRef, useState } from 'react';
 import { isName, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
@@ -92,7 +92,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
             <p className="dialog_note">{t('有回傳值的模組：在模組裡用計算積木「回傳」，後面直接接「結束」；用的時候可以寫在算式裡，例如「答案 設為 找最大(x, y)」。參數也是變數，在模組裡可以改，但只改到模組自己的那一份，不會影響外面。', 'With a return value: inside the module, use the Math block "Return", then go straight to "End". You can use it in math, like "answer = biggest(x, y)". Parameters are variables too. You can change them inside the module; it does not change anything outside.')}</p>
           </>
         )
-        : <p className="dialog_note">{t('參數在模組裡只能拿來用、不能改。Scratch 的自訂積木不能回傳值，要把結果帶回主流程，請存到變數表裡的變數。', 'Inside the module you can use a parameter but not change it. Scratch My Blocks cannot return a value. To bring a result back, save it in a variable from the table.')}</p>}
+        : <p className="dialog_note">{t('參數也是變數，模組裡可以改它的值，只改到模組自己的那一份。Scratch 的自訂積木不能回傳值，要把結果帶回主流程，請存到變數表裡的變數。', 'Parameters are variables too. You can change them inside the module; it does not change anything outside. Scratch My Blocks cannot return a value. To bring a result back, save it in a variable from the table.')}</p>}
       {problem && <p className="run_error">{problem}</p>}
       <p>
         <button id="hint_yes" onClick={save}>{t('確認', 'OK')}</button>{' '}

@@ -38,7 +38,6 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
       <th style={{ width: '1%' }}></th>
     </tr>
   );
-  const scratch = getTarget() == 'scratch';
   return (
     <div id="step3" className="card">
       <h5 className="card_title"><span className="step_badge">3</span>{t('定義變數', 'Variables')}</h5>
@@ -60,9 +59,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
                       <td><span className="param_name" title={t('參數的名稱要在「修改參數」裡改', 'Change the name in "Edit parameters"')}>🔒 {p.name}</span></td>
                       <td><span className="param_fixed">{p.type == '數字' ? t('數字', 'Number') : t('文字', 'Text')}</span></td>
                       <td><span className="muted">{t('執行時傳進來', 'Given when it runs')}</span></td>
-                      <td><span className="muted">{scratch
-                        ? t('只能拿來算，不能改', 'Use it, but do not change it')
-                        : t('可以改，只改到模組自己的那一份', 'You can change it; only this module sees it')}</span></td>
+                      <td><span className="muted">{t('流程裡可以改它的值，只改到模組自己的那一份', 'You can change its value; only this module sees it')}</span></td>
                       <td></td>
                     </tr>
                   ))}

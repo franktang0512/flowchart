@@ -31,8 +31,6 @@ export interface VarStore {
   type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[] };
   /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用） */
   params?: string[];
-  /** 參數不能存值進去（Scratch 的自訂積木參數不能改；Blockly、C++ 可以） */
-  paramsReadOnly?: boolean;
   /** 有回傳值的模組名稱：算式裡可以寫「名稱(引數)」 */
   calls?: string[];
 }
@@ -49,7 +47,6 @@ export function withParams(vars: VarStore, params: ParamInfo[]): VarStore {
       grid: vars.type_var_list.grid,
     },
     params: params.map(p => p.name),
-    paramsReadOnly: getTarget() == 'scratch',
     calls: vars.calls,
   };
 }
@@ -106,10 +103,6 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     type_var_list.number.includes(name) || type_var_list.text.includes(name) || type_var_list.array.includes(name) || type_var_list.grid.includes(name);
 
   if (!can_number) {
-    if (vars.paramsReadOnly && vars.params?.includes(str.trim())) {
-      alert(t(`「${str.trim()}」是模組的參數：Scratch 的參數只能拿來算，不能改。要存結果請用變數表裡的變數。`, `"${str.trim()}" is a parameter. In Scratch you can use it, but you cannot change it. Use a variable from the variable table instead.`));
-      return false;
-    }
     // 二維清單的一格：表[i][j]
     const cell = splitTarget(str);
     if (cell && cell.indexes.length == 2) {
