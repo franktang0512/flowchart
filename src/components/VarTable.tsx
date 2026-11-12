@@ -24,7 +24,7 @@ interface Props {
   onDelete: (id: number) => void;
   onCreate: () => void;
   /** 正在畫模組時：這個模組的參數（名稱、型別在「修改名稱、參數」設定，這裡不能改） */
-  module?: { name: string; params: ParamInfo[]; onEdit: () => void };
+  module?: { name: string; params: ParamInfo[] };
 }
 
 export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module }: Props) {
@@ -44,10 +44,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
       {module && (
         // 模組的參數：跟著模組設定走，名稱和型別不能在這裡改，所以跟自己建的變數分開列
         <>
-          <p className="section_label var_section">
-            {t(`模組「${module.name}」的參數`, `Parameters of "${module.name}"`)}
-            <button className="link_button" onClick={module.onEdit}>{t('修改參數', 'Edit parameters')}</button>
-          </p>
+          <p className="section_label var_section">{t(`模組「${module.name}」的參數（🔒 要改名稱或刪除，請到模組上方的「修改名稱、參數」）`, `Parameters of "${module.name}" (🔒 to rename or remove, use "Edit name, parameters" above the module)`)}</p>
           {module.params.length == 0
             ? <p className="muted param_none">{t('這個模組沒有參數。', 'This module has no parameters.')}</p>
             : (
@@ -56,7 +53,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
                   {head}
                   {module.params.map(p => (
                     <tr key={p.name} className="param_row">
-                      <td><span className="param_name" title={t('參數的名稱要在「修改參數」裡改', 'Change the name in "Edit parameters"')}>🔒 {p.name}</span></td>
+                      <td><span className="param_name" title={t('參數的名稱要在模組的「修改名稱、參數」裡改', 'Change the name in "Edit name, parameters"')}>🔒 {p.name}</span></td>
                       <td><span className="param_fixed">{p.type == '數字' ? t('數字', 'Number') : t('文字', 'Text')}</span></td>
                       <td><span className="muted">{t('執行時傳進來', 'Given when it runs')}</span></td>
                       <td><span className="muted">{t('流程裡可以改它的值，只改到模組自己的那一份', 'You can change its value; only this module sees it')}</span></td>
