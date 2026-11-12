@@ -51,16 +51,20 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
   const named = locals.filter(v => v.name.trim() != '');
   if (!params.length && !named.length) return vars;
   const lt = localTypes(named);
+  // 跟參數、區域變數同名的全域變數：在模組裡被蓋住（寫這個名字指的是參數或區域變數）
+  const own = new Set([...params.map(p => p.name), ...named.map(v => v.name.trim())]);
+  const g = (list: string[]) => list.filter(n => !own.has(n));
+  const globalNames = vars.var_list.name.filter(n => !own.has(n));
   return {
     var_list: {
-      name: [...vars.var_list.name, ...named.map(v => v.name.trim())],
-      value: [...vars.var_list.value, ...named.map(v => v.init)],
+      name: [...globalNames, ...named.map(v => v.name.trim())],
+      value: [...globalNames.map(n => vars.var_list.value[vars.var_list.name.indexOf(n)]), ...named.map(v => v.init)],
     },
     type_var_list: {
-      number: [...vars.type_var_list.number, ...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
-      text: [...vars.type_var_list.text, ...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
-      array: [...vars.type_var_list.array, ...lt.array],
-      grid: [...vars.type_var_list.grid, ...lt.grid],
+      number: [...g(vars.type_var_list.number), ...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
+      text: [...g(vars.type_var_list.text), ...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
+      array: [...g(vars.type_var_list.array), ...lt.array],
+      grid: [...g(vars.type_var_list.grid), ...lt.grid],
     },
     params: params.map(p => p.name),
     paramsReadOnly: getTarget() == 'scratch',
@@ -403,7 +407,7 @@ class CodeGenerator {
   /** 在模組裡：這個模組的區域變數（只有 C++） */
   private readonly locals: LocalVar[];
 
-  constructor(diagram: Diagram, vars: VarStore, names: string[], sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = [], locals: LocalVar[] = []) {
+  constructor(diagram: Diagram, vars: VarStore, sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = [], locals: LocalVar[] = []) {
     this.diagram = diagram;
     this.nodes = diagram.nodes;
     this.vars = withParams(vars, params, locals);
@@ -411,8 +415,11 @@ class CodeGenerator {
     this.modules = modules;
     this.params = params;
     this.locals = locals.filter(v => v.name.trim() != '');
-    // 每一步都把所有變數（在模組裡再加上參數、區域變數）的值記下來：{"a": a,"b": b}
-    this.varStr = '{' + [...names, ...params.map(p => p.name), ...this.locals.map(v => v.name.trim())].map(n => '"' + n + '": ' + n).join(',') + '}';
+    // 每一步都把所有變數的值記下來。全域變數用 __globals()（寫在最外層，模組裡同名的參數蓋不到它）；
+    // 在模組裡，參數和區域變數另外放在 __scope，第四步才分得開（名字可以跟全域變數一樣）
+    const own = [...params.map(p => p.name), ...this.locals.map(v => v.name.trim())];
+    this.varStr = sheet == 0 ? '__globals()'
+      : 'Object.assign(__globals(), {__scope: {' + own.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}})';
   }
 
   /** 積木在這張流程圖裡的 index（找箭頭用） */
@@ -817,16 +824,13 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     if (names.includes(m.info.name)) {
       throw new FlowError(t(`變數表裡的「${m.info.name}」跟模組同名：請把變數或模組改一個名字。`, `The variable "${m.info.name}" has the same name as a module. Rename one of them.`));
     }
-    const same = m.info.params.find(p => names.includes(p.name));
-    if (same) {
-      throw new FlowError(t(`變數表裡的「${same.name}」跟模組「${m.info.name}」的參數同名，流程圖上分不出是哪一個：請把變數或參數改一個名字。`, `The variable "${same.name}" has the same name as a parameter of "${m.info.name}". Rename one of them.`));
-    }
-    // 區域變數：不能跟全域變數、參數、模組同名，自己也不能重複
-    const locals = (m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean);
-    const clash = locals.find((n, k) => names.includes(n) || m.info.params.some(p => p.name == n) || modules.some(x => x.info.name == n) || locals.indexOf(n) != k);
+    // 參數、區域變數可以跟全域變數同名（模組裡指的是自己的）；但不能跟模組同名，彼此也不能重複
+    const own = [...m.info.params.map(p => p.name), ...(m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean)];
+    const clash = own.find((n, k) => modules.some(x => x.info.name == n) || own.indexOf(n) != k);
     if (clash) {
-      throw new FlowError(t(`模組「${m.info.name}」的區域變數「${clash}」跟全域變數、參數、模組或另一個區域變數同名，流程圖上分不出是哪一個：請改一個名字。`, `The local variable "${clash}" in "${m.info.name}" has the same name as another variable, parameter or module. Rename it.`));
+      throw new FlowError(t(`模組「${m.info.name}」的「${clash}」跟模組名稱、參數或另一個區域變數同名，流程圖上分不出是哪一個：請改一個名字。`, `"${clash}" in "${m.info.name}" has the same name as a module, parameter or another local variable. Rename it.`));
     }
+    const locals = (m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean);
     for (const n of locals) {
       if (!syntaxOk(`var ${n};`)) throw new FlowError(t(`模組「${m.info.name}」的區域變數名稱「${n}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${n}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
     }
@@ -840,12 +844,14 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     if (!syntaxOk(decl)) throw new FlowError(t(`變數名稱「${name}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${name}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
     code += decl;
   }
+  // 全域變數的值（寫在最外層：模組裡就算有同名的參數，這裡拿到的還是全域的）
+  code += 'function __globals(){ return {' + names.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; }\n';
   code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
   const infos = modules.map(m => m.info);
-  code += new CodeGenerator(diagram, vars, names, 0, infos).program();
+  code += new CodeGenerator(diagram, vars, 0, infos).program();
   // 模組：每個模組一個函式（__mod1、__mod2…）
   modules.forEach((m, k) => {
-    code += new CodeGenerator(m.diagram, vars, names, k + 1, infos, m.info.params, m.info.locals).program();
+    code += new CodeGenerator(m.diagram, vars, k + 1, infos, m.info.params, m.info.locals).program();
   });
   // 執行到一半出錯時，保留出錯前的每一步，學生才看得到變數是怎麼變的
   code += 'var __error = null;\ntry { flowchart_code(); } catch (e) { __error = e; }\n';

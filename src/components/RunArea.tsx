@@ -37,16 +37,23 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
   const values = run?.var[step];
   // 上一步的值：清單跟它比較，才知道這一步改了哪一格
   const prevValues = step > 0 ? run?.var[step - 1] : undefined;
-  /** 一個變數的格子（清單、二維清單畫成表格） */
-  const varBox = (name: string, extra = '') => {
-    const v = values?.[name];
+  // 在模組裡：參數和區域變數另外放在 __scope（名字可以跟全域變數一樣）
+  type Values = Record<string, unknown>;
+  const scope = values?.__scope as Values | undefined;
+  const prevScope = prevValues?.__scope as Values | undefined;
+  /** 一個變數的格子（清單、二維清單畫成表格）；own 是模組自己的（參數、區域變數） */
+  const varBox = (name: string, own = false) => {
+    const now = own ? scope : values;
+    const before = own ? prevScope : prevValues;
+    const v = now?.[name];
+    const extra = own ? ' is_param' : '';
     const isList = Array.isArray(v);
     const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
     return (
       <div key={name} className={'var_box' + (isList ? ' is_list' : '') + extra}>
         <span className="var_box_name">{name}</span>
         <span className={'var_box_value' + (isList ? ' is_list' : '')}>
-          {isGrid ? <GridValue rows={v as unknown[][]} prev={prevValues?.[name]} /> : isList ? <ListValue items={v} prev={prevValues?.[name]} /> : String(v)}
+          {isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} /> : isList ? <ListValue items={v} prev={before?.[name]} /> : String(v)}
         </span>
       </div>
     );
@@ -138,8 +145,8 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
             <div className="run_module_vars">
               <p className="section_label">{sheetName}{t(' 的參數和區域變數（只有這個模組裡有）', ': parameters and local variables (only in this module)')}</p>
               <div className="var_boxes">
-                {Object.keys(values).filter(name => !varNames.includes(name)).map(name => varBox(name, ' is_param'))}
-                {Object.keys(values).every(name => varNames.includes(name)) && <span className="muted">{t('（沒有參數和區域變數）', '(none)')}</span>}
+                {Object.keys(scope ?? {}).map(name => varBox(name, true))}
+                {Object.keys(scope ?? {}).length == 0 && <span className="muted">{t('（沒有參數和區域變數）', '(none)')}</span>}
               </div>
             </div>
           )}

@@ -212,6 +212,10 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
   useLang();
   /** 在模組裡：區域變數照型別分好；allTypes 是全域加區域（判斷選到的是哪一種用） */
   const localT = localTypes(request.locals);
+  // 跟參數、區域變數同名的全域變數：在模組裡被蓋住，選單不列出來
+  const own = new Set([...(request.params ?? []).map(p => p.name), ...Object.values(localT).flat()]);
+  const shown = (list: string[]) => list.filter(n => !own.has(n));
+  varTypes = { number: shown(varTypes.number), text: shown(varTypes.text), array: shown(varTypes.array), grid: shown(varTypes.grid) };
   const allTypes: VarTypes = {
     number: [...varTypes.number, ...localT.number],
     text: [...varTypes.text, ...localT.text],

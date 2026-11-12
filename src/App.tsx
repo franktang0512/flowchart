@@ -209,8 +209,10 @@ export function App() {
 
   /** 模組或參數的名字能不能用：不能跟變數、其他模組、清單的函式撞名 */
   const nameProblem = (editing: AppModule | null) => (name: string, kind: 'module' | 'param'): string | null => {
-    if (varStore.var_list.name.includes(name)) return t(`「${name}」已經是變數的名字了，請換一個。`, `"${name}" is already a variable. Choose another name.`);
-    if (modulesRef.current.some(m => m.info.locals?.some(v => v.name.trim() == name))) return t(`「${name}」已經是模組的區域變數了，請換一個。`, `"${name}" is already a local variable. Choose another name.`);
+    // 參數可以跟全域變數同名（模組裡指的是參數）；模組的名字不行
+    if (kind == 'module' && varStore.var_list.name.includes(name)) return t(`「${name}」已經是變數的名字了，請換一個。`, `"${name}" is already a variable. Choose another name.`);
+    if (kind == 'module' && modulesRef.current.some(m => m.info.locals?.some(v => v.name.trim() == name))) return t(`「${name}」已經是模組的區域變數了，請換一個。`, `"${name}" is already a local variable. Choose another name.`);
+    if (kind == 'param' && editing?.info.locals?.some(v => v.name.trim() == name)) return t(`「${name}」已經是這個模組的區域變數了，請換一個。`, `"${name}" is already a local variable of this module. Choose another name.`);
     if (kind == 'module' && modulesRef.current.some(m => m != editing && m.info.name == name)) return t(`已經有叫「${name}」的模組了。`, `There is already a module called "${name}".`);
     if (['長度', 'length', '項目編號', 'indexof', '包含', 'contains', 'and', 'or', 'not'].includes(name)) return t(`「${name}」是保留的字，請換一個。`, `"${name}" is a reserved word. Choose another name.`);
     try {
@@ -300,18 +302,16 @@ export function App() {
 
   /** 變數表每一列上次確定的名字（名字不能用時改回去） */
   const committedVarNames = useRef(new Map<number, string>());
-  /** 全域變數的名字跟模組、參數、區域變數一樣：流程圖上分不出是哪一個，回傳原因 */
+  /**
+   * 全域變數的名字跟模組一樣：流程圖上分不出是哪一個，回傳原因。
+   * 跟模組的參數、區域變數同名可以：模組裡寫這個名字指的是模組自己的，主流程指的是全域變數
+   */
   const globalVarProblem = (name: string): string | null => {
-    for (const m of modulesRef.current) {
-      if (m.info.name == name) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
-      if (m.info.params.some(p => p.name == name)) return t(`「${name}」已經是模組「${m.info.name}」的參數了`, `"${name}" is already a parameter of "${m.info.name}"`);
-      if (m.info.locals?.some(v => v.name.trim() == name)) return t(`「${name}」已經是模組「${m.info.name}」的區域變數了`, `"${name}" is already a local variable in "${m.info.name}"`);
-    }
+    if (modulesRef.current.some(m => m.info.name == name)) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
     return null;
   };
-  /** 區域變數的名字：不能跟全域變數、模組、這個模組的參數、這個模組的其他區域變數一樣 */
+  /** 區域變數的名字：不能跟模組、這個模組的參數、這個模組的其他區域變數一樣（跟全域變數一樣可以） */
   const localVarProblem = (m: AppModule, name: string, id: number, rows: LocalVar[]): string | null => {
-    if (varStore.var_list.name.includes(name)) return t(`「${name}」已經是全域變數了`, `"${name}" is already a global variable`);
     if (modulesRef.current.some(x => x.info.name == name)) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
     if (m.info.params.some(p => p.name == name)) return t(`「${name}」已經是這個模組的參數了`, `"${name}" is already a parameter of this module`);
     if (rows.some(v => v.id != id && v.name.trim() == name)) return t(`已經有叫「${name}」的區域變數了`, `There is already a local variable called "${name}"`);
@@ -346,8 +346,10 @@ export function App() {
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
     const added = varStore.var_list.name.filter(n => !oldNames.includes(n));
     if (replaced.length && added.length) {
-      // 主程式和每個模組的流程圖都要改
+      // 主程式和每個模組的流程圖都要改（模組裡有同名的參數或區域變數時，那個名字指的是模組自己的，不改）
       for (const d of allDiagrams()) {
+        const m = moduleOf(d);
+        if (m && (m.info.params.some(p => p.name == replaced[0]) || m.info.locals?.some(v => v.name.trim() == replaced[0]))) continue;
         for (const node of d.nodes) {
           if (node?.variables?.includes(replaced[0])) {
             node.variables = node.variables.map(v => v == replaced[0] ? added[0] : v);
