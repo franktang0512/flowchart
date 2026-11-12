@@ -213,6 +213,51 @@ export function checkCall(vars: VarStore, modules: ModuleInfo[], name: string, a
   return true;
 }
 
+/**
+ * 計算積木要存進去的值，型別要對（按「確認」時檢查）：
+ * - 數字變數（C++ 的 int、float）不能存文字、清單、判斷式；文字變數不能存清單、判斷式（數字可以，會變成文字）
+ * - C++ 的清單有型別：vector<int>、vector<float> 只能放數字；vector<string> 只能放文字
+ *   （Scratch、Blockly 的清單什麼都能放）
+ * where 是「變數」或「清單（含二維清單的一格）」
+ */
+export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: string, value: string, where: 'var' | 'item'): boolean {
+  let type: ExprType;
+  try {
+    type = exprType(parseExpr(value), varInfoMap(vars), modules);
+  }
+  catch {
+    return true;
+  }
+  const cpp = getTarget() == 'cpp';
+  const floats = vars.floats ?? [];
+  const what = { str: t('文字', 'text'), char: t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number') }[type];
+  const v = value.trim();
+  if (where == 'var') {
+    if (vars.type_var_list.number.includes(target) && type != 'num') {
+      const kind = cpp ? (floats.includes(target) ? ' float（小數）' : ' int（整數）') : t('數字', 'a number');
+      alert(t(`變數「${target}」是${kind}，但「${v}」是${what}，不能存進去。`, `"${target}" holds ${kind}, but "${v}" is ${what}. It cannot go in.`));
+      return false;
+    }
+    if (vars.type_var_list.text.includes(target) && (type == 'list' || type == 'bool')) {
+      alert(t(`變數「${target}」是${cpp ? ' string（文字）' : '文字'}，但「${v}」是${what}，不能存進去。`, `"${target}" holds text, but "${v}" is ${what}. It cannot go in.`));
+      return false;
+    }
+    return true;
+  }
+  if (!cpp) return true;
+  const holds = vars.var_list.value[vars.var_list.name.indexOf(target)];
+  const elem = holds == '文字' ? 'string' : holds == '小數' ? 'float' : 'int';
+  const ok = elem == 'string' ? type == 'str' || type == 'char' : type == 'num';
+  if (!ok) {
+    const fix = elem == 'string' && type == 'num'
+      ? t(`要放文字請加上引號，例如 "${v}"。`, `For text, add quotes, like "${v}".`)
+      : t(`請改放${elem == 'string' ? '文字' : '數字'}，或到第三步把清單改成裝 ${type == 'num' ? 'int / float' : 'string'}。`, `Put ${elem == 'string' ? 'text' : 'a number'} instead, or change what the list holds (step 3).`);
+    alert(t(`清單「${target}」是 vector<${elem}>，只能放${elem == 'string' ? '文字' : '數字'}，但「${v}」是${what}。${fix}`, `"${target}" is a vector<${elem}>, so it holds ${elem == 'string' ? 'text' : 'numbers'} only, but "${v}" is ${what}. ${fix}`));
+    return false;
+  }
+  return true;
+}
+
 /** 變數清單 → 名稱對到型別（判斷算式是數字還是文字用） */
 function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   const map = new Map<string, VarInfo>();
@@ -286,6 +331,8 @@ const CPP_RANGE_MESSAGES = () => ({
 });
 
 const runtimeMessages = () => ({
+  textToNumList: t('「{v}」是文字，不能放進清單「{name}」：它是 vector<{elem}>，只能放數字。', '"{v}" is text. It cannot go into "{name}", a vector<{elem}> that holds numbers only.'),
+  numToTextList: t('{v} 是數字，不能放進清單「{name}」：它是 vector<string>，只能放文字。', '{v} is a number. It cannot go into "{name}", a vector<string> that holds text only.'),
   intDivZero: t('整數除以 0：C++ 的整數不能除以 0，請檢查除數。', 'Whole-number division by 0. In C++ an int cannot be divided by 0. Check the number you divide by.'),
   noInput: t('測資的輸入不夠：執行到「輸入 {name}」時，已經沒有資料可以讀了。', 'Not enough test input: nothing is left to read at "Input {name}".'),
   inputNotNum: t('測資裡的「{v}」不是數字，不能存進數字變數「{name}」。如果要存文字，請把「{name}」的型別改成文字。', '"{v}" in the test input is not a number. It cannot go into the number variable "{name}". To keep words, change the type of "{name}" to Text.'),
@@ -348,7 +395,15 @@ function __idiv(a, b, i) {
   return Math.trunc(a / b);
 }
 function __int(v, i, name) { return Math.trunc(__num(v, i, name)); }
-function __intItem(v) { return typeof v == 'number' ? Math.trunc(v) : v; }
+function __listItem(v, i, name, elem) {
+  if (elem == 'string') {
+    if (typeof v != 'string') __err('numToTextList', i, { v: v, name: name });
+    return v;
+  }
+  if (typeof v == 'string') __err('textToNumList', i, { v: v, name: name, elem: elem });
+  if (!__isNum(v)) __err('nanToNum', i, { name: name });
+  return elem == 'int' ? Math.trunc(v) : v;
+}
 function __text(v, i, name) {
   if (Array.isArray(v)) __err('listToText', i, { name: name });
   return String(v);
@@ -515,10 +570,20 @@ class CodeGenerator {
     return getTarget() == 'cpp' && this.vars.type_var_list.number.includes(name) && !(this.vars.floats ?? []).includes(name);
   }
 
-  /** C++ 的清單、二維清單裝 int：放進去的數字小數會被去掉 */
-  private item(list: string, value: string) {
+  /**
+   * C++ 的清單、二維清單有型別：裝 int / float 的只能放數字（int 去掉小數），裝 string 的只能放文字。
+   * Scratch、Blockly 的清單什麼都能放，照原樣
+   */
+  private item(list: string, value: string, i: number) {
+    if (getTarget() != 'cpp' || !(this.isList(list) || this.isGrid(list))) return value;
     const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
-    return getTarget() == 'cpp' && (this.isList(list) || this.isGrid(list)) && holds == '數字' ? `__intItem(${value})` : value;
+    const elem = holds == '文字' ? 'string' : holds == '小數' ? 'float' : 'int';
+    return `__listItem(${value}, ${i}, ${JSON.stringify(list)}, ${JSON.stringify(elem)})`;
+  }
+
+  /** 輸入到清單：C++ 裝 string 的清單讀成文字（"5" 也是文字），其他照 Scratch（看起來是數字就當數字） */
+  private listReader(list: string) {
+    return getTarget() == 'cpp' && this.vars.var_list.value[this.vars.var_list.name.indexOf(list)] == '文字' ? '__inText' : '__inList';
   }
 
   /** 二維清單的一格「表[a][b]」：名稱後面的 [ 是第 k 個，配對的 ] 後面緊接著另一個 [ */
@@ -657,12 +722,12 @@ class CodeGenerator {
     // 二維清單的一格：表[a][b]
     const cell = splitTarget(target);
     if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
-      return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${this.item(cell.name, value)});\n`;
+      return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${this.item(cell.name, value, i)});\n`;
     }
     const item = listItemTarget(target);
     // 文字、數字變數接 [ ] 也交給 __set，執行時會說明為什麼不行
     if (item && this.isVar(item.list)) {
-      return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${this.item(item.list, value)});\n`;
+      return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${this.item(item.list, value, i)});\n`;
     }
     const { number, text } = this.vars.type_var_list;
     const name = JSON.stringify(target);
@@ -743,20 +808,20 @@ class CodeGenerator {
           if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
             const g = JSON.stringify(cell.name);
             const read = this.gridHoldsText(cell.name) ? '__inText' : '__inNum';
-            code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${this.item(cell.name, `${read}(input_list, ${i}, ${g})`)});\n`;
+            code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${this.item(cell.name, `${read}(input_list, ${i}, ${g})`, i)});\n`;
           }
           // 輸入 成績 插入第 k 項：跟計算積木的「插入」一樣，k 可以是 1 到 長度+1
           else if (insert) {
             const list = insert[1].trim();
             const listName = JSON.stringify(list);
-            code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), ${this.item(list, `__inList(input_list, ${i}, ${listName})`)});\n`;
+            code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), ${this.item(list, `${this.listReader(list)}(input_list, ${i}, ${listName})`, i)});\n`;
           }
           // 輸入 成績[k]：替換第 k 項，跟計算積木一樣從第 1 項開始，超出範圍會提示
           else if (item && this.isVar(item.list)) {
             const list = JSON.stringify(item.list);
-            code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), ${this.item(item.list, `__inList(input_list, ${i}, ${list})`)});\n`;
+            code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), ${this.item(item.list, `${this.listReader(item.list)}(input_list, ${i}, ${list})`, i)});\n`;
           }
-          else if (this.isList(v)) code = `${v}.push(${this.item(v, `__inList(input_list, ${i}, ${name})`)});\n`;
+          else if (this.isList(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
           else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
           // C++ 的 int：讀到小數時小數去掉
           else code = `${v} = ${this.isIntVar(v) ? 'Math.trunc' : ''}(__inNum(input_list, ${i}, ${name}));\n`;
@@ -812,8 +877,8 @@ class CodeGenerator {
           return { code: code + 'total_step ++;' + update, next };
         }
         const name = JSON.stringify(target);
-        const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value)});\n`
-          : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${this.item(target, value)});\n`
+        const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
+          : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${this.item(target, value, i)});\n`
           : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
           : action == '清空' ? `__clear(${target}, ${name}, ${i});\n`
           // 二維清單設定大小：每一格放 0（裝文字的放空的文字）

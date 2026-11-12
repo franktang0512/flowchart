@@ -871,6 +871,23 @@ input, textarea, select, button {
     margin-right: 6px;
     white-space: nowrap;
 }
+/* 計算積木：先選要改什麼（第一層粗一點），再選怎麼改 */
+#node_info .rect_kind {
+    font-weight: 600;
+}
+#node_info .rect_kind .muted {
+    font-weight: normal;
+    font-size: 0.85rem;
+}
+#node_info .rect_action label {
+    margin-right: 6px;
+    white-space: nowrap;
+}
+/* 變數表還沒有清單：選項變灰 */
+#node_info label.disabled_choice {
+    color: var(--muted);
+    cursor: not-allowed;
+}
 /* 選了清單時的說明（輸入的值會放到哪裡） */
 #node_info .dialog_note {
     display: block;

@@ -25,6 +25,11 @@ export interface DialogForm {
   varSelectOutputDisplay: 'inline-block' | 'none';
   /** 迴圈：顯示「達成某個條件」(while) 還是「執行完幾次」(for) 的輸入欄 */
   showWhile: boolean;
+  /**
+   * 計算積木先選要改什麼（跟輸入積木一樣先選類型）：變數、清單、二維清單（C++）、回傳（有回傳值的模組）；
+   * '' = 還沒選。選了清單、二維清單再選 rectAction（添加、插入…）
+   */
+  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳';
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 第幾項：計算積木的「插入」「替換」「刪除」，輸入到清單的「插入」「替換」；二維清單是第幾列（建立時是幾列） */
@@ -113,6 +118,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   ioText: '變數：',
   varSelectOutputDisplay: 'none',
   showWhile: false,
+  rectKind: '',
   rectAction: '設為',
   rectIndex: '',
   rectIndex2: '',
@@ -428,31 +434,60 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       break;
     }
     case 'Rectangle': {
-      // 每種動作可以選的變數：設定變數選數字/文字，建立選二維清單，替換可以是清單或二維清單的一格，其他選清單
-      const namesFor = (action: RectAction, ty: VarTypes = allTypes) => (action == '設為' ? [...ty.number, ...ty.text]
-        : action == '建立' ? ty.grid
-        : action == '替換' ? [...ty.array, ...ty.grid]
-        : ty.array);
-      const cell = f.rectAction == '替換' && allTypes.grid.includes(f.varSelect);
-      const indexLabel = cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
-      const index2Label = f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
-      const verb = RECT_VERB[f.rectAction];
+      // 先選要改什麼（變數、清單、二維清單、回傳），清單、二維清單再選怎麼改；每一類可以選的變數
+      const kind = f.rectKind;
+      const namesFor = (k: DialogForm['rectKind'], ty: VarTypes = allTypes) => (k == '變數' ? [...ty.number, ...ty.text]
+        : k == '清單' ? ty.array
+        : k == '二維清單' ? ty.grid
+        : []);
+      const cell = kind == '二維清單' && f.rectAction == '替換';
+      const indexLabel = !kind ? null : cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
+      const index2Label = !kind ? null : f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
+      const verb = kind ? RECT_VERB[f.rectAction] : null;
+      const noLists = allTypes.array.length == 0;
+      /** 選了一類：動作換成這一類的第一個，原本選的變數不能用就清掉 */
+      const pickKind = (k: DialogForm['rectKind']) => set({
+        rectKind: k,
+        rectAction: k == '變數' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : '加入',
+        ...([...namesFor(k), ...(k == '變數' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
+      });
+      const actionRadio = (action: RectAction, label: string) => (
+        <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({ rectAction: action })} />{label}</label>
+      );
       body = (
         <>
-          <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
-          <p className="rect_action">
-            {RECT_ACTIONS.filter(([action]) => (action != '建立' || allTypes.grid.length > 0) && (action != '回傳' || request.canReturn || f.rectAction == '回傳')).map(([action, label]) => (
-              <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({
-                rectAction: action,
-                // 換到另一種動作時，原本選的變數不能用就清掉
-                ...([...namesFor(action), ...(action == '設為' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
-              })} />{label()}</label>
-            ))}
+          <p id="hint">{kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
+          <p className="io_choice rect_kind">
+            {t('要改：', 'Change: ')}
+            <label><input type="radio" name="rect_kind" checked={kind == '變數'} onChange={() => pickKind('變數')} />{t('變數', 'A variable')}</label>
+            <label title={noLists ? t('變數表還沒有清單：要用清單，請先到變數表新增', 'No lists yet. Add one in the variable table first.') : undefined} className={noLists && kind != '清單' ? 'disabled_choice' : undefined}>
+              <input type="radio" name="rect_kind" checked={kind == '清單'} disabled={noLists && kind != '清單'} onChange={() => pickKind('清單')} />{t('清單', 'A list')}
+              {noLists && kind != '清單' && <span className="muted">{t('（變數表還沒有清單）', ' (no lists yet)')}</span>}
+            </label>
+            {(allTypes.grid.length > 0 || kind == '二維清單') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '二維清單'} onChange={() => pickKind('二維清單')} />{t('二維清單', 'A 2D list')}</label>
+            )}
+            {(request.canReturn || kind == '回傳') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '回傳'} onChange={() => pickKind('回傳')} />{t('回傳值', 'Return a value')}</label>
+            )}
           </p>
-          {f.rectAction != '回傳' && (
+          {kind == '清單' && (
+            <p className="rect_action">
+              {t('怎麼改：', 'How: ')}
+              {RECT_ACTIONS.filter(([action]) => ['加入', '插入', '替換', '刪除', '清空'].includes(action)).map(([action, label]) => actionRadio(action, label()))}
+            </p>
+          )}
+          {kind == '二維清單' && (
+            <p className="rect_action">
+              {t('怎麼改：', 'How: ')}
+              {actionRadio('建立', t('建立（幾列幾行）', 'Make (rows × columns)'))}
+              {actionRadio('替換', t('替換一格', 'Change one cell'))}
+            </p>
+          )}
+          {kind && kind != '回傳' && (
             <>
-              {f.rectAction == '設為' ? t('變數：', 'Variable: ') : f.rectAction == '建立' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction, varTypes)} params={f.rectAction == '設為' ? paramNames : []} locals={namesFor(f.rectAction, localT)} />
+              {kind == '變數' ? t('變數：', 'Variable: ') : kind == '二維清單' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(kind, varTypes)} params={kind == '變數' ? paramNames : []} locals={namesFor(kind, localT)} />
             </>
           )}
           {indexLabel && (

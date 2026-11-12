@@ -1,7 +1,7 @@
 // 對話框按「確認」之後：新增或修改積木。檢查條件的順序與舊版相同（會影響跳出哪個提示）。
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
-import { checkCall, checkVar, getCodeVar, type VarStore } from './engine/decoder';
+import { checkCall, checkValueType, checkVar, getCodeVar, type VarStore } from './engine/decoder';
 import { splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import type { Diagram } from './engine/diagram';
@@ -38,14 +38,18 @@ function rectangleText(vars: VarStore, f: DialogForm) {
 /** 刪除第幾項、刪除所有項目、建立二維清單不用填值 */
 const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立';
 
-function rectangleValid(vars: VarStore, f: DialogForm) {
-  if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false);
+function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
+  if (!f.rectKind) {
+    alert(t('請先選要改什麼：變數還是清單。', 'First choose what to change: a variable or a list.'));
+    return false;
+  }
+  if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
   if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
   const list = f.varSelect.trim();
   // 二維清單：建立（幾列幾行）、替換一格（第幾列第幾行）
   if (vars.type_var_list.grid.includes(list) && (f.rectAction == '建立' || f.rectAction == '替換')) {
     if (!checkVar(vars, f.rectIndex, true) || !checkVar(vars, f.rectIndex2, true)) return false;
-    return !hasValue(f) || checkVar(vars, f.code, true);
+    return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
   }
   if (f.rectAction == '建立') {
     alert(t('請選一個二維清單。', 'Choose a 2D list.'));
@@ -57,7 +61,7 @@ function rectangleValid(vars: VarStore, f: DialogForm) {
   }
   const needIndex = f.rectAction == '插入' || f.rectAction == '替換' || f.rectAction == '刪除';
   if (needIndex && !checkVar(vars, f.rectIndex, true)) return false;
-  return !hasValue(f) || checkVar(vars, f.code, true);
+  return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
 }
 
 /**
@@ -116,7 +120,7 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
       }
       return false;
     case 'Rectangle':
-      if (rectangleValid(vars, f)) {
+      if (rectangleValid(vars, f, modules)) {
         const { text, nodeVar } = rectangleText(vars, f);
         return add(text, 'Rectangle', nodeVar, f.radio);
       }
@@ -163,7 +167,7 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
       return done();
     }
     case 'Rectangle': {
-      if (!rectangleValid(vars, f)) return false;
+      if (!rectangleValid(vars, f, modules)) return false;
       const { text, nodeVar } = rectangleText(vars, f);
       node.text = text;
       node.data = f.radio;
@@ -227,6 +231,8 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
+          // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳
+          rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' || (action == '替換' && index2) ? '二維清單' : '清單',
           rectIndex: index,
           rectIndex2: index2,
           varSelect: target,
