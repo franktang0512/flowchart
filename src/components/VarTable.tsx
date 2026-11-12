@@ -1,5 +1,6 @@
 // 第三步左邊的「變數」表格
-import type { ParamInfo } from '../engine/modules';
+import { useRef } from 'react';
+import type { LocalVar, ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { getTarget } from '../target';
 import { useCommit } from '../useCommit';
@@ -23,9 +24,14 @@ interface Props {
   onCommit: () => void;
   onDelete: (id: number) => void;
   onCreate: () => void;
-  /** 正在畫模組時：這個模組的參數（名稱、型別在「修改名稱、參數」設定，這裡不能改） */
-  module?: { name: string; params: ParamInfo[] };
+  /**
+   * 正在畫模組時：這個模組的參數（名稱、型別在「修改名稱、參數」設定，這裡不能改）、
+   * 區域變數（只有 C++；null 是這個語言沒有區域變數）。onLocals 的 rename 是改名（舊名, 新名）
+   */
+  module?: { name: string; params: ParamInfo[]; locals: LocalVar[] | null; onLocals: (next: LocalVar[], rename?: [string, string]) => void };
 }
+
+let localSeq = 1_000_000;
 
 export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module }: Props) {
   useLang();
@@ -56,14 +62,17 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
                       <td><span className="param_name" title={t('參數的名稱要在模組的「修改名稱、參數」裡改', 'Change the name in "Edit name, parameters"')}>🔒 {p.name}</span></td>
                       <td><span className="param_fixed">{p.type == '數字' ? t('數字', 'Number') : t('文字', 'Text')}</span></td>
                       <td><span className="muted">{t('執行時傳進來', 'Given when it runs')}</span></td>
-                      <td><span className="muted">{t('流程裡可以改它的值，只改到模組自己的那一份', 'You can change its value; only this module sees it')}</span></td>
+                      <td><span className="muted">{getTarget() == 'scratch'
+                        ? t('只能拿來算，不能改（Scratch 的規定）', 'Use it, but do not change it (Scratch rule)')
+                        : t('流程裡可以改它的值，只改到模組自己的那一份', 'You can change its value; only this module sees it')}</span></td>
                       <td></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
-          <p className="section_label var_section">{t('變數表（主流程和所有模組共用）', 'Variables (shared by the main flow and all modules)')}</p>
+          {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} head={head} />}
+          <p className="section_label var_section">{t('全域變數（變數表，主流程和所有模組共用）', 'Global variables (shared by the main flow and all modules)')}</p>
         </>
       )}
       <table id="var_table" className="data_table">
@@ -79,7 +88,49 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
   );
 }
 
-function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
+/** C++ 模組的區域變數：只有這個模組用得到，每次執行模組都重新從初始值開始 */
+function LocalTable({ module, rows, onLocals, head }: { module: string; rows: LocalVar[]; onLocals: (next: LocalVar[], rename?: [string, string]) => void; head: React.ReactNode }) {
+  // 上次確定的名字：改名確定時，流程圖裡用到的地方也跟著改
+  const committed = useRef(new Map<number, string>());
+  for (const r of rows) if (!committed.current.has(r.id)) committed.current.set(r.id, r.name.trim());
+  // 最新的內容（改型別時 onChange 之後馬上 onCommit，還沒重新 render）
+  const latest = useRef(rows);
+  latest.current = rows;
+  const update = (next: LocalVar[], rename?: [string, string]) => {
+    latest.current = next;
+    onLocals(next, rename);
+  };
+  const commit = () => {
+    const now = latest.current;
+    const changed = now.find(r => committed.current.get(r.id) != r.name.trim());
+    const rename = changed ? [committed.current.get(changed.id) ?? '', changed.name.trim()] as [string, string] : undefined;
+    now.forEach(r => committed.current.set(r.id, r.name.trim()));
+    update(now, rename);
+  };
+  return (
+    <>
+      <p className="section_label var_section">{t(`模組「${module}」的區域變數（只有這個模組用得到，每次執行都從初始值開始）`, `Local variables of "${module}" (only this module can use them; they start over each run)`)}</p>
+      {rows.length > 0 && (
+        <table id="local_table" className="data_table">
+          <tbody>
+            {head}
+            {rows.map(row => (
+              <VarRowView
+                key={row.id} row={row} className="local_row"
+                onChange={(id, patch) => update(latest.current.map(r => (r.id == id ? { ...r, ...patch } : r)))}
+                onCommit={commit}
+                onDelete={id => update(latest.current.filter(r => r.id != id))}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+      <button className="create_local" onClick={() => update([...latest.current, { id: ++localSeq, name: '', type: '數字', init: '0', desc: '' }])}>＋ {t('新增區域變數', 'Add a local variable')}</button>
+    </>
+  );
+}
+
+function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: VarRow; className?: string } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
   const commit = useCommit<HTMLInputElement>(onCommit);
   const text = (field: 'name' | 'init' | 'desc') => ({
     className: 'var_input',
@@ -88,7 +139,7 @@ function VarRowView({ row, onChange, onCommit, onDelete }: { row: VarRow } & Pic
     ...commit,
   });
   return (
-    <tr>
+    <tr className={className}>
       <td><input {...text('name')} /></td>
       <td>
         <select

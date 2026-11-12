@@ -2,8 +2,8 @@
 //
 // 流程圖裡：每個模組有自己一張流程圖（從「開始」到「結束」），主程式或其他模組用「預定處理」積木
 // （figure 'Function'，長方形兩邊各多一條直線）執行它，積木上的字是「模組名稱(引數, 引數)」。
-// 模組可以有參數（只能讀、不能改，跟 Scratch 自訂積木的參數一樣），沒有回傳值；
-// 要把結果帶回來就存到變數（變數表的變數大家都能用）。這是 Scratch 和 Blockly 都做得到的部分。
+// 模組可以有參數（Scratch 只能讀；Blockly、C++ 可以改，只改到自己的那一份）、回傳值（Blockly、C++）、
+// 區域變數（只有 C++）。要把結果帶回來也可以存到全域變數（變數表的變數大家都能用）。
 import type { Diagram } from './diagram';
 
 export interface ParamInfo {
@@ -20,6 +20,20 @@ export interface ModuleInfo {
    * 用的地方可以寫在算式裡，例如「答案 設為 找最大(x, y)」
    */
   returns?: '數字' | '文字';
+  /**
+   * 區域變數（只有 C++ 有：寫在函式裡面，每次執行模組都重新從初始值開始，別的地方用不到）。
+   * Scratch、Blockly 沒有區域變數（在模組裡建的變數也是全域的），所以只有學習目標是 C++ 時才能新增
+   */
+  locals?: LocalVar[];
+}
+
+/** 區域變數：跟第三步變數表的一列一樣（id 是表格用的） */
+export interface LocalVar {
+  id: number;
+  name: string;
+  type: '數字' | '文字' | '清單' | '二維清單';
+  init: string;
+  desc: string;
 }
 
 /** 執行、轉程式時用：模組的資料加上它的流程圖 */

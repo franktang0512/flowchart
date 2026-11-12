@@ -37,6 +37,20 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
   const values = run?.var[step];
   // 上一步的值：清單跟它比較，才知道這一步改了哪一格
   const prevValues = step > 0 ? run?.var[step - 1] : undefined;
+  /** 一個變數的格子（清單、二維清單畫成表格） */
+  const varBox = (name: string, extra = '') => {
+    const v = values?.[name];
+    const isList = Array.isArray(v);
+    const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
+    return (
+      <div key={name} className={'var_box' + (isList ? ' is_list' : '') + extra}>
+        <span className="var_box_name">{name}</span>
+        <span className={'var_box_value' + (isList ? ' is_list' : '')}>
+          {isGrid ? <GridValue rows={v as unknown[][]} prev={prevValues?.[name]} /> : isList ? <ListValue items={v} prev={prevValues?.[name]} /> : String(v)}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div id="run_code_area" className="stage" style={{ display: visible ? undefined : 'none' }}>
@@ -117,32 +131,15 @@ export function RunArea({ visible, canvasRef, run, error, partial, step, onStep,
         <div className="card">
           <p className="section_label" style={{ marginTop: 0 }}>{callerName ? t('全域變數（變數表，主流程和模組都能用）', 'Global variables (the variable table)') : t('變數', 'Variables')}</p>
           <div id="variableTable" className="var_boxes">
-            {values && varNames.map(name => {
-              const v = values[name];
-              const isList = Array.isArray(v);
-              const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
-              return (
-                <div key={name} className={'var_box' + (isList ? ' is_list' : '')}>
-                  <span className="var_box_name">{name}</span>
-                  <span className={'var_box_value' + (isList ? ' is_list' : '')}>
-                    {isGrid ? <GridValue rows={v as unknown[][]} prev={prevValues?.[name]} /> : isList ? <ListValue items={v} prev={prevValues?.[name]} /> : String(v)}
-                  </span>
-                </div>
-              );
-            })}
+            {values && varNames.map(name => varBox(name))}
           </div>
           {/* 在模組裡：這個模組自己的（參數），只有執行到模組裡才有，跟全域變數分開 */}
           {values && callerName && (
             <div className="run_module_vars">
-              <p className="section_label">{sheetName}{t(' 的參數（只有這個模組裡有）', ': parameters (only in this module)')}</p>
+              <p className="section_label">{sheetName}{t(' 的參數和區域變數（只有這個模組裡有）', ': parameters and local variables (only in this module)')}</p>
               <div className="var_boxes">
-                {Object.keys(values).filter(name => !varNames.includes(name)).map(name => (
-                  <div key={'param_' + name} className="var_box is_param">
-                    <span className="var_box_name">{name}</span>
-                    <span className="var_box_value">{String(values[name])}</span>
-                  </div>
-                ))}
-                {Object.keys(values).every(name => varNames.includes(name)) && <span className="muted">{t('（沒有參數）', '(no parameters)')}</span>}
+                {Object.keys(values).filter(name => !varNames.includes(name)).map(name => varBox(name, ' is_param'))}
+                {Object.keys(values).every(name => varNames.includes(name)) && <span className="muted">{t('（沒有參數和區域變數）', '(none)')}</span>}
               </div>
             </div>
           )}

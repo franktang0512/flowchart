@@ -1228,3 +1228,13 @@ input, textarea, select, button {
 .param_none {
   margin: 0 0 6px;
 }
+#local_table .local_row td {
+  background: #f1f7ff;
+}
+#createRow, .create_local {
+  margin-top: 10px;
+  border: 1px dashed #9aa5ad;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 14px;
+}

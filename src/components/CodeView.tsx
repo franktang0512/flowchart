@@ -236,6 +236,11 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
   if (vars.some(v => v.type == '二維清單')) {
     return <p className="run_error">{t('Scratch / Blockly 沒有二維清單：用到二維清單的流程圖，請把學習目標換成 C++ 再看程式。', 'Scratch / Blockly have no 2D lists. To see this flowchart as code, change the learning goal to C++.')}</p>;
   }
+  // 區域變數只有 C++ 有
+  const withLocals = modules.find(m => (m.info.locals ?? []).some(v => v.name.trim() != ''));
+  if (withLocals) {
+    return <p className="run_error">{t(`模組「${withLocals.info.name}」有區域變數：Scratch / Blockly 沒有區域變數（在模組裡建的變數也是全域的），請把學習目標換成 C++ 再看程式，或把區域變數改到變數表。`, `The module "${withLocals.info.name}" has local variables. Scratch and Blockly have none, so change the learning goal to C++, or move them to the variable table.`)}</p>;
+  }
   // Scratch 的自訂積木不能回傳值
   if (mode == 'scratch' && modules.some(m => m.info.returns)) {
     return <p className="run_error">{t('Scratch 的自訂積木不能回傳值：有回傳值的模組，請把學習目標換成 Blockly 或 C++ 再看程式。', 'Scratch My Blocks cannot return a value. To see modules with a return value, change the learning goal to Blockly or C++.')}</p>;

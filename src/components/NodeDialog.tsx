@@ -1,11 +1,11 @@
 // 新增/編輯積木、選箭頭標籤、清空流程圖時跳出的對話框（舊版 shapes.js 的 node_model）。
 // 版面要跟舊版一模一樣，所以元素之間的空白（{' '}）與 <p> 的巢狀方式都照舊版 HTML 被瀏覽器解析後的結果。
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { VarStore } from '../engine/decoder';
+import { localTypes, type VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
-import type { ModuleInfo, ParamInfo } from '../engine/modules';
+import type { LocalVar, ModuleInfo, ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { byTarget, itemWord } from '../target';
+import { byTarget, getTarget, itemWord } from '../target';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -137,6 +137,8 @@ export interface DialogRequest {
   canReturn?: boolean;
   /** 在模組裡：這個模組的參數（「設定變數」「輸入到變數」的下拉選單也列出來） */
   params?: ParamInfo[];
+  /** 在模組裡：這個模組的區域變數（只有 C++） */
+  locals?: LocalVar[];
 }
 
 /** 變數表裡各型別的變數名稱，給下拉選單用 */
@@ -154,17 +156,22 @@ interface Props {
  * 選變數的下拉選單（像 Scratch 一樣用選的，不會打錯字），只列出一種類型的變數。
  * 舊作品裡填的值不在選項裡時，也放進選項，打開修改才不會被清掉。
  */
-function VarPicker({ id, value, onChange, names, params = [] }: { id: string; value: string; onChange: (v: string) => void; names: string[]; params?: string[] }) {
-  // 參數也是一種變數，流程圖裡可以改（只改到這次執行模組的那一份）
-  const all = [...names, ...params];
+function VarPicker({ id, value, onChange, names, params = [], locals = [] }: { id: string; value: string; onChange: (v: string) => void; names: string[]; params?: string[]; locals?: string[] }) {
+  // 參數：Blockly、C++ 可以改，Scratch 不行（列出來但不能選，學生才知道參數也是一種變數）
+  const readOnly = getTarget() == 'scratch';
+  const all = [...names, ...params, ...locals];
+  // 在模組裡才分組：全域變數、參數、區域變數（C++）
+  const grouped = params.length + locals.length > 0;
   return (
     <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
       <option value="" disabled>{all.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
       {value && !all.includes(value) && <option value={value}>{value}</option>}
-      {params.length > 0 && names.length > 0 && <option disabled>{t('── 變數表（全域）──', '── Variables (global) ──')}</option>}
+      {grouped && names.length > 0 && <option disabled>{t('── 全域變數（大家共用）──', '── Global variables (shared) ──')}</option>}
       {names.map(name => <option key={name} value={name}>{name}</option>)}
-      {params.length > 0 && <option disabled>{t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
-      {params.map(name => <option key={'p_' + name} value={name}>{name}</option>)}
+      {params.length > 0 && <option disabled>{readOnly ? t('── 參數（Scratch 的參數不能改）──', '── Parameters (cannot change in Scratch) ──') : t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
+      {params.map(name => <option key={'p_' + name} value={name} disabled={readOnly}>{name}</option>)}
+      {locals.length > 0 && <option disabled>{t('── 這個模組的區域變數 ──', '── Local variables of this module ──')}</option>}
+      {locals.map(name => <option key={'l_' + name} value={name}>{name}</option>)}
     </select>
   );
 }
@@ -203,17 +210,27 @@ export function NodeDialog({ request, onClose, varTypes, modules }: Props) {
 function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[] }) {
   const { kind } = request;
   useLang();
+  /** 在模組裡：區域變數照型別分好；allTypes 是全域加區域（判斷選到的是哪一種用） */
+  const localT = localTypes(request.locals);
+  const allTypes: VarTypes = {
+    number: [...varTypes.number, ...localT.number],
+    text: [...varTypes.text, ...localT.text],
+    array: [...varTypes.array, ...localT.array],
+    grid: [...varTypes.grid, ...localT.grid],
+  };
   const [f, setF] = useState<DialogForm>(() => {
     const form = { ...defaultForm(kind), ...request.initial };
     // 打開已經畫好的輸入積木：依變數表判斷原本存到變數還是清單
     if (form.radio == '輸入' && !form.ioTarget && form.varSelect) {
-      form.ioTarget = form.ioPlace != '加入' || varTypes.array.includes(form.varSelect) ? '清單' : '變數';
+      form.ioTarget = allTypes.grid.includes(form.varSelect) ? '二維清單' : form.ioPlace != '加入' || allTypes.array.includes(form.varSelect) ? '清單' : '變數';
     }
     return form;
   });
   const set = (patch: Partial<DialogForm>) => setF(prev => ({ ...prev, ...patch }));
   /** 在模組裡：這個模組的參數（數字、文字都可以設定） */
   const paramNames = (request.params ?? []).map(p => p.name);
+  /** 輸入積木「存到」選的那一類變數 */
+  const ioNames = (ty: VarTypes) => (f.ioTarget == '清單' ? ty.array : f.ioTarget == '二維清單' ? ty.grid : [...ty.number, ...ty.text]);
 
   const yes = () => {
     if (request.onYes(f)) onClose();
@@ -273,7 +290,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                   {t('存到：', 'Save to: ')}
                   <label><input type="radio" name="io_target" checked={f.ioTarget == '變數'} onChange={() => set({ ioTarget: '變數', varSelect: '' })} />{t('變數', 'Variable')}</label>
                   <label><input type="radio" name="io_target" checked={f.ioTarget == '清單'} onChange={() => set({ ioTarget: '清單', varSelect: '' })} />{t('清單', 'List')}</label>
-                  {(varTypes.grid.length > 0 || f.ioTarget == '二維清單') && (
+                  {(allTypes.grid.length > 0 || f.ioTarget == '二維清單') && (
                     <label><input type="radio" name="io_target" checked={f.ioTarget == '二維清單'} onChange={() => set({ ioTarget: '二維清單', varSelect: '' })} />{t('二維清單的一格', 'A 2D list cell')}</label>
                   )}
                 </p>
@@ -281,8 +298,9 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                   <p>
                     <VarPicker
                       id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
-                      names={f.ioTarget == '清單' ? varTypes.array : f.ioTarget == '二維清單' ? varTypes.grid : [...varTypes.number, ...varTypes.text]}
+                      names={ioNames(varTypes)}
                       params={f.ioTarget == '變數' ? paramNames : []}
+                      locals={ioNames(localT)}
                     />
                   </p>
                 )}
@@ -400,11 +418,11 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
     }
     case 'Rectangle': {
       // 每種動作可以選的變數：設定變數選數字/文字，建立選二維清單，替換可以是清單或二維清單的一格，其他選清單
-      const namesFor = (action: RectAction) => (action == '設為' ? [...varTypes.number, ...varTypes.text]
-        : action == '建立' ? varTypes.grid
-        : action == '替換' ? [...varTypes.array, ...varTypes.grid]
-        : varTypes.array);
-      const cell = f.rectAction == '替換' && varTypes.grid.includes(f.varSelect);
+      const namesFor = (action: RectAction, ty: VarTypes = allTypes) => (action == '設為' ? [...ty.number, ...ty.text]
+        : action == '建立' ? ty.grid
+        : action == '替換' ? [...ty.array, ...ty.grid]
+        : ty.array);
+      const cell = f.rectAction == '替換' && allTypes.grid.includes(f.varSelect);
       const indexLabel = cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
       const index2Label = f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
       const verb = RECT_VERB[f.rectAction];
@@ -412,18 +430,18 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
         <>
           <p id="hint">{RECT_HINT[f.rectAction]()}</p>{' '}
           <p className="rect_action">
-            {RECT_ACTIONS.filter(([action]) => (action != '建立' || varTypes.grid.length > 0) && (action != '回傳' || request.canReturn || f.rectAction == '回傳')).map(([action, label]) => (
+            {RECT_ACTIONS.filter(([action]) => (action != '建立' || allTypes.grid.length > 0) && (action != '回傳' || request.canReturn || f.rectAction == '回傳')).map(([action, label]) => (
               <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({
                 rectAction: action,
                 // 換到另一種動作時，原本選的變數不能用就清掉
-                ...(namesFor(action).includes(f.varSelect) ? {} : { varSelect: '' }),
+                ...([...namesFor(action), ...(action == '設為' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
               })} />{label()}</label>
             ))}
           </p>
           {f.rectAction != '回傳' && (
             <>
               {f.rectAction == '設為' ? t('變數：', 'Variable: ') : f.rectAction == '建立' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction)} params={f.rectAction == '設為' ? paramNames : []} />
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(f.rectAction, varTypes)} params={f.rectAction == '設為' ? paramNames : []} locals={namesFor(f.rectAction, localT)} />
             </>
           )}
           {indexLabel && (

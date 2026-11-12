@@ -14,7 +14,7 @@ import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, parseCall, splitId, type ModuleInfo, type ModuleSource } from './engine/modules';
+import { callText, parseCall, splitId, type LocalVar, type ModuleInfo, type ModuleSource } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -171,7 +171,7 @@ export function App() {
   const moduleOf2 = (id: number) => modulesRef.current.find(m => m.id == id);
   /** 在這張流程圖裡可以用的變數：模組裡還可以用它的參數 */
   const storeFor = (d: Diagram) => ({
-    ...withParams(varStore, moduleOf(d)?.info.params ?? []),
+    ...withParams(varStore, moduleOf(d)?.info.params ?? [], moduleOf(d)?.info.locals),
     // 有回傳值的模組可以寫在算式裡
     calls: modulesRef.current.filter(m => m.info.returns).map(m => m.info.name),
   });
@@ -210,6 +210,7 @@ export function App() {
   /** 模組或參數的名字能不能用：不能跟變數、其他模組、清單的函式撞名 */
   const nameProblem = (editing: AppModule | null) => (name: string, kind: 'module' | 'param'): string | null => {
     if (varStore.var_list.name.includes(name)) return t(`「${name}」已經是變數的名字了，請換一個。`, `"${name}" is already a variable. Choose another name.`);
+    if (modulesRef.current.some(m => m.info.locals?.some(v => v.name.trim() == name))) return t(`「${name}」已經是模組的區域變數了，請換一個。`, `"${name}" is already a local variable. Choose another name.`);
     if (kind == 'module' && modulesRef.current.some(m => m != editing && m.info.name == name)) return t(`已經有叫「${name}」的模組了。`, `There is already a module called "${name}".`);
     if (['長度', 'length', '項目編號', 'indexof', '包含', 'contains', 'and', 'or', 'not'].includes(name)) return t(`「${name}」是保留的字，請換一個。`, `"${name}" is a reserved word. Choose another name.`);
     try {
@@ -249,7 +250,8 @@ export function App() {
           }
         }
       }
-      setModules(modulesRef.current.map(x => (x == m ? { ...m, info } : x)));
+      // 區域變數不在這個視窗裡設定（在第三步的變數表），照舊留著
+      setModules(modulesRef.current.map(x => (x == m ? { ...m, info: { ...info, ...(x.info.locals ? { locals: x.info.locals } : {}) } } : x)));
       currentDiagram().draw();
     },
   });
@@ -259,6 +261,25 @@ export function App() {
     m.diagram.dispose();
     setModules(modulesRef.current.filter(x => x != m));
     showSheet(0);
+  };
+
+  /** 改模組的區域變數；rename 是改名（舊名, 新名）：這個模組的流程圖裡用到的地方也跟著改 */
+  const setLocals = (id: number, locals: LocalVar[], rename?: [string, string]) => {
+    const m = moduleOf2(id);
+    if (!m) return;
+    if (rename && rename[0] && rename[1] && rename[0] != rename[1]) {
+      const [from, to] = rename;
+      const d = m.diagram;
+      for (const node of d.nodes) {
+        if (node?.variables?.includes(from)) {
+          node.variables = node.variables.map(v => (v == from ? to : v));
+          node.text = node.text.replaceAll(from, to);
+          d.fitNode(node);
+        }
+      }
+      d.draw();
+    }
+    setModules(modulesRef.current.map(x => (x.id == id ? { ...x, info: { ...x.info, locals } } : x)));
   };
 
   /** 換掉全部的模組（匯入作品、積木套用回來時） */
@@ -316,6 +337,7 @@ export function App() {
       initial,
       canReturn: returnsIn(d),
       params: moduleOf(d)?.info.params,
+      locals: moduleOf(d)?.info.locals,
       onYes: f => editMainNode(node, d, storeFor(d), f, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
@@ -458,6 +480,7 @@ export function App() {
       kind: t as DialogRequest['kind'],
       canReturn: returnsIn(d),
       params: moduleOf(d)?.info.params,
+      locals: moduleOf(d)?.info.locals,
       onYes: f => addMainNode(t, d, storeFor(d), f, x, y, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
@@ -536,7 +559,11 @@ export function App() {
       name: nameRef.current!.value,
       questionName: questionIn(question, getLang()).title,
       questionNote: noteRef.current!.value,
-      vars: varsRef.current.map(v => [v.name, v.type, v.init, v.desc]),
+      vars: [
+        ...varsRef.current.map(v => [v.name, v.type, v.init, v.desc]),
+        // C++ 模組的區域變數：說明欄註明是哪個模組的
+        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, v.type, v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
+      ],
       cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     });
     setPrintImg(main.toImage() ?? undefined);
@@ -597,6 +624,15 @@ export function App() {
         name: String(m.name ?? ''),
         params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字' })),
         ...(m.returns == '數字' || m.returns == '文字' ? { returns: m.returns } : {}),
+        ...(Array.isArray(m.locals) && m.locals.length ? {
+          locals: m.locals.map(v => ({
+            id: ++varSeq,
+            name: String(v.name ?? ''),
+            type: (['數字', '文字', '清單', '二維清單'] as const).find(x => x == v.type) ?? '數字',
+            init: String(v.init ?? ''),
+            desc: String(v.desc ?? ''),
+          })),
+        } : {}),
       },
       fill: d => d.loadData(m.flowchart),
     })));
@@ -733,7 +769,13 @@ export function App() {
                 onCreate={() => createRow()}
                 module={(() => {
                   const m = moduleOf2(sheet);
-                  return m && { name: m.info.name, params: m.info.params };
+                  return m && {
+                    name: m.info.name,
+                    params: m.info.params,
+                    // 區域變數只有 C++ 有（舊作品換了學習目標還留著的話，也列出來讓學生刪掉）
+                    locals: getTarget() == 'cpp' || m.info.locals?.length ? m.info.locals ?? [] : null,
+                    onLocals: (next: LocalVar[], rename?: [string, string]) => setLocals(m.id, next, rename),
+                  };
                 })()}
               />
             )}

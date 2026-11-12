@@ -16,15 +16,19 @@ const NEGATE: Record<string, string> = { '==': '!=', '!=': '==', '<': '>=', '<='
 
 export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgram[] = []): string {
   const globals = new Map(varList.map(v => [v.name, v]));
-  /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數 */
+  /** 模組的區域變數（寫在函式裡面） */
+  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init }));
+  /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數和區域變數 */
   let vars = globals;
   /** 目前寫到哪個模組（null 是主程式） */
   let current: ModuleProgram | null = null;
   const enter = (m: ModuleProgram | null) => {
     current = m;
-    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '' } as VarInfo] as const)]) : globals;
+    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '' } as VarInfo] as const), ...localsOf(m).map(v => [v.name, v] as const)]) : globals;
   };
-  const doubles = findDoubles([program, ...modules.map(m => m.body)], varList);
+  /** 全部的變數（全域＋各模組的區域變數；名字不會重複，執行時會擋） */
+  const allVars = [...varList, ...modules.flatMap(localsOf)];
+  const doubles = findDoubles([program, ...modules.map(m => m.body)], allVars);
   /** 數字參數有沒有被傳過小數（有的話用 double） */
   const paramDouble = new Set<string>();
   /** 回傳數字的模組，回傳值會不會有小數（有的話回傳 double） */
@@ -39,7 +43,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
 
   /** 數字變數是 int 還是 double */
   const numType = (name: string) => (doubles.has(name) ? 'double' : 'int');
-  const elemType = (list: string) => (vars.get(list)?.init == '文字' ? 'string' : 'int');
+  const elemType = (list: string) => ((vars.get(list) ?? allVars.find(v => v.name == list))?.init == '文字' ? 'string' : 'int');
   const typeOf = (e: Expr): ExprType => exprType(e, vars, modules);
   const paramOf = (name: string) => (current as ModuleProgram | null)?.params.find(p => p.name == name);
   /** 運算式是不是整數（決定 / 要不要先轉成小數） */
@@ -313,11 +317,20 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   const paramCode = (m: ModuleProgram) => m.params.map(p => `${p.type == '文字' ? 'string' : paramDouble.has(paramKey(m.name, p.name)) ? 'double' : 'int'} ${p.name}`).join(', ');
   /** 函式的回傳型別：沒有回傳值是 void */
   const retType = (m: ModuleProgram) => (m.returns == '文字' ? 'string' : m.returns == '數字' ? (returnDouble.has(m.name) ? 'double' : 'int') : 'void');
+  const declLine = (v: VarInfo, pad: string) => {
+    if (v.type == '清單') return `${pad}vector<${elemType(v.name)}> ${v.name};`;
+    if (v.type == '二維清單') return `${pad}vector<vector<${elemType(v.name)}>> ${v.name};`;
+    if (v.type == '文字') return `${pad}string ${v.name} = ${JSON.stringify(stripQuotes(v.init))};`;
+    return `${pad}${numType(v.name)} ${v.name} = ${v.init.trim() || '0'};`;
+  };
   const functions = modules.flatMap(m => {
     enter(m);
     stmts(m.body, 1);
     if (m.returns == '文字') uses.string = true;
-    return [`${retType(m)} ${m.name}(${paramCode(m)}) {`, ...lines.splice(0), '}', ''];
+    // 區域變數：寫在函式最上面，每次執行都重新從初始值開始，只有這個函式用得到
+    const locals = localsOf(m).map(v => declLine(v, INDENT));
+    const localPart = locals.length ? [`${INDENT}// ${t('區域變數：只有這個函式裡用得到', 'Local variables: only this function can use them')}`, ...locals, ''] : [];
+    return [`${retType(m)} ${m.name}(${paramCode(m)}) {`, ...localPart, ...lines.splice(0), '}', ''];
   });
   enter(null);
   if (modules.some(m => m.params.some(p => p.type == '文字'))) uses.string = true;
@@ -325,20 +338,15 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   // 有模組時，變數表的變數主程式和模組都要用，所以放在 main 外面（全域變數）
   const shared = modules.length > 0;
   const pad = shared ? '' : INDENT;
-  const decls = varList.map(v => {
-    if (v.type == '清單') return `${pad}vector<${elemType(v.name)}> ${v.name};`;
-    if (v.type == '二維清單') return `${pad}vector<vector<${elemType(v.name)}>> ${v.name};`;
-    if (v.type == '文字') return `${pad}string ${v.name} = ${JSON.stringify(stripQuotes(v.init))};`;
-    return `${pad}${numType(v.name)} ${v.name} = ${v.init.trim() || '0'};`;
-  });
+  const decls = varList.map(v => declLine(v, pad));
   const tmpNote = t('輸入到清單時先暫存在這裡', 'input goes here first, then into the list');
   if (uses.inputNumber) decls.push(`${pad}int inputNumber;   // ${tmpNote}`);
   if (uses.inputText) decls.push(`${pad}string inputText;  // ${tmpNote}`);
 
   // 有文字變數、裝文字的清單或用到 string 的寫法才要 <string>；有清單才要 <vector>
   const isList = (v: VarInfo) => v.type == '清單' || v.type == '二維清單';
-  const needString = uses.string || varList.some(v => v.type == '文字' || (isList(v) && elemType(v.name) == 'string'));
-  const needVector = uses.indexOf || varList.some(isList);
+  const needString = uses.string || allVars.some(v => v.type == '文字' || (isList(v) && elemType(v.name) == 'string'));
+  const needVector = uses.indexOf || allVars.some(isList);
   const head = ['#include <iostream>'];
   if (needString) head.push('#include <string>');
   if (needVector) head.push('#include <vector>');
@@ -358,7 +366,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     );
   }
   if (shared) {
-    const globalsPart = decls.length ? ['// ' + t('變數表的變數：主程式和模組都會用到，所以放在 main 外面', 'Variables from the table: main and the modules all use them, so they are outside main'), ...decls, ''] : [];
+    const globalsPart = decls.length ? ['// ' + t('全域變數（變數表）：主程式和模組都會用到，所以放在 main 外面', 'Global variables (the table): main and the modules all use them, so they are outside main'), ...decls, ''] : [];
     // 模組之間互相執行時，要先宣告才能用
     const protos = modules.length > 1 ? [...modules.map(m => `${retType(m)} ${m.name}(${paramCode(m)});`), ''] : [];
     return [...head, ...globalsPart, ...protos, ...functions, 'int main() {', ...body, `${INDENT}return 0;`, '}', ''].join('\n');

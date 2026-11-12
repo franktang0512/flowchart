@@ -21,7 +21,7 @@ import { t } from '../i18n';
 import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
-import { parseCall, sheetId, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
+import { parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -31,22 +31,40 @@ export interface VarStore {
   type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[] };
   /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用） */
   params?: string[];
+  /** 參數不能存值進去（Scratch 的自訂積木參數不能改；Blockly、C++ 可以） */
+  paramsReadOnly?: boolean;
+  /** 在模組裡：這個模組的區域變數（只有 C++；也放在 var_list、type_var_list 裡） */
+  locals?: string[];
   /** 有回傳值的模組名稱：算式裡可以寫「名稱(引數)」 */
   calls?: string[];
 }
 
-/** 模組裡用的變數清單：變數表的變數，再加上這個模組的參數 */
-export function withParams(vars: VarStore, params: ParamInfo[]): VarStore {
-  if (!params.length) return vars;
+/** 區域變數照型別分好（給下拉選單、型別檢查用） */
+export function localTypes(locals: LocalVar[] = []): VarStore['type_var_list'] {
+  const named = locals.filter(v => v.name.trim() != '');
+  const of = (type: LocalVar['type']) => named.filter(v => v.type == type).map(v => v.name.trim());
+  return { number: of('數字'), text: of('文字'), array: of('清單'), grid: of('二維清單') };
+}
+
+/** 模組裡用的變數清單：變數表的變數（全域），再加上這個模組的參數和區域變數 */
+export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar[] = []): VarStore {
+  const named = locals.filter(v => v.name.trim() != '');
+  if (!params.length && !named.length) return vars;
+  const lt = localTypes(named);
   return {
-    var_list: vars.var_list,
+    var_list: {
+      name: [...vars.var_list.name, ...named.map(v => v.name.trim())],
+      value: [...vars.var_list.value, ...named.map(v => v.init)],
+    },
     type_var_list: {
-      number: [...vars.type_var_list.number, ...params.filter(p => p.type == '數字').map(p => p.name)],
-      text: [...vars.type_var_list.text, ...params.filter(p => p.type == '文字').map(p => p.name)],
-      array: vars.type_var_list.array,
-      grid: vars.type_var_list.grid,
+      number: [...vars.type_var_list.number, ...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
+      text: [...vars.type_var_list.text, ...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
+      array: [...vars.type_var_list.array, ...lt.array],
+      grid: [...vars.type_var_list.grid, ...lt.grid],
     },
     params: params.map(p => p.name),
+    paramsReadOnly: getTarget() == 'scratch',
+    locals: named.map(v => v.name.trim()),
     calls: vars.calls,
   };
 }
@@ -103,6 +121,10 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     type_var_list.number.includes(name) || type_var_list.text.includes(name) || type_var_list.array.includes(name) || type_var_list.grid.includes(name);
 
   if (!can_number) {
+    if (vars.paramsReadOnly && vars.params?.includes(str.trim())) {
+      alert(t(`「${str.trim()}」是模組的參數：Scratch 的參數只能拿來算，不能改。要存結果請用變數表裡的變數。`, `"${str.trim()}" is a parameter. In Scratch you can use it, but you cannot change it. Use a variable from the variable table instead.`));
+      return false;
+    }
     // 二維清單的一格：表[i][j]
     const cell = splitTarget(str);
     if (cell && cell.indexes.length == 2) {
@@ -378,16 +400,19 @@ class CodeGenerator {
   private readonly modules: ModuleInfo[];
   /** 在模組裡：這個模組的參數 */
   private readonly params: ParamInfo[];
+  /** 在模組裡：這個模組的區域變數（只有 C++） */
+  private readonly locals: LocalVar[];
 
-  constructor(diagram: Diagram, vars: VarStore, names: string[], sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = []) {
+  constructor(diagram: Diagram, vars: VarStore, names: string[], sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = [], locals: LocalVar[] = []) {
     this.diagram = diagram;
     this.nodes = diagram.nodes;
-    this.vars = withParams(vars, params);
+    this.vars = withParams(vars, params, locals);
     this.sheet = sheet;
     this.modules = modules;
     this.params = params;
-    // 每一步都把所有變數（在模組裡再加上參數）的值記下來：{"a": a,"b": b}
-    this.varStr = '{' + [...names, ...params.map(p => p.name)].map(n => '"' + n + '": ' + n).join(',') + '}';
+    this.locals = locals.filter(v => v.name.trim() != '');
+    // 每一步都把所有變數（在模組裡再加上參數、區域變數）的值記下來：{"a": a,"b": b}
+    this.varStr = '{' + [...names, ...params.map(p => p.name), ...this.locals.map(v => v.name.trim())].map(n => '"' + n + '": ' + n).join(',') + '}';
   }
 
   /** 積木在這張流程圖裡的 index（找箭頭用） */
@@ -549,6 +574,8 @@ class CodeGenerator {
               + `if (arguments.length != ${this.params.length}) __err('argCount', ${i}, { name: ${name}, got: arguments.length, n: ${this.params.length} });\n`
               // 傳進來的值照參數的型別檢查
               + this.params.map(p => `${p.name} = ${p.type == '文字' ? '__text' : '__num'}(${p.name}, ${i}, ${JSON.stringify(p.name)});\n`).join('')
+              // 區域變數：每次執行模組都重新從初始值開始（遞迴時每一層有自己的一份）
+              + this.locals.map(v => `var ${v.name.trim()} = ${initialValue(this.vars, v.name.trim(), v.init)};\n`).join('')
               + 'var __ret;\n';
             return { code: head + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
           }
@@ -794,6 +821,15 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     if (same) {
       throw new FlowError(t(`變數表裡的「${same.name}」跟模組「${m.info.name}」的參數同名，流程圖上分不出是哪一個：請把變數或參數改一個名字。`, `The variable "${same.name}" has the same name as a parameter of "${m.info.name}". Rename one of them.`));
     }
+    // 區域變數：不能跟全域變數、參數、模組同名，自己也不能重複
+    const locals = (m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean);
+    const clash = locals.find((n, k) => names.includes(n) || m.info.params.some(p => p.name == n) || modules.some(x => x.info.name == n) || locals.indexOf(n) != k);
+    if (clash) {
+      throw new FlowError(t(`模組「${m.info.name}」的區域變數「${clash}」跟全域變數、參數、模組或另一個區域變數同名，流程圖上分不出是哪一個：請改一個名字。`, `The local variable "${clash}" in "${m.info.name}" has the same name as another variable, parameter or module. Rename it.`));
+    }
+    for (const n of locals) {
+      if (!syntaxOk(`var ${n};`)) throw new FlowError(t(`模組「${m.info.name}」的區域變數名稱「${n}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${n}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
+    }
   }
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
   let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\n';
@@ -809,7 +845,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   code += new CodeGenerator(diagram, vars, names, 0, infos).program();
   // 模組：每個模組一個函式（__mod1、__mod2…）
   modules.forEach((m, k) => {
-    code += new CodeGenerator(m.diagram, vars, names, k + 1, infos, m.info.params).program();
+    code += new CodeGenerator(m.diagram, vars, names, k + 1, infos, m.info.params, m.info.locals).program();
   });
   // 執行到一半出錯時，保留出錯前的每一步，學生才看得到變數是怎麼變的
   code += 'var __error = null;\ntry { flowchart_code(); } catch (e) { __error = e; }\n';
