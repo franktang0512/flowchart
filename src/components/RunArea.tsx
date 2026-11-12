@@ -32,9 +32,19 @@ interface Props {
   varNames: string[];
   /** 有模組時：畫布上現在是哪一張流程圖（主流程或某個模組） */
   sheetName: string;
+  /** 每個模組（sheet 是第幾張流程圖）和它的參數、區域變數名稱：第四步每個模組分開列出來 */
+  moduleVars: { sheet: number; name: string; names: string[] }[];
 }
 
-export function RunArea({ visible, panes, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName }: Props) {
+/** 執行到模組裡時，每一層的參數和區域變數（decoder 的 Update_output 記下來的） */
+interface Frame {
+  sheet: number;
+  /** 第幾層（從主流程執行進來是第 1 層） */
+  depth: number;
+  vals: Record<string, unknown>;
+}
+
+export function RunArea({ visible, panes, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName, moduleVars }: Props) {
   useLang();
   const split = useSplit(panes, visible);
   const total = run?.totalStep ?? 0;
@@ -45,24 +55,50 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
   const values = run?.var[step];
   // 上一步的值：清單跟它比較，才知道這一步改了哪一格
   const prevValues = step > 0 ? run?.var[step - 1] : undefined;
-  // 在模組裡：參數和區域變數另外放在 __scope（名字可以跟全域變數一樣）
   type Values = Record<string, unknown>;
-  const scope = values?.__scope as Values | undefined;
-  const prevScope = prevValues?.__scope as Values | undefined;
-  /** 一個變數的格子（清單、二維清單畫成表格）；own 是模組自己的（參數、區域變數） */
-  const varBox = (name: string, own = false) => {
-    const now = own ? scope : values;
-    const before = own ? prevScope : prevValues;
+  // 正在執行的模組（一層一層）：每一層的參數和區域變數
+  const frames = (values?.__frames ?? []) as Frame[];
+  const prevFrames = (prevValues?.__frames ?? []) as Frame[];
+  const running = frames[frames.length - 1];
+  /**
+   * 一個變數的格子（清單、二維清單畫成表格）。
+   * now / before：這一步、上一步的值；kind：主流程的、模組的（參數、區域變數）、模組現在沒有在執行（沒有值）
+   */
+  const varBox = (name: string, now: Values | undefined, before: Values | undefined, kind: 'main' | 'module' | 'idle' = 'main') => {
     const v = now?.[name];
-    const extra = own ? ' is_param' : '';
+    const extra = kind == 'module' ? ' is_param' : kind == 'idle' ? ' is_idle' : '';
     const isList = Array.isArray(v);
     const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
     return (
       <div key={name} className={'var_box' + (isList ? ' is_list' : '') + extra}>
         <span className="var_box_name">{name}</span>
         <span className={'var_box_value' + (isList ? ' is_list' : '')}>
-          {isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} /> : isList ? <ListValue items={v} prev={before?.[name]} /> : String(v)}
+          {kind == 'idle' ? '—' : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} /> : isList ? <ListValue items={v} prev={before?.[name]} /> : String(v)}
         </span>
+      </div>
+    );
+  };
+  /** 一個模組的參數和區域變數：沒有在執行時只列名字；遞迴時每一層各一排（最多列最後三層） */
+  const moduleSection = (m: Props['moduleVars'][number]) => {
+    const own = frames.filter(f => f.sheet == m.sheet);
+    const isRunning = running?.sheet == m.sheet;
+    const status = isRunning ? t('（正在執行）', ' (running)')
+      : own.length ? t('（等裡面執行的模組做完）', ' (waiting for a module it ran)')
+      : t('（現在沒有在執行）', ' (not running now)');
+    const empty = m.names.length == 0 && <span className="muted">{t('（沒有參數和區域變數）', '(none)')}</span>;
+    return (
+      <div key={m.sheet} className={'run_module_vars' + (isRunning ? ' is_running' : own.length ? '' : ' is_idle')}>
+        <p className="section_label">{t(`模組：${m.name} 的參數和區域變數`, `Module ${m.name}: parameters and local variables`)}<span className="run_module_status">{status}</span></p>
+        {own.length == 0 && <div className="var_boxes">{m.names.map(n => varBox(n, undefined, undefined, 'idle'))}{empty}</div>}
+        {own.slice(-3).map(f => {
+          const before = prevFrames.find(p => p.sheet == f.sheet && p.depth == f.depth)?.vals;
+          return (
+            <div key={f.depth} className="run_frame">
+              {own.length > 1 && <span className="run_frame_depth">{t(`第 ${f.depth} 層`, `Level ${f.depth}`)}</span>}
+              <div className="var_boxes">{m.names.map(n => varBox(n, f.vals, before, 'module'))}{empty}</div>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -150,20 +186,13 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
         </div>
 
         <div className="card">
-          <p className="section_label" style={{ marginTop: 0 }}>{panes.length > 1 ? t('主流程的變數', 'Main-flow variables') : t('變數', 'Variables')}</p>
+          {/* 主流程的變數、每個模組的參數和區域變數分開列（模組沒有在執行時只列名字） */}
+          <p className="section_label" style={{ marginTop: 0 }}>{moduleVars.length ? t('主流程的變數', 'Main-flow variables') : t('變數', 'Variables')}</p>
           <div id="variableTable" className="var_boxes">
-            {values && varNames.map(name => varBox(name))}
+            {values && varNames.map(name => varBox(name, values, prevValues))}
+            {values && varNames.length == 0 && <span className="muted">{t('（沒有變數）', '(none)')}</span>}
           </div>
-          {/* 在模組裡：這個模組自己的（參數），只有執行到模組裡才有，跟全域變數分開 */}
-          {values && panes.length > 1 && (
-            <div className="run_module_vars">
-              <p className="section_label">{sheetName}{t(' 的參數和區域變數（只有這個模組裡有）', ': parameters and local variables (only in this module)')}</p>
-              <div className="var_boxes">
-                {Object.keys(scope ?? {}).map(name => varBox(name, true))}
-                {Object.keys(scope ?? {}).length == 0 && <span className="muted">{t('（沒有參數和區域變數）', '(none)')}</span>}
-              </div>
-            </div>
-          )}
+          {values && moduleVars.map(moduleSection)}
         </div>
       </div>
     </div>

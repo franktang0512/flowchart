@@ -8,6 +8,11 @@
     --green-darker: #166b2f;
     --panel: #f4f7f9;
     --line: #b4bec7;
+    /* 模組、參數：淡紫色（紅色看起來像出錯） */
+    --module-bg: #f8f5fd;
+    --module-soft: #ece5f8;
+    --module-line: #c9b8e8;
+    --module-text: #5b3f99;
     /* 卡片外框：比表格線淡一點，但看得出範圍 */
     --card-line: #cfd7de;
     --text: #212529;
@@ -286,7 +291,7 @@ input, textarea, select, button {
 }
 #param_table input.param_name {
     min-width: 70px;
-    color: #b0204a;
+    color: var(--module-text);
     font-weight: bold;
 }
 
@@ -1073,8 +1078,8 @@ input, textarea, select, button {
     font-size: 0.95rem;
 }
 .sheet_tabs button.selected {
-    background: #ffd6de;
-    border-color: #ff6680;
+    background: var(--module-soft);
+    border-color: var(--module-line);
     font-weight: 600;
 }
 .sheet_tabs button:first-child.selected {
@@ -1091,8 +1096,8 @@ input, textarea, select, button {
     align-items: center;
     gap: 8px 14px;
     padding: 6px 12px;
-    background: #fff0f3;
-    border: 1px solid #ffb3c1;
+    background: var(--module-bg);
+    border: 1px solid var(--module-line);
     border-radius: 10px;
 }
 .module_bar button {
@@ -1120,12 +1125,12 @@ input, textarea, select, button {
 .run_sheet {
     padding: 2px 10px;
     border-radius: 999px;
-    background: #fff0f3;
-    border: 1px solid #ffb3c1;
+    background: var(--module-bg);
+    border: 1px solid var(--module-line);
     font-size: 0.9rem;
 }
 .var_box.is_param .var_box_value {
-    background: #ffd6de;
+    background: var(--module-soft);
 }
 .var_box_name small {
     font-weight: normal;
@@ -1226,7 +1231,37 @@ input, textarea, select, button {
     border-top: 1px dashed var(--line);
 }
 .run_module_vars .section_label {
-    color: #c0244a;
+    color: var(--module-text);
+}
+/* 模組現在沒有在執行：顏色淡一點，值寫「—」 */
+.run_module_vars.is_idle .section_label {
+    color: var(--muted);
+}
+.var_box.is_idle .var_box_value {
+    background: #f1f3f5;
+    color: var(--muted);
+}
+/* 正在執行的模組：左邊一條紫色線 */
+.run_module_vars.is_running {
+    border-left: 3px solid var(--module-line);
+    padding-left: 8px;
+}
+.run_module_status {
+    margin-left: 4px;
+    font-size: 0.85em;
+    font-weight: normal;
+    color: var(--muted);
+}
+.run_frame {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+.run_frame_depth {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    color: var(--module-text);
 }
 
 /* 第三步：模組的參數（名稱固定）和自己建的變數分開列 */
@@ -1246,12 +1281,12 @@ input, textarea, select, button {
   cursor: pointer;
 }
 #param_table .param_row td {
-  background: #fff4f7;
+  background: var(--module-bg);
   padding: 4px 6px;
 }
 .param_name {
   font-weight: bold;
-  color: #b0204a;
+  color: var(--module-text);
 }
 .param_fixed {
   color: #555;

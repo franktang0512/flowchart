@@ -465,10 +465,8 @@ class CodeGenerator {
     this.locals = locals.filter(v => v.name.trim() != '');
     this.globalRefs = sheet > 0 && getTarget() == 'scratch';
     // 每一步都把所有變數的值記下來。全域變數用 __globals()（寫在最外層，模組裡同名的參數蓋不到它）；
-    // 在模組裡，參數和區域變數另外放在 __scope，第四步才分得開（名字可以跟全域變數一樣）
-    const own = [...params.map(p => p.name), ...this.locals.map(v => v.name.trim())];
-    this.varStr = sheet == 0 ? '__globals()'
-      : 'Object.assign(__globals(), {__scope: {' + own.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}})';
+    // 正在執行的模組（一層一層）的參數和區域變數在 __frames，Update_output 時一起記下來（見 frameGetter）
+    this.varStr = '__globals()';
   }
 
   /** 積木在這張流程圖裡的 index（找箭頭用） */
@@ -701,11 +699,14 @@ class CodeGenerator {
               + 'var __ret;\n';
             // Scratch：模組裡的「主流程的a」透過 __G 讀寫主流程的 a（參數 a 把它蓋住了，直接寫 a 拿不到）
             const open = this.globalRefs ? 'with (__G) {\n' : '';
-            return { code: head + open + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
+            // 這一層的參數和區域變數：第四步每個模組分開列出來（遞迴時每一層各一份）
+            const own = [...this.params.map(p => p.name), ...this.locals.map(v => v.name.trim())];
+            const frame = `__frames.push({ sheet: ${this.sheet}, get: function () { return {${own.map(n => JSON.stringify(n) + ': ' + n).join(', ')}}; } });\n`;
+            return { code: head + frame + open + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
           }
           // 有回傳值的模組：走到結束時一定要已經「回傳」過
           const check = m.returns ? `if (__ret === undefined) __err('noReturn', ${i}, { name: ${name} });\n` : '';
-          return { code: 'total_step ++;\n' + update + check + '__depth--;\nreturn __ret;\n' + (this.globalRefs ? '}\n' : '') + '}\n', next: undefined };
+          return { code: 'total_step ++;\n' + update + check + '__depth--;\n__frames.pop();\nreturn __ret;\n' + (this.globalRefs ? '}\n' : '') + '}\n', next: undefined };
         }
         if (node.text == '開始') {
           return { code: 'function flowchart_code(){\n' + update, next: this.nextOf(node) };
@@ -971,7 +972,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     }
   }
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
-  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\n';
+  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\nvar __frames = [];\n';
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
   code += runtime();
   for (const name of names) {
@@ -986,7 +987,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   }).join(', ') + '};\n';
   // 全域變數的值（寫在最外層：模組裡就算有同名的參數，這裡拿到的還是全域的）
   code += 'function __globals(){ return {' + names.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; }\n';
-  code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
+  code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nif (b && typeof b == "object" && __frames.length) b.__frames = __frames.slice(-20).map(function (f, k, all) { return { sheet: f.sheet, depth: __frames.length - all.length + k + 1, vals: f.get() }; });\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
   const infos = modules.map(m => m.info);
   code += new CodeGenerator(diagram, vars, 0, infos).program();
   // 模組：每個模組一個函式（__mod1、__mod2…）

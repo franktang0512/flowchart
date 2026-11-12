@@ -1049,6 +1049,11 @@ export function App() {
           cases={cases}
           varNames={varStore.var_list.name}
           sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
+          moduleVars={modules.map((m, k) => ({
+            sheet: k + 1,
+            name: m.info.name,
+            names: [...m.info.params.map(p => p.name), ...(m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean)],
+          }))}
         />
       </div>
 
