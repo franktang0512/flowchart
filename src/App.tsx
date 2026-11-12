@@ -21,7 +21,8 @@ import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './quest
 import { fitRowOnInput } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
 import { getLang, link, onLangChange, t, useLang } from './i18n';
-import { getTarget, targetName } from './target';
+import { getTarget, setTarget, targetName, useTarget, type Target } from './target';
+import { COURSES, courseFits } from './courses';
 import { useCommit } from './useCommit';
 import { downloadWorkFile, makeWorkFile, parseWorkFile, pickTextFile, stashPendingImport, takePendingImport, type WorkContent, type WorkFile } from './workFile';
 
@@ -611,6 +612,32 @@ export function App() {
     window.print();
   };
 
+  // ---------------- 換學習目標：每種語言能用的積木不一樣，目前的作答全部清掉重來 ----------------
+  const target = useTarget() ?? getTarget();
+  const course = COURSES.find(c => c.id == urlParams.get('w'));
+  const switchTarget = (next: Target) => {
+    if (next == getTarget()) return;
+    if (!confirm(t(`換成 ${targetName(next)} 的話，目前的作答（第一步到第三步、變數、流程圖、模組）會全部清掉，確定嗎？`, `Switch to ${targetName(next)}? All your work (steps 1–3, variables, flowchart and modules) will be cleared.`))) return;
+    setTarget(next);
+    // 網址上有 ?target= 的話也換掉，重新整理才不會跑回原本的語言
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('target')) {
+      url.searchParams.set('target', next);
+      history.replaceState(null, '', url);
+    }
+    applyWork(makeWorkFile({
+      question: questionPath,
+      questionTitle: question.title,
+      page: 0,
+      student: { className: classRef.current!.value, number: numberRef.current!.value, name: nameRef.current!.value },
+      step1: { note: '', hint: '', hint2: '' },
+      cases: [],
+      variables: [],
+      flowchart: { nodes: [], links: [] },
+      modules: [],
+    }));
+  };
+
   // ---------------- 匯出／匯入尚未完成的作品 ----------------
   const hint1Ref = useRef<HTMLInputElement>(null);
   const hint2Ref = useRef<HTMLInputElement>(null);
@@ -743,8 +770,22 @@ export function App() {
           {t('電子式學習單', 'Flowchart Worksheet')}
         </a>
         <LangToggle />
-        {/* 目前的學習目標（清單從 1 還是 0 開始）；要換請回首頁 */}
-        <span className="target_badge" title={t('要更換請回到首頁', 'Change it on the home page')}>{targetName(getTarget())}</span>
+        {/* 學習目標：全部列出來，換的話目前的作答全部清掉（每種語言能用的積木不一樣） */}
+        <div className="lang_toggle target_toggle" role="group" aria-label={t('學習目標', 'Learning')}>
+          {(['scratch', 'blockly', 'cpp'] as Target[]).map(x => {
+            const fits = !course || courseFits(course, x);
+            return (
+              <button
+                key={x} className={target == x ? 'selected' : ''} aria-pressed={target == x} disabled={!fits}
+                title={fits ? undefined : t('這個課程不能用這個語言', 'This course does not use this language')}
+                onClick={() => switchTarget(x)}
+              >
+                {targetName(x)}
+              </button>
+            );
+          })}
+          <button disabled title={t('準備中', 'Coming soon')}>Python</button>
+        </div>
         </div>
         <div id="student_info">
           <label>{t('班級', 'Class')}<input id="class" placeholder={t('必填', 'Required')} ref={classRef} /></label>
