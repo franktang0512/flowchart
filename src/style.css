@@ -1197,3 +1197,34 @@ input, textarea, select, button {
 .run_module_vars .section_label {
     color: #c0244a;
 }
+
+/* 第三步：模組的參數（名稱固定）和自己建的變數分開列 */
+.var_section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0 4px;
+}
+.link_button {
+  border: none;
+  background: none;
+  color: #0b62c4;
+  text-decoration: underline;
+  padding: 0;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+#param_table .param_row td {
+  background: #fff4f7;
+  padding: 4px 6px;
+}
+.param_name {
+  font-weight: bold;
+  color: #b0204a;
+}
+.param_fixed {
+  color: #555;
+}
+.param_none {
+  margin: 0 0 6px;
+}

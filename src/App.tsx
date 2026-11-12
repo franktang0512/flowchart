@@ -731,6 +731,10 @@ export function App() {
                 onCommit={syncVarList}
                 onDelete={id => { setVars(varsRef.current.filter(v => v.id != id)); syncVarList(); }}
                 onCreate={() => createRow()}
+                module={(() => {
+                  const m = moduleOf2(sheet);
+                  return m && { name: m.info.name, params: m.info.params, onEdit: () => editModule(m) };
+                })()}
               />
             )}
             <QuestionPanel question={question} />

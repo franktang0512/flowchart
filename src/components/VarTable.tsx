@@ -1,4 +1,5 @@
 // 第三步左邊的「變數」表格
+import type { ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { getTarget } from '../target';
 import { useCommit } from '../useCommit';
@@ -22,22 +23,58 @@ interface Props {
   onCommit: () => void;
   onDelete: (id: number) => void;
   onCreate: () => void;
+  /** 正在畫模組時：這個模組的參數（名稱、型別在「修改名稱、參數」設定，這裡不能改） */
+  module?: { name: string; params: ParamInfo[]; onEdit: () => void };
 }
 
-export function VarTable({ rows, onChange, onCommit, onDelete, onCreate }: Props) {
+export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module }: Props) {
   useLang();
+  const head = (
+    <tr>
+      <th style={{ width: '24%' }}>{t('名稱', 'Name')}</th>
+      <th style={{ width: '1%' }}>{t('型別', 'Type')}</th>
+      <th style={{ width: '18%' }}>{t('初始值', 'Start')}</th>
+      <th>{t('說明', 'Note')}</th>
+      <th style={{ width: '1%' }}></th>
+    </tr>
+  );
+  const scratch = getTarget() == 'scratch';
   return (
     <div id="step3" className="card">
       <h5 className="card_title"><span className="step_badge">3</span>{t('定義變數', 'Variables')}</h5>
+      {module && (
+        // 模組的參數：跟著模組設定走，名稱和型別不能在這裡改，所以跟自己建的變數分開列
+        <>
+          <p className="section_label var_section">
+            {t(`模組「${module.name}」的參數`, `Parameters of "${module.name}"`)}
+            <button className="link_button" onClick={module.onEdit}>{t('修改參數', 'Edit parameters')}</button>
+          </p>
+          {module.params.length == 0
+            ? <p className="muted param_none">{t('這個模組沒有參數。', 'This module has no parameters.')}</p>
+            : (
+              <table id="param_table" className="data_table">
+                <tbody>
+                  {head}
+                  {module.params.map(p => (
+                    <tr key={p.name} className="param_row">
+                      <td><span className="param_name" title={t('參數的名稱要在「修改參數」裡改', 'Change the name in "Edit parameters"')}>🔒 {p.name}</span></td>
+                      <td><span className="param_fixed">{p.type == '數字' ? t('數字', 'Number') : t('文字', 'Text')}</span></td>
+                      <td><span className="muted">{t('執行時傳進來', 'Given when it runs')}</span></td>
+                      <td><span className="muted">{scratch
+                        ? t('只能拿來算，不能改', 'Use it, but do not change it')
+                        : t('可以改，只改到模組自己的那一份', 'You can change it; only this module sees it')}</span></td>
+                      <td></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          <p className="section_label var_section">{t('變數表（主流程和所有模組共用）', 'Variables (shared by the main flow and all modules)')}</p>
+        </>
+      )}
       <table id="var_table" className="data_table">
         <tbody>
-          <tr>
-            <th style={{ width: '24%' }}>{t('名稱', 'Name')}</th>
-            <th style={{ width: '1%' }}>{t('型別', 'Type')}</th>
-            <th style={{ width: '18%' }}>{t('初始值', 'Start')}</th>
-            <th>{t('說明', 'Note')}</th>
-            <th style={{ width: '1%' }}></th>
-          </tr>
+          {head}
           {rows.map(row => (
             <VarRowView key={row.id} row={row} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
           ))}
