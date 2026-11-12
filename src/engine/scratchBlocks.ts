@@ -416,7 +416,11 @@ export const blocklyToolbox = (zh: boolean) => ({
 });
 
 /** 編輯模式：Scratch 的「變數」「清單」分類列出目前的變數，並有「建立變數」「建立清單」按鈕 */
-export function setupScratchEditing(Blockly: B, workspace: B) {
+/**
+ * onCreateProc：按「建立函式」時打開「建立一個積木」視窗（見 ScratchProcDialog）；
+ * 給它已經有的函式名稱，按確定後呼叫 add 放一個「定義」積木到工作區
+ */
+export function setupScratchEditing(Blockly: B, workspace: B, onCreateProc: (existing: string[], add: (name: string, params: { name: string; type: string }[]) => void) => void) {
   const create = (type: string) => (button: B) => Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace(), undefined, type);
   workspace.registerButtonCallback('CREATE_SCRATCH_VARIABLE', create(''));
   workspace.registerButtonCallback('CREATE_SCRATCH_LIST', create('list'));
@@ -453,19 +457,13 @@ export function setupScratchEditing(Blockly: B, workspace: B) {
   // 函式（跟練習網頁一樣叫「函式」）：「建立函式」放一個「定義」到工作區；分類裡列出每個函式和它的參數
   workspace.registerButtonCallback('CREATE_SCRATCH_PROC', (button: B) => {
     const ws = button.getTargetWorkspace();
-    const name = window.prompt('積木的名稱：')?.trim();
-    if (!name) return;
-    if (ws.getBlocksByType('scratch_proc_def').some((b: B) => b.procName == name)) {
-      window.alert(`已經有「${name}」這個積木了。`);
-      return;
-    }
-    // 參數跟變數一樣要決定型別：名稱後面加「:文字」是文字，沒寫就是數字
-    const raw = window.prompt('參數（用逗號分開；文字參數在名稱後面加「:文字」，例如 次數, 名字:文字；沒有參數就留空）：') ?? '';
-    const params = raw.split(/[,，]/).map(s => s.trim()).filter(Boolean).map(p => {
-      const [name, type] = p.split(/[:：]/).map(s => s.trim());
-      return { name, type: type == '文字' ? '文字' : '數字' };
+    const existing = ws.getBlocksByType('scratch_proc_def').map((b: B) => b.procName);
+    onCreateProc(existing, (name, params) => {
+      // 放在看得到的地方（工作區左上角附近）
+      const at = ws.getMetricsManager().getViewMetrics(true);
+      Blockly.serialization.blocks.append({ type: 'scratch_proc_def', extraState: { name, params }, x: at.left + 40, y: at.top + 40 }, ws);
+      ws.refreshToolboxSelection();
     });
-    Blockly.serialization.blocks.append({ type: 'scratch_proc_def', extraState: { name, params }, x: 40, y: 40 }, ws);
   });
   workspace.registerToolboxCategoryCallback('SCRATCH_PROCEDURES', (ws: B) => {
     const items: unknown[] = [{ kind: 'button', text: '建立函式', callbackkey: 'CREATE_SCRATCH_PROC' }];

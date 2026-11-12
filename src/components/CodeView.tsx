@@ -6,6 +6,8 @@ import type { Diagram } from '../engine/diagram';
 import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
 import { blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
+import { ScratchProcDialog } from './ScratchProcDialog';
+import type { ParamInfo } from '../engine/modules';
 import type { ModuleSource } from '../engine/modules';
 import { structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
@@ -167,7 +169,9 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
   const [editing, setEditing] = useState(false);
   /** 套用時積木有問題的說明 */
   const [applyError, setApplyError] = useState<string | null>(null);
-  const live = useRef<{ Blockly: BlocklyModule; workspace: BlocklyModule } | null>(null);
+  const live = useRef<{ Blockly: BlocklyModule; workspace: BlocklyModule; theme: BlocklyModule } | null>(null);
+  /** 「建立函式」的視窗開著時：已經有的函式名稱、按確定要做的事 */
+  const [procDialog, setProcDialog] = useState<{ existing: string[]; add: (name: string, params: ParamInfo[]) => void } | null>(null);
   const json = program ? JSON.stringify(toBlockly(program, vars, mode, mods)) : editing ? JSON.stringify(emptyBlocks(mode)) : null;
 
   useEffect(() => {
@@ -193,11 +197,11 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
           move: { scrollbars: true, drag: true, wheel: true },
           zoom: { controls: true, startScale: 0.8 },
         });
-        if (editing && mode == 'scratch') setupScratchEditing(Blockly, workspace);
+        if (editing && mode == 'scratch') setupScratchEditing(Blockly, workspace, (existing, add) => setProcDialog({ existing, add }));
         Blockly.serialization.workspaces.load(JSON.parse(json), workspace);
         // 有模組（好幾串積木）時排整齊，不然寬的積木會疊在一起
         if (workspace.getTopBlocks(false).length > 1) workspace.cleanUp();
-        live.current = { Blockly, workspace };
+        live.current = { Blockly, workspace, theme: mode == 'scratch' ? themes.scratch : themes.blockly };
       }
       catch (e) {
         console.error(e);
@@ -277,6 +281,13 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
       {loadError && <p className="run_error">{loadError}</p>}
       {/* 換外觀、進出編輯時整個重建，Blockly 才不會留著上一個工作區 */}
       <div key={mode + editing} className="code_blockly" ref={boxRef} style={loadError ? { display: 'none' } : undefined} />
+      {procDialog && live.current && (
+        <ScratchProcDialog
+          Blockly={live.current.Blockly} theme={live.current.theme} existing={procDialog.existing}
+          onConfirm={(name, params) => { procDialog.add(name, params); setProcDialog(null); }}
+          onCancel={() => setProcDialog(null)}
+        />
+      )}
     </>
   );
 }
