@@ -23,6 +23,7 @@ import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
 import { GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
+import { exprType, parseExpr, type ExprType, type VarInfo } from './structure';
 
 /** 第三步「變數」表格整理出來的變數清單 */
 export interface VarStore {
@@ -191,8 +192,33 @@ export function checkCall(vars: VarStore, modules: ModuleInfo[], name: string, a
       return false;
     }
     if (!checkVar(vars, args[k], true)) return false;
+    // 型別要對：數字參數不能放文字（例如 "haha 6767"）、清單、判斷式；文字參數不能放清單（數字可以，會變成文字）
+    const p = m.params[k];
+    let type: ExprType;
+    try {
+      type = exprType(parseExpr(args[k]), varInfoMap(vars), modules);
+    }
+    catch {
+      continue;
+    }
+    const what = { str: t('文字', 'text'), char: t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number') }[type];
+    if ((p.type == '數字' && type != 'num') || (p.type == '文字' && type == 'list')) {
+      alert(t(`參數「${p.name}」是${p.type}，但填的「${args[k].trim()}」是${what}：請改成${p.type}。`, `"${p.name}" is ${p.type == '數字' ? 'a number' : 'text'}, but "${args[k].trim()}" is ${what}. Change it.`));
+      return false;
+    }
   }
   return true;
+}
+
+/** 變數清單 → 名稱對到型別（判斷算式是數字還是文字用） */
+function varInfoMap(vars: VarStore): Map<string, VarInfo> {
+  const map = new Map<string, VarInfo>();
+  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '' }));
+  add(vars.type_var_list.number, '數字');
+  add(vars.type_var_list.text, '文字');
+  add(vars.type_var_list.array, '清單');
+  add(vars.type_var_list.grid, '二維清單');
+  return map;
 }
 
 /** 判斷式轉成 JavaScript：= 變 ==、and/or/not（且/或/非）變 && || !，字串裡的字不動 */

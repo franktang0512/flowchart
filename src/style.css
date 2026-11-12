@@ -278,11 +278,16 @@ input, textarea, select, button {
 .page_tab {
     white-space: nowrap;
 }
-#var_table th {
+#var_table th, #local_table th, #param_table th {
     white-space: nowrap;
 }
-#var_table select.var_input {
+#var_table select.var_input, #local_table select.var_input, #param_table select.var_input {
     min-width: 92px;
+}
+#param_table input.param_name {
+    min-width: 70px;
+    color: #b0204a;
+    font-weight: bold;
 }
 
 /* 左右兩欄，各自捲動 */

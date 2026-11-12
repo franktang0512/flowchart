@@ -1,5 +1,5 @@
 // 第三步左邊的「變數」表格
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { getTarget } from '../target';
@@ -35,6 +35,8 @@ interface Props {
     onLocals: (next: LocalVar[], rename?: [string, string]) => void;
     /** 區域變數的名字不能用時的原因（跟全域變數、參數、模組、其他區域變數撞名） */
     localProblem: (name: string, id: number, rows: LocalVar[]) => string | null;
+    /** 改參數的名稱或型別；名字不能用時回傳原因 */
+    onParam: (k: number, patch: Partial<ParamInfo>) => string | null;
     onProblem: (why: string) => void;
   };
 }
@@ -56,19 +58,24 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
     <div id="step3" className="card">
       <h5 className="card_title"><span className="step_badge">3</span>{t('定義變數', 'Variables')}</h5>
       {module && (
-        // 模組的參數：跟著模組設定走，名稱和型別不能在這裡改，所以跟自己建的變數分開列
+        // 模組的參數：名稱、型別可以在這裡改，但不能在這裡刪（要刪請到模組上方的「修改名稱、參數」）
         <>
-          <p className="section_label var_section">{t(`模組「${module.name}」的參數（🔒 要改名稱或刪除，請到模組上方的「修改名稱、參數」）`, `Parameters of "${module.name}" (🔒 to rename or remove, use "Edit name, parameters" above the module)`)}</p>
+          <p className="section_label var_section">{t(`模組「${module.name}」的參數（要刪除參數，請到模組上方的「修改名稱、參數」）`, `Parameters of "${module.name}" (to remove one, use "Edit name, parameters" above the module)`)}</p>
           {module.params.length == 0
             ? <p className="muted param_none">{t('這個模組沒有參數。', 'This module has no parameters.')}</p>
             : (
               <table id="param_table" className="data_table">
                 <tbody>
                   {head}
-                  {module.params.map(p => (
-                    <tr key={p.name} className="param_row">
-                      <td><span className="param_name" title={t('參數的名稱要在模組的「修改名稱、參數」裡改', 'Change the name in "Edit name, parameters"')}>🔒 {p.name}</span></td>
-                      <td><span className="param_fixed">{p.type == '數字' ? t('數字', 'Number') : t('文字', 'Text')}</span></td>
+                  {module.params.map((p, k) => (
+                    <tr key={k + ':' + p.name} className="param_row">
+                      <td><ParamName name={p.name} onCommit={name => module.onParam(k, { name })} /></td>
+                      <td>
+                        <select className="var_input" value={p.type} onChange={e => module.onParam(k, { type: e.target.value as ParamInfo['type'] })}>
+                          <option value="數字">{t('數字', 'Number')}</option>
+                          <option value="文字">{t('文字', 'Text')}</option>
+                        </select>
+                      </td>
                       <td><span className="muted">{t('執行時傳進來', 'Given when it runs')}</span></td>
                       <td><span className="muted">{getTarget() == 'scratch'
                         ? t('只能拿來算，不能改（Scratch 的規定）', 'Use it, but do not change it (Scratch rule)')
@@ -102,6 +109,29 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
         </>
       )}
     </div>
+  );
+}
+
+/** 參數名稱的輸入框：離開或按 Enter 才改（改名時模組流程圖裡用到的地方跟著改）；名字不能用就改回原本的 */
+function ParamName({ name, onCommit }: { name: string; onCommit: (name: string) => string | null }) {
+  const [draft, setDraft] = useState(name);
+  useEffect(() => setDraft(name), [name]);
+  const commit = () => {
+    if (draft.trim() == name) {
+      setDraft(name);
+      return;
+    }
+    const why = onCommit(draft.trim());
+    if (why) {
+      alert(why);
+      setDraft(name);
+    }
+  };
+  return (
+    <input
+      className="var_input param_name" value={draft} onChange={e => setDraft(e.target.value)}
+      onBlur={commit} onKeyDown={e => { if (e.key == 'Enter') e.currentTarget.blur(); }}
+    />
   );
 }
 

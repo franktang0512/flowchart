@@ -51,6 +51,24 @@ export interface ModuleSource {
   diagram: Diagram;
 }
 
+/** 積木文字裡完整的名稱 name（前後不是名稱的字，也不在 "引號" 裡）；回呼 f 換掉每一段引號外的文字 */
+function outsideQuotes(text: string, f: (part: string) => string) {
+  return text.split(/("[^"]*"|'[^']*')/).map((part, i) => (i % 2 ? part : f(part))).join('');
+}
+// 名稱只有中英文、數字、底線（見 isName），不用跳脫
+const wordRe = (name: string) => new RegExp(`(?<![\\p{L}\\p{N}_$])${name}(?![\\p{L}\\p{N}_$])`, 'gu');
+/** 把積木文字裡的變數名稱 from 換成 to（只換完整的名稱：改 a 不會動到 abc、主流程的a） */
+export const renameInText = (text: string, from: string, to: string) => outsideQuotes(text, part => part.replace(wordRe(from), to));
+/** 積木文字裡有沒有用到名稱 name */
+export const usesName = (text: string, name: string) => {
+  let found = false;
+  outsideQuotes(text, part => {
+    if (wordRe(name).test(part)) found = true;
+    return part;
+  });
+  return found;
+};
+
 /** 名稱可以用的字：中英文、數字、底線，不能用數字開頭 */
 export const isName = (s: string) => /^[\p{L}_][\p{L}\p{N}_]*$/u.test(s);
 

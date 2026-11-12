@@ -12,8 +12,17 @@ export interface ModuleRequest {
   initial?: ModuleInfo;
   /** 這個名字（模組或參數）能不能用；不能用時回傳原因 */
   nameProblem: (name: string, kind: 'module' | 'param') => string | null;
-  onSave: (info: ModuleInfo) => void;
+  /** 修改時：原本的參數在模組的流程圖裡有沒有用到（有的話回傳說明，不能刪） */
+  paramUsed?: (name: string) => string | null;
+  /**
+   * renames：改了名字的參數（舊名, 新名），流程圖裡用到的地方跟著改；
+   * removed：刪掉的是原本的第幾個參數，執行這個模組的積木也拿掉那個值
+   */
+  onSave: (info: ModuleInfo, renames: [string, string][], removed: number[]) => void;
 }
+
+/** 表單裡的參數；orig 是原本的第幾個（新加的沒有） */
+type ParamRow = ParamInfo & { orig?: number };
 
 export function ModuleDialog({ request, onClose }: { request: ModuleRequest | null; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -32,15 +41,28 @@ export function ModuleDialog({ request, onClose }: { request: ModuleRequest | nu
 function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () => void }) {
   useLang();
   const [name, setName] = useState(request.initial?.name ?? '');
-  const [params, setParams] = useState<ParamInfo[]>(request.initial?.params.map(p => ({ ...p })) ?? []);
+  const [params, setParams] = useState<ParamRow[]>(request.initial?.params.map((p, k) => ({ ...p, orig: k })) ?? []);
   const [returns, setReturns] = useState<'' | '數字' | '文字'>(request.initial?.returns ?? '');
   const [problem, setProblem] = useState<string | null>(null);
 
   const setParam = (k: number, patch: Partial<ParamInfo>) => setParams(params.map((p, i) => (i == k ? { ...p, ...patch } : p)));
+  /** 刪參數：模組的流程圖裡還有用到的話不能刪，請學生先把那些積木刪掉或改掉 */
+  const removeParam = (k: number) => {
+    const p = params[k];
+    const orig = p.orig != null ? request.initial?.params[p.orig].name : undefined;
+    const used = orig ? request.paramUsed?.(orig) : null;
+    if (used) {
+      setProblem(used);
+      return;
+    }
+    setProblem(null);
+    setParams(params.filter((_, i) => i != k));
+  };
 
   const save = () => {
     const n = name.trim();
-    const list = params.map(p => ({ ...p, name: p.name.trim() })).filter(p => p.name);
+    const rows = params.map(p => ({ ...p, name: p.name.trim() })).filter(p => p.name);
+    const list: ParamInfo[] = rows.map(p => ({ name: p.name, type: p.type }));
     const bad = (s: string, kind: 'module' | 'param') => {
       if (!isName(s)) return t(`「${s}」不能當名稱：只能用中英文、數字和底線，不能有空白，也不能用數字開頭。`, `"${s}" cannot be a name. Use letters, numbers and _ only, with no spaces, and do not start with a number.`);
       return request.nameProblem(s, kind);
@@ -54,7 +76,10 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
       setProblem(why);
       return;
     }
-    request.onSave({ name: n, params: list, ...(returns && canReturn() ? { returns } : {}) });
+    const old = request.initial?.params ?? [];
+    const renames = rows.filter(p => p.orig != null && old[p.orig].name != p.name).map(p => [old[p.orig!].name, p.name] as [string, string]);
+    const removed = old.map((_, k) => k).filter(k => !rows.some(p => p.orig == k));
+    request.onSave({ name: n, params: list, ...(returns && canReturn() ? { returns } : {}) }, renames, removed);
     onClose();
   };
 
@@ -73,7 +98,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
             <option value="數字">{t('數字', 'Number')}</option>
             <option value="文字">{t('文字', 'Text')}</option>
           </select>
-          <button onClick={() => setParams(params.filter((_, i) => i != k))}>{t('刪除', 'Remove')}</button>
+          <button onClick={() => removeParam(k)}>{t('刪除', 'Remove')}</button>
         </p>
       ))}
       <p><button onClick={() => setParams([...params, { name: '', type: '數字' }])}>{t('＋ 加一個參數', '+ Add a parameter')}</button></p>

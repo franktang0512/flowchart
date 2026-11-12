@@ -14,7 +14,7 @@ import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, GLOBAL_PREFIX, parseCall, splitId, type LocalVar, type ModuleInfo, type ModuleSource } from './engine/modules';
+import { callText, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -235,19 +235,53 @@ export function App() {
     },
   });
 
+  /** 這張流程圖裡用到 name 的積木（列出積木上的字，給學生找） */
+  const blocksUsing = (d: Diagram, name: string) => d.nodes.filter(n => n && usesName(n.text, name)).map(n => `「${n!.text.trim()}」`);
+  /** 參數在模組的流程圖裡有沒有用到：有的話回傳說明（不能刪） */
+  const paramUsedIn = (m: AppModule) => (name: string) => {
+    const used = blocksUsing(m.diagram, name);
+    return used.length
+      ? t(`參數「${name}」在模組的流程圖裡還有用到：${used.join('、')}。請先把這些積木刪掉或改掉，再刪這個參數。`, `The parameter "${name}" is still used in the module's flowchart: ${used.join(', ')}. Delete or change those blocks first.`)
+      : null;
+  };
+  /** 參數改名（模組的流程圖裡跟著改）、刪掉（執行這個模組的積木拿掉那個值） */
+  const applyParamChanges = (m: AppModule, renames: [string, string][], removed: number[]) => {
+    for (const [from, to] of renames) {
+      for (const node of m.diagram.nodes) {
+        if (node && usesName(node.text, from)) {
+          node.text = renameInText(node.text, from, to);
+          node.variables = node.variables?.map(v => (v == from ? to : v));
+          m.diagram.fitNode(node);
+        }
+      }
+    }
+    if (removed.length) {
+      for (const d of allDiagrams()) {
+        for (const node of d.nodes) {
+          const call = node?.figure == 'Function' ? parseCall(node.text) : null;
+          if (node && call?.name == m.info.name) {
+            node.text = callText(call.name, call.args.filter((_, k) => !removed.includes(k)));
+            d.fitNode(node);
+          }
+        }
+      }
+    }
+  };
+
   const editModule = (m: AppModule) => setModuleDialog({
     id: ++dialogSeq,
     initial: m.info,
     nameProblem: nameProblem(m),
-    onSave: info => {
+    paramUsed: paramUsedIn(m),
+    onSave: (info, renames, removed) => {
+      applyParamChanges(m, renames, removed);
       const oldName = m.info.name;
-      // 改名：每張流程圖裡執行這個模組的積木也跟著改
+      // 改名：每張流程圖裡執行這個模組的積木（還有算式裡用到的地方）也跟著改
       if (info.name != oldName) {
         for (const d of allDiagrams()) {
           for (const node of d.nodes) {
-            const call = node?.figure == 'Function' ? parseCall(node.text) : null;
-            if (node && call?.name == oldName) {
-              node.text = callText(info.name, call.args);
+            if (node && usesName(node.text, oldName)) {
+              node.text = renameInText(node.text, oldName, info.name);
               d.fitNode(node);
             }
           }
@@ -259,7 +293,33 @@ export function App() {
     },
   });
 
+  /** 第三步參數表：改參數的名稱或型別（不能在那裡刪）；名字不能用時回傳原因 */
+  const editParam = (m: AppModule, k: number, patch: Partial<ParamInfo>): string | null => {
+    const old = m.info.params[k];
+    if (!old) return null;
+    const name = patch.name?.trim() ?? old.name;
+    if (name != old.name) {
+      const why = !isName(name)
+        ? t(`「${name}」不能當名稱：只能用中英文、數字和底線，不能有空白，也不能用數字開頭。`, `"${name}" cannot be a name. Use letters, numbers and _ only, with no spaces, and do not start with a number.`)
+        : m.info.params.some((p, i) => i != k && p.name == name) ? t('參數的名字不能重複。', 'Two parameters have the same name.')
+        : name == m.info.name ? t('參數的名字不能跟模組一樣。', 'A parameter cannot have the same name as the module.')
+        : nameProblem(m)(name, 'param');
+      if (why) return why;
+      applyParamChanges(m, [[old.name, name]], []);
+    }
+    const params = m.info.params.map((p, i) => (i == k ? { name, type: patch.type ?? p.type } : p));
+    setModules(modulesRef.current.map(x => (x.id == m.id ? { ...x, info: { ...x.info, params } } : x)));
+    currentDiagram().draw();
+    return null;
+  };
+
   const deleteModule = (m: AppModule) => {
+    // 還有地方執行這個模組：請學生先把那些積木刪掉
+    const used = allDiagrams().filter(d => d != m.diagram).flatMap(d => blocksUsing(d, m.info.name));
+    if (used.length) {
+      alert(t(`模組「${m.info.name}」還有地方在用：${used.join('、')}。請先把這些積木刪掉，再刪除模組。`, `The module "${m.info.name}" is still used: ${used.join(', ')}. Delete those blocks first.`));
+      return;
+    }
     if (!confirm(t(`確定要刪除模組「${m.info.name}」嗎？它的流程圖也會一起刪掉。`, `Delete the module "${m.info.name}"? Its flowchart will be deleted too.`))) return;
     m.diagram.dispose();
     setModules(modulesRef.current.filter(x => x != m));
@@ -276,7 +336,7 @@ export function App() {
       for (const node of d.nodes) {
         if (node?.variables?.includes(from)) {
           node.variables = node.variables.map(v => (v == from ? to : v));
-          node.text = node.text.replaceAll(from, to);
+          node.text = renameInText(node.text, from, to);
           d.fitNode(node);
         }
       }
@@ -354,7 +414,7 @@ export function App() {
           // 只改「主流程的舊名」（Scratch）
           for (const node of d.nodes) {
             if (node?.text.includes(GLOBAL_PREFIX + replaced[0])) {
-              node.text = node.text.replaceAll(GLOBAL_PREFIX + replaced[0], GLOBAL_PREFIX + added[0]);
+              node.text = renameInText(node.text, GLOBAL_PREFIX + replaced[0], GLOBAL_PREFIX + added[0]);
               d.fitNode(node);
             }
           }
@@ -363,7 +423,7 @@ export function App() {
         for (const node of d.nodes) {
           if (node?.variables?.includes(replaced[0])) {
             node.variables = node.variables.map(v => v == replaced[0] ? added[0] : v);
-            node.text = node.text.replaceAll(replaced[0], added[0]);
+            node.text = renameInText(node.text, replaced[0], added[0]);
             d.fitNode(node);
           }
         }
@@ -863,6 +923,7 @@ export function App() {
                     locals: getTarget() == 'cpp' || m.info.locals?.length ? m.info.locals ?? [] : null,
                     onLocals: (next: LocalVar[], rename?: [string, string]) => setLocals(m.id, next, rename),
                     localProblem: (name: string, id: number, rows: LocalVar[]) => localVarProblem(m, name, id, rows),
+                    onParam: (k: number, patch: Partial<ParamInfo>) => editParam(m, k, patch),
                     onProblem: sameNameAlert,
                   };
                 })()}
