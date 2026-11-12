@@ -14,7 +14,7 @@ import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
+import { callText, cppType, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, typeLabel, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -307,7 +307,13 @@ export function App() {
       if (why) return why;
       applyParamChanges(m, [[old.name, name]], []);
     }
-    const params = m.info.params.map((p, i) => (i == k ? { name, type: patch.type ?? p.type } : p));
+    const params = m.info.params.map((p, i) => {
+      if (i != k) return p;
+      const type = patch.type ?? p.type;
+      const float = 'float' in patch ? patch.float : p.float;
+      const desc = patch.desc ?? p.desc;
+      return { name, type, ...(type == '數字' && float ? { float: true } : {}), ...(desc ? { desc } : {}) };
+    });
     setModules(modulesRef.current.map(x => (x.id == m.id ? { ...x, info: { ...x.info, params } } : x)));
     currentDiagram().draw();
     return null;
@@ -402,6 +408,7 @@ export function App() {
     varStore.type_var_list.text = rows.filter(r => r.type == '文字').map(r => r.name);
     varStore.type_var_list.array = rows.filter(r => r.type == '清單').map(r => r.name);
     varStore.type_var_list.grid = rows.filter(r => r.type == '二維清單').map(r => r.name);
+    varStore.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
 
     rows.forEach(r => committedVarNames.current.set(r.id, r.name));
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
@@ -667,9 +674,9 @@ export function App() {
       questionName: questionIn(question, getLang()).title,
       questionNote: noteRef.current!.value,
       vars: [
-        ...varsRef.current.map(v => [v.name, v.type, v.init, v.desc]),
+        ...varsRef.current.map(v => [v.name, typeLabel(v.type, v.float, v.init), v.init, v.desc]),
         // C++ 模組的區域變數：說明欄註明是哪個模組的
-        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, v.type, v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
+        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, typeLabel(v.type, v.float, v.init), v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
       ],
       cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     });
@@ -746,6 +753,8 @@ export function App() {
       type: v.type == '文字' || v.type == '清單' || v.type == '二維清單' ? v.type : '數字',
       init: String(v.init ?? '0'),
       desc: String(v.desc ?? ''),
+      // 以前的作品沒有 int / float：C++ 初始值有小數點的當成 float
+      ...(v.float || (getTarget() == 'cpp' && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
     })));
     // 先清空舊的變數清單，不然會被當成「改名」而去改到流程圖裡的字
     varStore.var_list.name = [];
@@ -755,8 +764,9 @@ export function App() {
     replaceModules((work.modules ?? []).map(m => ({
       info: {
         name: String(m.name ?? ''),
-        params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字' })),
+        params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字', ...(p.float && p.type != '文字' ? { float: true } : {}), ...(p.desc ? { desc: String(p.desc) } : {}) })),
         ...(m.returns == '數字' || m.returns == '文字' ? { returns: m.returns } : {}),
+        ...(m.returns == '數字' && m.returnsFloat ? { returnsFloat: true } : {}),
         ...(Array.isArray(m.locals) && m.locals.length ? {
           locals: m.locals.map(v => ({
             id: ++varSeq,
@@ -764,6 +774,7 @@ export function App() {
             type: (['數字', '文字', '清單', '二維清單'] as const).find(x => x == v.type) ?? '數字',
             init: String(v.init ?? ''),
             desc: String(v.desc ?? ''),
+            ...(v.float ? { float: true } : {}),
           })),
         } : {}),
       },
@@ -892,7 +903,7 @@ export function App() {
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
         open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
-        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init }))}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float }))}
       />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>
@@ -1010,8 +1021,8 @@ export function App() {
                 <div className="module_bar">
                   <span>
                     {t('定義', 'Define')} <b>{m.info.name}</b>
-                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
-                    {m.info.returns && <>{t('，回傳', ', returns ')}{m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
+                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${getTarget() == 'cpp' ? `［${cppType(p.type, p.float)}］` : p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
+                    {m.info.returns && <>{t('，回傳', ', returns ')}{getTarget() == 'cpp' ? ' ' + cppType(m.info.returns, m.info.returnsFloat) : m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
                   </span>
                   <span className="muted">{t('從「開始」做到「結束」，做完回到執行它的地方', 'Runs from Start to End, then goes back to where it was run')}</span>
                   <button onClick={() => editModule(m)}>{t('修改名稱、參數', 'Edit name, parameters')}</button>

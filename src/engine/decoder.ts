@@ -23,7 +23,7 @@ import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
 import { GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
-import { exprType, parseExpr, type ExprType, type VarInfo } from './structure';
+import { exprType, parseExpr, type Expr, type ExprType, type VarInfo } from './structure';
 
 /** 第三步「變數」表格整理出來的變數清單 */
 export interface VarStore {
@@ -38,6 +38,8 @@ export interface VarStore {
   locals?: string[];
   /** 有回傳值的模組名稱：算式裡可以寫「名稱(引數)」 */
   calls?: string[];
+  /** C++：宣告成 float（小數）的數字變數、參數；其他數字是 int（整數），存值時小數會被去掉（跟 C++ 一樣） */
+  floats?: string[];
 }
 
 /** 區域變數照型別分好（給下拉選單、型別檢查用） */
@@ -81,6 +83,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
     paramsReadOnly: getTarget() == 'scratch',
     locals: named.map(v => v.name.trim()),
     calls: vars.calls,
+    floats: [...g(vars.floats ?? []), ...params.filter(p => p.type == '數字' && p.float).map(p => p.name), ...named.filter(v => v.type == '數字' && v.float).map(v => v.name.trim())],
   };
 }
 
@@ -283,6 +286,7 @@ const CPP_RANGE_MESSAGES = () => ({
 });
 
 const runtimeMessages = () => ({
+  intDivZero: t('整數除以 0：C++ 的整數不能除以 0，請檢查除數。', 'Whole-number division by 0. In C++ an int cannot be divided by 0. Check the number you divide by.'),
   noInput: t('測資的輸入不夠：執行到「輸入 {name}」時，已經沒有資料可以讀了。', 'Not enough test input: nothing is left to read at "Input {name}".'),
   inputNotNum: t('測資裡的「{v}」不是數字，不能存進數字變數「{name}」。如果要存文字，請把「{name}」的型別改成文字。', '"{v}" in the test input is not a number. It cannot go into the number variable "{name}". To keep words, change the type of "{name}" to Text.'),
   listToNum: t('清單不能直接存進數字變數「{name}」。', 'A list cannot go into the number variable "{name}".'),
@@ -339,6 +343,12 @@ function __num(v, i, name) {
   if (!__isNum(v)) __err('nanToNum', i, { name: name });
   return v;
 }
+function __idiv(a, b, i) {
+  if (b == 0) __err('intDivZero', i, {});
+  return Math.trunc(a / b);
+}
+function __int(v, i, name) { return Math.trunc(__num(v, i, name)); }
+function __intItem(v) { return typeof v == 'number' ? Math.trunc(v) : v; }
 function __text(v, i, name) {
   if (Array.isArray(v)) __err('listToText', i, { name: name });
   return String(v);
@@ -502,6 +512,17 @@ class CodeGenerator {
     return this.vars.var_list.value[this.vars.var_list.name.indexOf(name)] == '文字';
   }
 
+  /** C++ 的 int 變數（或參數）：存進去的值小數會被去掉 */
+  private isIntVar(name: string) {
+    return getTarget() == 'cpp' && this.vars.type_var_list.number.includes(name) && !(this.vars.floats ?? []).includes(name);
+  }
+
+  /** C++ 的清單、二維清單裝 int：放進去的數字小數會被去掉 */
+  private item(list: string, value: string) {
+    const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
+    return getTarget() == 'cpp' && (this.isList(list) || this.isGrid(list)) && holds == '數字' ? `__intItem(${value})` : value;
+  }
+
   /** 二維清單的一格「表[a][b]」：名稱後面的 [ 是第 k 個，配對的 ] 後面緊接著另一個 [ */
   private isCell(tokens: Token[], k: number) {
     const name = tokens[k - 1];
@@ -515,8 +536,60 @@ class CodeGenerator {
   }
 
   /** 學生寫的運算式 → JavaScript：清單或文字[第幾項]、二維清單[列][行]、長度(清單或文字)、判斷式的 and/or/= */
+  /** C++：運算式是不是整數（int）——整數 / 整數 要照 C++ 去掉小數 */
+  private isIntExpr(e: Expr): boolean {
+    const { array, grid } = this.vars.type_var_list;
+    const holdsInt = (name: string) => (array.includes(name) || grid.includes(name)) && this.vars.var_list.value[this.vars.var_list.name.indexOf(name)] == '數字';
+    switch (e.t) {
+      case 'num': return !e.v.includes('.');
+      case 'var': return this.isIntVar(e.name);
+      case 'idx':
+        if (e.obj.t == 'var') return array.includes(e.obj.name) && holdsInt(e.obj.name);
+        return e.obj.t == 'idx' && e.obj.obj.t == 'var' && grid.includes(e.obj.obj.name) && holdsInt(e.obj.obj.name);
+      case 'call': return e.fn != 'has';
+      case 'fcall': {
+        const m = this.modules.find(x => x.name == e.name);
+        return m?.returns == '數字' && !m.returnsFloat;
+      }
+      case 'neg': return this.isIntExpr(e.a);
+      case 'bin': return ['+', '-', '*', '/', '%'].includes(e.op) && this.isIntExpr(e.a) && this.isIntExpr(e.b);
+      default: return false;
+    }
+  }
+
+  /**
+   * C++：哪些「整數 / 整數」要改成 __idiv(a, b)（去掉小數，跟 C++ 一樣）。
+   * 回傳每個 token 前面要加幾個「__idiv(」、哪些 / 換成逗號、後面要加幾個「)」
+   */
+  private intDivisions(text: string) {
+    const open = new Map<number, number>();
+    const close = new Map<number, number>();
+    const ops = new Set<number>();
+    if (getTarget() != 'cpp') return { open, close, ops };
+    const visit = (e: Expr) => {
+      switch (e.t) {
+        case 'bin':
+          visit(e.a);
+          visit(e.b);
+          if (e.op == '/' && e.span && this.isIntExpr(e.a) && this.isIntExpr(e.b)) {
+            const [from, at, to] = e.span;
+            open.set(from, (open.get(from) ?? 0) + 1);
+            ops.add(at);
+            close.set(to - 1, (close.get(to - 1) ?? 0) + 1);
+          }
+          break;
+        case 'idx': visit(e.obj); visit(e.index); break;
+        case 'call': case 'fcall': e.args.forEach(visit); break;
+        case 'neg': case 'not': visit(e.a); break;
+      }
+    };
+    visit(parseExpr(text));
+    return { open, close, ops };
+  }
+
   private expr(text: string, i: number, condition = false): string {
     const tokens = tokenize(text);
+    const div = this.intDivisions(text);
     // 每個 [ 是哪一種：清單的一項、二維清單的第一個／第二個 [ 、一般的中括號
     const stack: ('item' | 'cell1' | 'cell2' | 'raw')[] = [];
     let secondBracket = false;
@@ -558,8 +631,11 @@ class CodeGenerator {
         piece = kind == 'cell1' ? '), (' : kind == 'raw' || kind == null ? ']' : '))';
         if (kind == 'cell1') secondBracket = true;
       }
+      // C++ 的整數除法：a / b → __idiv(a, b, 積木編號)
+      if (div.ops.has(k)) piece = ', ';
+      piece = '__idiv('.repeat(div.open.get(k) ?? 0) + piece + `, ${i})`.repeat(div.close.get(k) ?? 0);
       out += (word && prevWord ? ' ' : '') + piece;
-      prevWord = word;
+      prevWord = word && !div.close.has(k);
     });
     // 長度( )、項目編號( )、包含( ) 要把積木編號傳進去，錯誤時才能標出積木
     out = out.replace(/__(len|find|has)\(/g, `__$1_${i}(`);
@@ -583,16 +659,16 @@ class CodeGenerator {
     // 二維清單的一格：表[a][b]
     const cell = splitTarget(target);
     if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
-      return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${value});\n`;
+      return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${this.item(cell.name, value)});\n`;
     }
     const item = listItemTarget(target);
     // 文字、數字變數接 [ ] 也交給 __set，執行時會說明為什麼不行
     if (item && this.isVar(item.list)) {
-      return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${value});\n`;
+      return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${this.item(item.list, value)});\n`;
     }
     const { number, text } = this.vars.type_var_list;
     const name = JSON.stringify(target);
-    if (number.includes(target)) return `${target} = __num(${value}, ${i}, ${name});\n`;
+    if (number.includes(target)) return `${target} = ${this.isIntVar(target) ? '__int' : '__num'}(${value}, ${i}, ${name});\n`;
     if (text.includes(target)) return `${target} = __text(${value}, ${i}, ${name});\n`;
     if (this.isList(target)) return `${target} = __list(${value}, ${i}, ${name});\n`;
     return `${target} = ${value};\n`;
@@ -619,7 +695,7 @@ class CodeGenerator {
             const head = `function __mod${this.sheet}(${this.params.map(p => p.name).join(', ')}){\n`
               + `if (arguments.length != ${this.params.length}) __err('argCount', ${i}, { name: ${name}, got: arguments.length, n: ${this.params.length} });\n`
               // 傳進來的值照參數的型別檢查
-              + this.params.map(p => `${p.name} = ${p.type == '文字' ? '__text' : '__num'}(${p.name}, ${i}, ${JSON.stringify(p.name)});\n`).join('')
+              + this.params.map(p => `${p.name} = ${p.type == '文字' ? '__text' : this.isIntVar(p.name) ? '__int' : '__num'}(${p.name}, ${i}, ${JSON.stringify(p.name)});\n`).join('')
               // 區域變數：每次執行模組都重新從初始值開始（遞迴時每一層有自己的一份）
               + this.locals.map(v => `var ${v.name.trim()} = ${initialValue(this.vars, v.name.trim(), v.init)};\n`).join('')
               + 'var __ret;\n';
@@ -666,22 +742,23 @@ class CodeGenerator {
           if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
             const g = JSON.stringify(cell.name);
             const read = this.gridHoldsText(cell.name) ? '__inText' : '__inNum';
-            code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${read}(input_list, ${i}, ${g}));\n`;
+            code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${this.item(cell.name, `${read}(input_list, ${i}, ${g})`)});\n`;
           }
           // 輸入 成績 插入第 k 項：跟計算積木的「插入」一樣，k 可以是 1 到 長度+1
           else if (insert) {
             const list = insert[1].trim();
             const listName = JSON.stringify(list);
-            code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), __inList(input_list, ${i}, ${listName}));\n`;
+            code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), ${this.item(list, `__inList(input_list, ${i}, ${listName})`)});\n`;
           }
           // 輸入 成績[k]：替換第 k 項，跟計算積木一樣從第 1 項開始，超出範圍會提示
           else if (item && this.isVar(item.list)) {
             const list = JSON.stringify(item.list);
-            code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), __inList(input_list, ${i}, ${list}));\n`;
+            code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), ${this.item(item.list, `__inList(input_list, ${i}, ${list})`)});\n`;
           }
-          else if (this.isList(v)) code = `${v}.push(__inList(input_list, ${i}, ${name}));\n`;
+          else if (this.isList(v)) code = `${v}.push(${this.item(v, `__inList(input_list, ${i}, ${name})`)});\n`;
           else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
-          else code = `${v} = __inNum(input_list, ${i}, ${name});\n`;
+          // C++ 的 int：讀到小數時小數去掉
+          else code = `${v} = ${this.isIntVar(v) ? 'Math.trunc' : ''}(__inNum(input_list, ${i}, ${name}));\n`;
         }
         else {
           code = 'output_result += (__show(' + expr(parts.slice(1).join(' ')) + ') + "\\n");\n';
@@ -729,13 +806,13 @@ class CodeGenerator {
           if (next && !(next.figure == 'Circle' && next.text == '結束')) {
             this.fail(t(`${label(node)} 後面要直接接「結束」：回傳之後就離開模組，後面的積木不會做。`, `${label(node)} must go straight to "End". After returning, the module stops.`), node);
           }
-          const code = `__ret = ${m.returns == '文字' ? '__text' : '__num'}(${value}, ${i}, ${JSON.stringify(t('回傳值', 'return value'))});\n`;
+          const code = `__ret = ${m.returns == '文字' ? '__text' : getTarget() == 'cpp' && !m.returnsFloat ? '__int' : '__num'}(${value}, ${i}, ${JSON.stringify(t('回傳值', 'return value'))});\n`;
           this.checkSyntax(node, code);
           return { code: code + 'total_step ++;' + update, next };
         }
         const name = JSON.stringify(target);
-        const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${value});\n`
-          : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${value});\n`
+        const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value)});\n`
+          : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${this.item(target, value)});\n`
           : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
           : action == '清空' ? `__clear(${target}, ${name}, ${i});\n`
           // 二維清單設定大小：每一格放 0（裝文字的放空的文字）
@@ -850,6 +927,9 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
   }
   if (value == '') return '0';
   if (!isNumeric(value)) throw new FlowError(t(`變數「${name}」是數字，但初始值「${value}」不是數字：請到第三步的變數表修改。`, `"${name}" is a number variable, but its start value "${value}" is not a number. Change it in the variable table (step 3).`));
+  if (getTarget() == 'cpp' && !(vars.floats ?? []).includes(name) && !Number.isInteger(Number(value))) {
+    throw new FlowError(t(`變數「${name}」是 int（整數），但初始值「${value}」有小數：請到第三步的變數表改成整數，或把型別改成 float（小數）。`, `"${name}" is an int, but its start value "${value}" has a decimal part. Change it to a whole number, or make the type float (step 3).`));
+  }
   return value;
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { localTypes, type VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
-import { GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
+import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { byTarget, getTarget, itemWord } from '../target';
 
@@ -406,7 +406,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               {m.params.map((p, k) => (
                 <p key={p.name}>
                   <label>
-                    {p.name}<span className="muted">（{p.type == '文字' ? t('文字', 'text') : t('數字', 'number')}）</span>{' = '}
+                    {p.name}<span className="muted">（{getTarget() == 'cpp' ? cppType(p.type, p.float) : p.type == '文字' ? t('文字', 'text') : t('數字', 'number')}）</span>{' = '}
                     <input
                       value={f.moduleArgs[k] ?? ''}
                       onChange={e => {

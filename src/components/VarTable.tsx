@@ -12,6 +12,8 @@ export interface VarRow {
   type: '數字' | '文字' | '清單' | '二維清單';
   init: string;
   desc: string;
+  /** C++：數字是 float（小數）；沒有就是 int（整數）。Scratch、Blockly 不分 */
+  float?: boolean;
 }
 
 /** 清單、二維清單：一開始是空的，初始值欄改成選裡面裝什麼 */
@@ -55,7 +57,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
     </tr>
   );
   return (
-    <div id="step3" className="card">
+    <div id="step3" className={getTarget() == 'cpp' ? 'card cpp_types' : 'card'}>
       <h5 className="card_title"><span className="step_badge">3</span>{t('定義變數', 'Variables')}</h5>
       {module && (
         // 模組的參數：名稱、型別可以在這裡改，但不能在這裡刪（要刪請到模組上方的「修改名稱、參數」）
@@ -71,21 +73,30 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
                     <tr key={k + ':' + p.name} className="param_row">
                       <td><ParamName name={p.name} onCommit={name => module.onParam(k, { name })} /></td>
                       <td>
-                        <select className="var_input" value={p.type} onChange={e => module.onParam(k, { type: e.target.value as ParamInfo['type'] })}>
-                          <option value="數字">{t('數字', 'Number')}</option>
-                          <option value="文字">{t('文字', 'Text')}</option>
+                        <select className="var_input" value={typeValue(p.type, p.float)} onChange={e => module.onParam(k, fromTypeValue(e.target.value) as Partial<ParamInfo>)}>
+                          <TypeOptions />
                         </select>
                       </td>
-                      <td><span className="muted">{t('執行時傳進來', 'Given when it runs')}</span></td>
-                      <td><span className="muted">{getTarget() == 'scratch'
-                        ? t('只能拿來算，不能改（Scratch 的規定）', 'Use it, but do not change it (Scratch rule)')
-                        : t('流程裡可以改它的值，只改到模組自己的那一份', 'You can change its value; only this module sees it')}</span></td>
+                      {/* 初始值：參數的值由「執行模組」積木傳進來（C++ 其實可以給預設值，這裡先只練習傳參數） */}
+                      <td className="param_init" title={getTarget() == 'cpp'
+                        ? t('C++ 其實可以替參數設預設值（例如 int a = 0），這裡先練習在執行模組時把值傳進來。', 'C++ can give a parameter a default value (like int a = 0). Here, practice passing the value in when the module runs.')
+                        : t('參數的值由「執行模組」積木傳進來。', 'The value comes from the "Run module" block.')}>
+                        <span className="muted">{t('由執行模組傳入', 'Passed in')}</span>
+                      </td>
+                      <td><ParamDesc desc={p.desc ?? ''} onCommit={desc => module.onParam(k, { desc })} /></td>
                       <td></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+          {module.params.length > 0 && (
+            <p className="muted param_rule">{getTarget() == 'scratch'
+              ? t('參數在模組裡只能拿來算，不能改（Scratch 的規定）。', 'Inside the module you can use a parameter but not change it (a Scratch rule).')
+              : getTarget() == 'cpp'
+              ? t('參數的值由「執行模組」傳進來。C++ 其實可以替參數設預設值，這裡先專心練習傳參數。參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'The value is passed in by "Run module". C++ can give a parameter a default value, but here we practice passing values. You can change a parameter in the flow; only the module\'s own copy changes.')
+              : t('參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'A parameter is a variable too. You can change it in the flow, but only the module\'s own copy changes.')}</p>
+          )}
           {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
           {/* 全域變數只在主流程顯示；模組這裡只列這個模組自己的 */}
           <p className="muted global_note">{getTarget() == 'cpp'
@@ -109,6 +120,48 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * 型別下拉選單的值：C++ 的數字分 int（'數字'）、float（'float'）；文字是 string。
+ * Scratch、Blockly 只有數字、文字
+ */
+const typeValue = (type: string, float?: boolean) => (type == '數字' && float && getTarget() == 'cpp' ? 'float' : type);
+const fromTypeValue = (value: string) => (value == 'float'
+  ? { type: '數字' as const, float: true }
+  : { type: value as VarRow['type'], float: undefined });
+
+/** 數字、文字的選項（C++ 寫成 int、float、string） */
+export function TypeOptions() {
+  if (getTarget() == 'cpp') {
+    return (
+      <>
+        <option value="數字">{t('int（整數）', 'int')}</option>
+        <option value="float">{t('float（小數）', 'float')}</option>
+        <option value="文字">{t('string（文字）', 'string')}</option>
+      </>
+    );
+  }
+  return (
+    <>
+      <option value="數字">{t('數字', 'Number')}</option>
+      <option value="文字">{t('文字', 'Text')}</option>
+    </>
+  );
+}
+
+/** 參數的說明（像註解，學生自己寫）：離開或按 Enter 才存 */
+function ParamDesc({ desc, onCommit }: { desc: string; onCommit: (desc: string) => void }) {
+  const [draft, setDraft] = useState(desc);
+  useEffect(() => setDraft(desc), [desc]);
+  return (
+    <input
+      className="var_input param_desc" value={draft} placeholder={t('這個參數是做什麼用的', 'What is it for?')}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => { if (draft != desc) onCommit(draft); }}
+      onKeyDown={e => { if (e.key == 'Enter') e.currentTarget.blur(); }}
+    />
   );
 }
 
@@ -204,21 +257,21 @@ function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: Var
       <td><input {...text('name')} /></td>
       <td>
         <select
-          className="var_input" value={row.type}
+          className="var_input" value={typeValue(row.type, row.float)}
           onChange={e => {
-            const type = e.target.value as VarRow['type'];
-            // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字
-            const init = isListType(type) ? (row.init == '文字' ? '文字' : '數字')
+            const { type, float } = fromTypeValue(e.target.value);
+            // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字；改成 int 時初始值的小數去掉
+            let init = isListType(type) ? (row.init == '文字' || row.init == '小數' ? row.init : '數字')
               : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
-            onChange(row.id, { type, init });
+            if (type == '數字' && !float && /^\s*-?\d+\.\d*\s*$/.test(init)) init = String(Math.trunc(Number(init)));
+            onChange(row.id, { type, init, float });
             onCommit();
           }}
         >
-          <option value="數字">{t('數字', 'Number')}</option>
-          <option value="文字">{t('文字', 'Text')}</option>
-          <option value="清單">{t('清單', 'List')}</option>
-          {(getTarget() == 'cpp' || row.type == '二維清單') && <option value="二維清單">{t('二維清單', '2D list')}</option>}
+          <TypeOptions />
+          <option value="清單">{getTarget() == 'cpp' ? 'vector' : t('清單', 'List')}</option>
+          {(getTarget() == 'cpp' || row.type == '二維清單') && <option value="二維清單">{getTarget() == 'cpp' ? t('二維 vector', '2D vector') : t('二維清單', '2D list')}</option>}
         </select>
       </td>
       <td>
@@ -229,14 +282,22 @@ function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: Var
           ? (
             // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>）
             <select
-              className="var_input" value={row.init == '文字' ? '文字' : '數字'}
+              className="var_input" value={row.init == '文字' || row.init == '小數' ? row.init : '數字'}
               title={row.type == '二維清單'
                 ? t('二維清單一開始是空的，要先用計算積木「建立 幾 列 幾 行」；這裡選裡面要裝什麼', 'The 2D list starts empty. Make it with a Math block (rows × columns). Choose what it holds.')
                 : t('清單一開始是空的，這裡選裡面要裝什麼', 'The list starts empty. Choose what it holds.')}
               onChange={e => { onChange(row.id, { init: e.target.value }); onCommit(); }}
             >
-              <option value="數字">{t('裝數字', 'Numbers')}</option>
-              <option value="文字">{t('裝文字', 'Text')}</option>
+              {getTarget() == 'cpp'
+                ? <>
+                    <option value="數字">{t('裝 int', 'int')}</option>
+                    <option value="小數">{t('裝 float', 'float')}</option>
+                    <option value="文字">{t('裝 string', 'string')}</option>
+                  </>
+                : <>
+                    <option value="數字">{t('裝數字', 'Numbers')}</option>
+                    <option value="文字">{t('裝文字', 'Text')}</option>
+                  </>}
             </select>
           )
           : <input {...text('init')} />}

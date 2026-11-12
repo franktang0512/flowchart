@@ -1247,6 +1247,20 @@ input, textarea, select, button {
   margin: 12px 0 0;
   font-size: 0.9em;
 }
+/* C++ 的型別寫成「float（小數）」，選單要寬一點才看得完整 */
+.cpp_types select.var_input {
+  min-width: 128px !important;
+}
+/* 參數表：初始值不能改（值由執行模組傳進來），說明可以寫 */
+#param_table td.param_init {
+  background: #f3f4f6;
+  cursor: help;
+  font-size: 0.9em;
+}
+.param_rule {
+  margin: 6px 0 0;
+  font-size: 0.9em;
+}
 
 /* ---------- Scratch「建立一個積木」（照練習網頁 individual_demo） ---------- */
 .proc_overlay {

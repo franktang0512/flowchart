@@ -4,12 +4,18 @@
 // （figure 'Function'，長方形兩邊各多一條直線）執行它，積木上的字是「模組名稱(引數, 引數)」。
 // 模組可以有參數（Scratch 只能讀；Blockly、C++ 可以改，只改到自己的那一份）、回傳值（Blockly、C++）、
 // 區域變數（只有 C++）。要把結果帶回來也可以存到全域變數（變數表的變數大家都能用）。
+import { t } from '../i18n';
+import { getTarget } from '../target';
 import type { Diagram } from './diagram';
 
 export interface ParamInfo {
   name: string;
   /** 參數的型別：學生跟變數表的變數一樣自己決定（三種語言都一樣） */
   type: '數字' | '文字';
+  /** C++：數字是 float（小數）；沒有就是 int（整數）。Scratch、Blockly 不分 */
+  float?: boolean;
+  /** 說明：學生自己寫這個參數是做什麼用的（像註解） */
+  desc?: string;
 }
 
 export interface ModuleInfo {
@@ -21,6 +27,8 @@ export interface ModuleInfo {
    * 用的地方可以寫在算式裡，例如「答案 設為 找最大(x, y)」
    */
   returns?: '數字' | '文字';
+  /** C++：回傳的數字是 float（小數）；沒有就是 int */
+  returnsFloat?: boolean;
   /**
    * 區域變數（只有 C++ 有：寫在函式裡面，每次執行模組都重新從初始值開始，別的地方用不到）。
    * Scratch、Blockly 沒有區域變數（在模組裡建的變數也是全域的），所以只有學習目標是 C++ 時才能新增
@@ -35,6 +43,25 @@ export interface LocalVar {
   type: '數字' | '文字' | '清單' | '二維清單';
   init: string;
   desc: string;
+  /** C++：數字是 float（小數）；沒有就是 int（整數） */
+  float?: boolean;
+}
+
+/**
+ * C++ 的型別名稱（給學生看的）：數字分 int（整數）、float（小數），文字是 string。
+ * 只是過渡用，不讓學生碰太多型別：清單只能裝這三種
+ */
+export const cppType = (type: '數字' | '文字', float?: boolean) => (type == '文字' ? 'string' : float ? 'float' : 'int');
+
+/** 給學生看的型別名稱：C++ 寫 int / float / string、vector<int>…；Scratch、Blockly 寫數字、文字、清單 */
+export function typeLabel(type: string, float?: boolean, init?: string): string {
+  if (getTarget() == 'cpp') {
+    const elem = init == '文字' ? 'string' : init == '小數' ? 'float' : 'int';
+    if (type == '清單') return `vector<${elem}>`;
+    if (type == '二維清單') return `vector<vector<${elem}>>`;
+    return cppType(type == '文字' ? '文字' : '數字', float);
+  }
+  return type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : type == '二維清單' ? t('二維清單', '2D list') : t('數字', 'Number');
 }
 
 /**

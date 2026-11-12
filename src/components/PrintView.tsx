@@ -6,6 +6,7 @@ export interface PrintData {
   questionName: string;
   questionNote: string;
   /** [名稱, 型別, 初始值, 說明] */
+  /** [名稱, 型別（已經寫成給學生看的名稱）, 初始值, 說明] */
   vars: string[][];
   /** [輸入, 輸出, 測試重點] */
   cases: string[][];
@@ -13,7 +14,6 @@ export interface PrintData {
 
 import { t, useLang } from '../i18n';
 
-const typeName = (type: string) => (type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : type == '二維清單' ? t('二維清單', '2D list') : t('數字', 'Number'));
 
 export function PrintView({ visible, data, imgSrc, modules }: { visible: boolean; data: PrintData | null; imgSrc: string | undefined; modules: { title: string; src: string }[] }) {
   useLang();
@@ -48,7 +48,7 @@ export function PrintView({ visible, data, imgSrc, modules }: { visible: boolean
                   {data?.vars.map((v, i) => (
                     <tr key={i}>
                       <td style={{ width: '20%' }}>{v[0]}</td>
-                      <td style={{ width: '20%' }}>{typeName(v[1])}</td>
+                      <td style={{ width: '20%' }}>{v[1]}</td>
                       <td style={{ width: '20%' }}>{v[2]}</td>
                       <td style={{ width: '50%' }}>{v[3]}</td>
                     </tr>

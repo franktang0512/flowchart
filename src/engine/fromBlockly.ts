@@ -398,7 +398,8 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
     m.params = defs[k].names.map((p, i): ParamInfo => {
       const type = defs[k].types[i] ?? old?.params.find(x => x.name == p)?.type
         ?? ((callArgs.get(m.name) ?? []).some(a => a[i] && isTextValue(a[i])) ? '文字' : '數字');
-      return { name: p, type };
+      const desc = old?.params.find(x => x.name == p)?.desc;
+      return { name: p, type, ...(desc ? { desc } : {}) };
     });
   });
   // Blockly 的函式參數也是變數，但不是變數表的變數

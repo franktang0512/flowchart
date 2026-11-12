@@ -1,10 +1,10 @@
 // 「看程式」：流程圖的結構 → C++（學習目標是 C++ 時，清單的索引從 0 開始，所以位置直接照抄）。
-// 給學生看「流程圖怎麼變成程式」，以好讀為主：數字變數用 int，會算出小數的才用 double，清單用 vector。
+// 給學生看「流程圖怎麼變成程式」，以好讀為主：型別照第三步學生選的 int / float / string，清單用 vector。
 import { t } from '../i18n';
+import { cppType } from './modules';
 import { exprType, type Expr, type ExprType, type ModuleProgram, type Stmt, type VarInfo } from './structure';
 
 const INDENT = '    ';
-const paramKey = (m: string, p: string) => m + '\u0000' + p;
 
 /** 運算子的優先順序（數字越大越先算），決定要不要加括號 */
 const PREC: Record<string, number> = {
@@ -17,33 +17,30 @@ const NEGATE: Record<string, string> = { '==': '!=', '!=': '==', '<': '>=', '<='
 export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgram[] = []): string {
   const globals = new Map(varList.map(v => [v.name, v]));
   /** 模組的區域變數（寫在函式裡面） */
-  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init }));
+  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float }));
   /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數和區域變數 */
   let vars = globals;
   /** 目前寫到哪個模組（null 是主程式） */
   let current: ModuleProgram | null = null;
   const enter = (m: ModuleProgram | null) => {
     current = m;
-    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '' } as VarInfo] as const), ...localsOf(m).map(v => [v.name, v] as const)]) : globals;
+    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '', float: p.float } as VarInfo] as const), ...localsOf(m).map(v => [v.name, v] as const)]) : globals;
   };
   /** 全部的變數（全域＋各模組的區域變數；名字不會重複，執行時會擋） */
   const allVars = [...varList, ...modules.flatMap(localsOf)];
-  const doubles = findDoubles([program, ...modules.map(m => m.body)], allVars);
-  /** 數字參數有沒有被傳過小數（有的話用 double） */
-  const paramDouble = new Set<string>();
-  /** 回傳數字的模組，回傳值會不會有小數（有的話回傳 double） */
-  const returnDouble = new Set<string>();
   /** 傳給模組的值：文字參數傳數字進去要先變成文字 */
   const argCode = (name: string, a: Expr, k: number) => {
     const p = modules.find(x => x.name == name)?.params[k];
     return p?.type == '文字' && typeOf(a) != 'str' ? strPart(a, false) : expr(a);
   };
   // 用到哪些東西：最後只 #include 有用到的
-  const uses = { indexOf: false, inputNumber: false, inputText: false, cmath: false, string: false };
+  const uses = { indexOf: false, inputNumber: false, inputFloat: false, inputText: false, cmath: false, string: false };
 
-  /** 數字變數是 int 還是 double */
-  const numType = (name: string) => (doubles.has(name) ? 'double' : 'int');
-  const elemType = (list: string) => ((vars.get(list) ?? allVars.find(v => v.name == list))?.init == '文字' ? 'string' : 'int');
+  /** 清單裡裝什麼：學生在第三步選的 int / float / string */
+  const elemType = (list: string) => {
+    const init = (vars.get(list) ?? allVars.find(v => v.name == list))?.init;
+    return init == '文字' ? 'string' : init == '小數' ? 'float' : 'int';
+  };
   const typeOf = (e: Expr): ExprType => exprType(e, vars, modules);
   const paramOf = (name: string) => (current as ModuleProgram | null)?.params.find(p => p.name == name);
   /** 運算式是不是整數（決定 / 要不要先轉成小數） */
@@ -52,8 +49,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'num': return !e.v.includes('.');
       case 'var': {
         const p = paramOf(e.name);
-        if (p) return p.type == '數字' && !paramDouble.has(paramKey(current!.name, p.name));
-        return vars.get(e.name)?.type == '數字' && !doubles.has(e.name);
+        if (p) return p.type == '數字' && !p.float;
+        const v = vars.get(e.name);
+        return v?.type == '數字' && !v.float;
       }
       case 'idx':
         // 清單的一項、二維清單的一格（只取一個 [ ] 的二維清單是一整列，不是數字）
@@ -62,10 +60,11 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'call': return true;
       case 'fcall': {
         const m = modules.find(x => x.name == e.name);
-        return m?.returns == '數字' && !returnDouble.has(m.name);
+        return m?.returns == '數字' && !m.returnsFloat;
       }
       case 'neg': return isInt(e.a);
-      case 'bin': return ['+', '-', '*', '%'].includes(e.op) && isInt(e.a) && isInt(e.b);
+      // 整數 / 整數 在 C++ 還是整數（小數去掉），流程圖執行時也一樣
+      case 'bin': return ['+', '-', '*', '/', '%'].includes(e.op) && isInt(e.a) && isInt(e.b);
       default: return false;
     }
   };
@@ -104,10 +103,6 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         // 文字的一個字（char）跟 "a" 比較：寫成 'a'
         if ((e.op == '==' || e.op == '!=') && (ta == 'char' || tb == 'char')) {
           return wrap(`${charSide(e.a)} ${e.op} ${charSide(e.b)}`, p, parent);
-        }
-        // 整數除以整數在 C++ 會捨去小數，流程圖裡不會，所以先轉成 double
-        if (e.op == '/' && isInt(e.a) && isInt(e.b)) {
-          return wrap(`(double) ${expr(e.a, 7)} / ${expr(e.b, p + 1)}`, p, parent);
         }
         if (e.op == '%' && !(isInt(e.a) && isInt(e.b))) {
           uses.cmath = true;
@@ -176,9 +171,8 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
           break;
         }
         // 輸入到清單：先讀進暫存的變數，再放進 vector
-        const tmp = elemType(s.target) == 'string' ? 'inputText' : 'inputNumber';
-        if (tmp == 'inputText') uses.inputText = true;
-        else uses.inputNumber = true;
+        const tmp = ({ string: 'inputText', float: 'inputFloat', int: 'inputNumber' } as const)[elemType(s.target)];
+        uses[tmp] = true;
         emit(depth, `cin >> ${tmp};`);
         emit(depth, s.place == 'insert' ? `${s.target}.insert(${s.target}.begin() + ${expr(s.index!, 5)}, ${tmp});` : `${s.target}.push_back(${tmp});`);
         break;
@@ -262,71 +256,24 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     }
   };
 
-  // 每個運算式（含裡面的）都看一次
-  const visitExpr = (e: Expr | undefined, f: (e: Expr) => void) => {
-    if (!e) return;
-    f(e);
-    switch (e.t) {
-      case 'idx': visitExpr(e.obj, f); visitExpr(e.index, f); break;
-      case 'call': case 'fcall': e.args.forEach(a => visitExpr(a, f)); break;
-      case 'bin': visitExpr(e.a, f); visitExpr(e.b, f); break;
-      case 'not': case 'neg': visitExpr(e.a, f); break;
-    }
-  };
-  const exprsOf = (s: Stmt): Expr[] => {
-    switch (s.kind) {
-      case 'input': return [s.index, s.index2].filter((x): x is Expr => !!x);
-      case 'output': return [s.value];
-      case 'rect': return [s.index, s.index2, s.value].filter((x): x is Expr => !!x);
-      case 'if': return [s.cond];
-      case 'repeat': return [s.times];
-      case 'until': return [s.cond];
-      case 'call': return s.args;
-      case 'return': return [s.value];
-    }
-  };
-  /** 模組裡的每個步驟（包括判斷、迴圈裡面的） */
-  const eachStmt = (list: Stmt[], f: (s: Stmt) => void) => list.forEach(s => {
-    f(s);
-    if (s.kind == 'if') { eachStmt(s.yes, f); eachStmt(s.no, f); }
-    if (s.kind == 'repeat' || s.kind == 'until') eachStmt(s.body, f);
-  });
-  // 先看每個模組的數字參數有沒有被傳過小數、回傳值會不會有小數（模組之間互相用的，要多看幾次）
-  const findDoubleTypes = (list: Stmt[]) => eachStmt(list, s => {
-    const args = (name: string, list: Expr[]) => modules.find(x => x.name == name)?.params.forEach((p, k) => {
-      if (p.type == '數字' && list[k] && !isInt(list[k])) paramDouble.add(paramKey(name, p.name));
-    });
-    if (s.kind == 'call') args(s.name, s.args);
-    exprsOf(s).forEach(e => visitExpr(e, x => { if (x.t == 'fcall') args(x.name, x.args); }));
-    const m = current as ModuleProgram | null;
-    if (s.kind == 'return' && m?.returns == '數字' && !s.round && !isInt(s.value)) returnDouble.add(m.name);
-  });
-  for (let pass = 0; pass < 3; pass++) {
-    enter(null);
-    findDoubleTypes(program);
-    for (const m of modules) {
-      enter(m);
-      findDoubleTypes(m.body);
-    }
-  }
-
   // 先寫 main 和各個模組的內容，才知道要不要 cmath、indexOf、暫存變數
   enter(null);
   stmts(program, 1);
   const body = lines.splice(0);
-  const paramCode = (m: ModuleProgram) => m.params.map(p => `${p.type == '文字' ? 'string' : paramDouble.has(paramKey(m.name, p.name)) ? 'double' : 'int'} ${p.name}`).join(', ');
+  const paramCode = (m: ModuleProgram) => m.params.map(p => `${cppType(p.type, p.float)} ${p.name}`).join(', ');
   /** 函式的回傳型別：沒有回傳值是 void */
-  const retType = (m: ModuleProgram) => (m.returns == '文字' ? 'string' : m.returns == '數字' ? (returnDouble.has(m.name) ? 'double' : 'int') : 'void');
+  const retType = (m: ModuleProgram) => (m.returns ? cppType(m.returns, m.returnsFloat) : 'void');
   const declLine = (v: VarInfo, pad: string) => {
     if (v.type == '清單') return `${pad}vector<${elemType(v.name)}> ${v.name};`;
     if (v.type == '二維清單') return `${pad}vector<vector<${elemType(v.name)}>> ${v.name};`;
     if (v.type == '文字') return `${pad}string ${v.name} = ${JSON.stringify(stripQuotes(v.init))};`;
-    return `${pad}${numType(v.name)} ${v.name} = ${v.init.trim() || '0'};`;
+    return `${pad}${cppType('數字', v.float)} ${v.name} = ${v.init.trim() || '0'};`;
   };
   const tmpNote = t('輸入到清單時先暫存在這裡', 'input goes here first, then into the list');
   /** 輸入到清單用的暫存變數：哪個函式（或 main）用到就宣告在那裡 */
   const tmpDecls = (code: string[], pad: string) => [
     ...(code.some(l => l.includes("inputNumber")) ? [`${pad}int inputNumber;   // ${tmpNote}`] : []),
+    ...(code.some(l => l.includes("inputFloat")) ? [`${pad}float inputFloat;  // ${tmpNote}`] : []),
     ...(code.some(l => l.includes("inputText")) ? [`${pad}string inputText;  // ${tmpNote}`] : []),
   ];
   const functions = modules.flatMap(m => {
@@ -376,27 +323,3 @@ const stripQuotes = (s: string) => {
   const v = s.trim();
   return /^(".*"|'.*')$/.test(v) ? v.slice(1, -1) : v;
 };
-
-/** 哪些數字變數要用 double：初始值有小數點，或被設成會算出小數的值（有 / 而且沒有捨去進位） */
-function findDoubles(programs: Stmt[][], varList: VarInfo[]): Set<string> {
-  const doubles = new Set(varList.filter(v => v.type == '數字' && v.init.includes('.')).map(v => v.name));
-  const hasDivide = (e: Expr): boolean => {
-    switch (e.t) {
-      case 'bin': return e.op == '/' || hasDivide(e.a) || hasDivide(e.b);
-      case 'neg': case 'not': return hasDivide(e.a);
-      case 'num': return e.v.includes('.');
-      case 'var': return doubles.has(e.name);
-      default: return false;
-    }
-  };
-  // 重複幾次，讓「用到小數變數算出來的」也跟著變成小數
-  for (let pass = 0; pass < 3; pass++) {
-    const visit = (list: Stmt[]) => list.forEach(s => {
-      if (s.kind == 'rect' && s.action == '設為' && s.value && !s.round && hasDivide(s.value)) doubles.add(s.target);
-      if (s.kind == 'if') { visit(s.yes); visit(s.no); }
-      if (s.kind == 'repeat' || s.kind == 'until') visit(s.body);
-    });
-    programs.forEach(visit);
-  }
-  return doubles;
-}

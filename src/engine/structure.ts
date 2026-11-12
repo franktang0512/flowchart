@@ -192,7 +192,8 @@ export type Expr =
   /** 有回傳值的模組：找最大(x, y) */
   | { t: 'fcall'; name: string; args: Expr[] }
   /** + - * / % 、比較（== != < <= > >=）、and or */
-  | { t: 'bin'; op: string; a: Expr; b: Expr }
+  /** span（只有 * / %）：[開頭, 運算子, 結尾後面] 是第幾個 token（C++ 的整數除法要包起來，見 decoder） */
+  | { t: 'bin'; op: string; a: Expr; b: Expr; span?: [number, number, number] }
   | { t: 'not'; a: Expr }
   | { t: 'neg'; a: Expr }
   /** 看不懂的寫法：原樣保留 */
@@ -268,8 +269,14 @@ class Parser {
     return a;
   }
   private mul(): Expr {
+    const from = this.k;
     let a = this.unary();
-    while (this.is('*', '/', '%')) { const op = this.take().text; a = { t: 'bin', op, a, b: this.unary() }; }
+    while (this.is('*', '/', '%')) {
+      const at = this.k;
+      const op = this.take().text;
+      const b = this.unary();
+      a = { t: 'bin', op, a, b, span: [from, at, this.k] };
+    }
     return a;
   }
   private unary(): Expr {
@@ -321,8 +328,10 @@ export interface VarInfo {
   name: string;
   /** 二維清單只有學習目標是 C++ 時才有 */
   type: '數字' | '文字' | '清單' | '二維清單';
-  /** 數字/文字的初始值；清單、二維清單是裡面裝「數字」還是「文字」 */
+  /** 數字/文字的初始值；清單、二維清單是裡面裝「數字」、「小數」（C++ 的 float）還是「文字」 */
   init: string;
+  /** C++：數字變數是 float（小數）；沒有就是 int（整數） */
+  float?: boolean;
 }
 
 /** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用） */
