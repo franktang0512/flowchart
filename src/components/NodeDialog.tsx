@@ -5,7 +5,7 @@ import { localTypes, type VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
 import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { byTarget, getTarget, itemWord } from '../target';
+import { byTarget, canReturn as canReturnTarget, getTarget, itemWord } from '../target';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -26,10 +26,11 @@ export interface DialogForm {
   /** 迴圈：顯示「達成某個條件」(while) 還是「執行完幾次」(for) 的輸入欄 */
   showWhile: boolean;
   /**
-   * 計算積木先選要改什麼（跟輸入積木一樣先選類型）：變數、清單、二維清單（C++）、回傳（有回傳值的模組）；
+   * 計算積木先選要改什麼（跟輸入積木一樣先選類型）：變數、清單、二維清單（C++）、回傳（有回傳值的模組）、
+   * 接收（執行有回傳值的模組，把回傳值存進變數：「a 設為 aaa(x)」，模組和參數用 moduleName、moduleArgs）；
    * '' = 還沒選。選了清單、二維清單再選 rectAction（添加、插入…）
    */
-  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳';
+  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收';
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 第幾項：計算積木的「插入」「替換」「刪除」，輸入到清單的「插入」「替換」；二維清單是第幾列（建立時是幾列） */
@@ -40,6 +41,8 @@ export interface DialogForm {
   ioTarget: '' | '變數' | '清單' | '二維清單';
   /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
   ioPlace: '加入' | '插入' | '替換';
+  /** 輸出積木輸出什麼：'' 是變數或字串（自己打）；'回傳' 是執行有回傳值的模組、輸出回傳值（moduleName、moduleArgs） */
+  outputKind: '' | '回傳';
   /** 執行模組：哪個模組、每個參數要用的值 */
   moduleName: string;
   moduleArgs: string[];
@@ -124,6 +127,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   rectIndex2: '',
   ioTarget: '',
   ioPlace: '加入',
+  outputKind: '',
   moduleName: '',
   moduleArgs: [],
 });
@@ -279,6 +283,35 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       onKeyDown={e => { if (e.key == 'Enter') { e.preventDefault(); yes(); } }}
     />
   );
+  /** 執行模組時每個參數要填的值（執行模組、接收模組回傳值共用） */
+  const argFields = (m: ModuleInfo) => (m.params.length == 0
+    ? <p className="dialog_note">{t('這個模組沒有參數。', 'This module has no parameters.')}</p>
+    : (
+      <div className="module_args">
+        {m.params.map((p, k) => (
+          <p key={p.name}>
+            <label>
+              {p.name}<span className="muted">（{getTarget() == 'cpp' ? cppType(p.type, p.float) : p.type == '文字' ? t('文字', 'text') : t('數字', 'number')}）</span>{' = '}
+              <input
+                value={f.moduleArgs[k] ?? ''}
+                onChange={e => {
+                  const args = [...f.moduleArgs];
+                  args[k] = e.target.value;
+                  set({ moduleArgs: args });
+                }}
+              />
+            </label>
+          </p>
+        ))}
+        <span className="dialog_note">{t('可以填數字、"文字"、變數或算式', 'Use a number, "text", a variable or math')}</span>
+      </div>
+    ));
+  /** 有回傳值的模組（Scratch 的模組不能回傳） */
+  const returningModules = modules.filter(x => x.returns);
+  /** 回傳值的型別（給學生看） */
+  const returnLabel = (m: ModuleInfo) => (m.returns == null ? ''
+    : getTarget() == 'cpp' ? ' ' + cppType(m.returns, m.returnsFloat)
+    : m.returns == '文字' ? t('文字', 'text') : t('數字', 'a number'));
   const conditionHint = <p id="hint">{t('請輸入邏輯判斷式，', 'Write a condition: ')}and, or, not &lt; &gt; = </p>;
 
   let body: ReactNode;
@@ -347,13 +380,42 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
             )
             : (
               <>
-                <p id="io_text">{t('變數或字串：', 'Variable or "text": ')}</p>
-                <p>
-                  <input
-                    className="var_select" id="var_select_output" value={f.varSelectOutput}
-                    onChange={e => set({ varSelectOutput: e.target.value })}
-                  />
-                </p>
+                {/* 有回傳值的模組（Blockly、C++）：可以選「模組回傳值」，選模組、填參數就好，不用自己打 */}
+                {canReturnTarget() && (returningModules.length > 0 || f.outputKind == '回傳') && (
+                  <p className="io_choice output_kind">
+                    {t('輸出：', 'Output: ')}
+                    <label><input type="radio" name="output_kind" checked={f.outputKind == ''} onChange={() => set({ outputKind: '' })} />{t('變數或字串', 'A variable or "text"')}</label>
+                    <label><input type="radio" name="output_kind" checked={f.outputKind == '回傳'} onChange={() => set({ outputKind: '回傳' })} />{t('模組回傳值', "A module's return value")}</label>
+                  </p>
+                )}
+                {f.outputKind == '回傳'
+                  ? (
+                    <>
+                      <p>
+                        {t('模組：', 'Module: ')}
+                        <select className="var_select" id="module_select" value={f.moduleName} onChange={e => set({ moduleName: e.target.value, moduleArgs: [] })}>
+                          <option value="" disabled>{t('請選擇', 'Choose one')}</option>
+                          {f.moduleName && !returningModules.some(x => x.name == f.moduleName) && <option value={f.moduleName}>{f.moduleName}</option>}
+                          {returningModules.map(x => <option key={x.name} value={x.name}>{x.name}{t(`（回傳${returnLabel(x)}）`, ` (returns ${returnLabel(x)})`)}</option>)}
+                        </select>
+                      </p>
+                      {(() => {
+                        const m = returningModules.find(x => x.name == f.moduleName);
+                        return m && argFields(m);
+                      })()}
+                    </>
+                  )
+                  : (
+                    <>
+                      <p id="io_text">{t('變數或字串：', 'Variable or "text": ')}</p>
+                      <p>
+                        <input
+                          className="var_select" id="var_select_output" value={f.varSelectOutput}
+                          onChange={e => set({ varSelectOutput: e.target.value })}
+                        />
+                      </p>
+                    </>
+                  )}
               </>
             )}
           <p>
@@ -407,27 +469,13 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               </select>
             )
             : <p className="dialog_note">{t('還沒有模組：請先按流程圖上方的「＋ 新增模組」。', 'There are no modules yet. Click "+ New module" above the flowchart first.')}</p>}
-          {m && m.params.length > 0 && (
-            <div className="module_args">
-              {m.params.map((p, k) => (
-                <p key={p.name}>
-                  <label>
-                    {p.name}<span className="muted">（{getTarget() == 'cpp' ? cppType(p.type, p.float) : p.type == '文字' ? t('文字', 'text') : t('數字', 'number')}）</span>{' = '}
-                    <input
-                      value={f.moduleArgs[k] ?? ''}
-                      onChange={e => {
-                        const args = [...f.moduleArgs];
-                        args[k] = e.target.value;
-                        set({ moduleArgs: args });
-                      }}
-                    />
-                  </label>
-                </p>
-              ))}
-              <span className="dialog_note">{t('可以填數字、"文字"、變數或算式', 'Use a number, "text", a variable or math')}</span>
-            </div>
+          {m && argFields(m)}
+          {m?.returns && (
+            <p className="dialog_note return_tip">
+              {t(`「${m.name}」會回傳一個${returnLabel(m)}，但這個積木會把回傳值丟掉。要用回傳值，請改用計算積木的「接收模組回傳值」。`,
+                `"${m.name}" returns ${returnLabel(m)}, but this block throws it away. To keep it, use the Math block option "Get a module's return value".`)}
+            </p>
           )}
-          {m && m.params.length == 0 && <p className="dialog_note">{t('這個模組沒有參數。', 'This module has no parameters.')}</p>}
           <p><br />{buttons}</p>
         </>
       );
@@ -436,27 +484,30 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
     case 'Rectangle': {
       // 先選要改什麼（變數、清單、二維清單、回傳），清單、二維清單再選怎麼改；每一類可以選的變數
       const kind = f.rectKind;
-      const namesFor = (k: DialogForm['rectKind'], ty: VarTypes = allTypes) => (k == '變數' ? [...ty.number, ...ty.text]
+      const namesFor = (k: DialogForm['rectKind'], ty: VarTypes = allTypes) => (k == '變數' || k == '接收' ? [...ty.number, ...ty.text]
         : k == '清單' ? ty.array
         : k == '二維清單' ? ty.grid
         : []);
       const cell = kind == '二維清單' && f.rectAction == '替換';
       const indexLabel = !kind ? null : cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
       const index2Label = !kind ? null : f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
-      const verb = kind ? RECT_VERB[f.rectAction] : null;
+      const verb = kind && kind != '接收' ? RECT_VERB[f.rectAction] : null;
+      // 有回傳值的模組（Scratch 的模組不能回傳，看不到這個選項）
+      const returning = modules.filter(x => x.returns);
+      const recvModule = returning.find(x => x.name == f.moduleName);
       const noLists = allTypes.array.length == 0;
       /** 選了一類：動作換成這一類的第一個，原本選的變數不能用就清掉 */
       const pickKind = (k: DialogForm['rectKind']) => set({
         rectKind: k,
-        rectAction: k == '變數' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : '加入',
-        ...([...namesFor(k), ...(k == '變數' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
+        rectAction: k == '變數' || k == '接收' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : '加入',
+        ...([...namesFor(k), ...(k == '變數' || k == '接收' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
       });
       const actionRadio = (action: RectAction, label: string) => (
         <label key={action}><input type="radio" name="rect_action" checked={f.rectAction == action} onChange={() => set({ rectAction: action })} />{label}</label>
       );
       body = (
         <>
-          <p id="hint">{kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
+          <p id="hint">{kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
           <p className="io_choice rect_kind">
             {t('要改：', 'Change: ')}
             <label><input type="radio" name="rect_kind" checked={kind == '變數'} onChange={() => pickKind('變數')} />{t('變數', 'A variable')}</label>
@@ -470,7 +521,29 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
             {(request.canReturn || kind == '回傳') && (
               <label><input type="radio" name="rect_kind" checked={kind == '回傳'} onChange={() => pickKind('回傳')} />{t('回傳值', 'Return a value')}</label>
             )}
+            {(canReturnTarget() || kind == '接收') && (
+              <label
+                title={returning.length ? undefined : t('還沒有有回傳值的模組：到模組上方的「修改名稱、參數」設定回傳值', 'No module returns a value yet. Set a return value in "Edit name, parameters".')}
+                className={!returning.length && kind != '接收' ? 'disabled_choice' : undefined}
+              >
+                <input type="radio" name="rect_kind" checked={kind == '接收'} disabled={!returning.length && kind != '接收'} onChange={() => pickKind('接收')} />{t('接收模組回傳值', "A module's return value")}
+                {!returning.length && kind != '接收' && <span className="muted">{t('（還沒有有回傳值的模組）', ' (no module returns a value yet)')}</span>}
+              </label>
+            )}
           </p>
+          {kind == '接收' && (
+            <>
+              <p>
+                {t('模組：', 'Module: ')}
+                <select className="var_select" id="module_select" value={f.moduleName} onChange={e => set({ moduleName: e.target.value, moduleArgs: [] })}>
+                  <option value="" disabled>{t('請選擇', 'Choose one')}</option>
+                  {f.moduleName && !recvModule && <option value={f.moduleName}>{f.moduleName}</option>}
+                  {returning.map(x => <option key={x.name} value={x.name}>{x.name}{t(`（回傳${returnLabel(x)}）`, ` (returns ${returnLabel(x)})`)}</option>)}
+                </select>
+              </p>
+              {recvModule && argFields(recvModule)}
+            </>
+          )}
           {kind == '清單' && (
             <p className="rect_action">
               {t('怎麼改：', 'How: ')}
@@ -486,8 +559,8 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           )}
           {kind && kind != '回傳' && (
             <>
-              {kind == '變數' ? t('變數：', 'Variable: ') : kind == '二維清單' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(kind, varTypes)} params={kind == '變數' ? paramNames : []} locals={namesFor(kind, localT)} />
+              {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={namesFor(kind, localT)} />
             </>
           )}
           {indexLabel && (

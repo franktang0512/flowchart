@@ -4,6 +4,7 @@ import { createConnectors } from './engine/connector';
 import { checkCall, checkValueType, checkVar, getCodeVar, type VarStore } from './engine/decoder';
 import { splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
+import { parseExpr } from './engine/structure';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
 import { t } from './i18n';
@@ -35,6 +36,14 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   return { text, nodeVar };
 }
 
+/** 接收模組回傳值：變成一般的計算積木「a 設為 aaa(x)」（不捨去進位） */
+function receiveForm(f: DialogForm, modules: ModuleInfo[]): DialogForm {
+  if (f.rectKind != '接收') return f;
+  const m = modules.find(x => x.name == f.moduleName);
+  const args = m ? m.params.map((_, k) => (f.moduleArgs[k] ?? '').trim()) : [];
+  return { ...f, rectAction: '設為', radio: '', code: callText(f.moduleName, args) };
+}
+
 /** 刪除第幾項、刪除所有項目、建立二維清單不用填值 */
 const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立';
 
@@ -42,6 +51,21 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (!f.rectKind) {
     alert(t('請先選要改什麼：變數還是清單。', 'First choose what to change: a variable or a list.'));
     return false;
+  }
+  // 接收模組回傳值：模組、參數照「執行模組」的檢查，回傳值的型別要跟變數一樣
+  if (f.rectKind == '接收') {
+    const m = modules.find(x => x.name == f.moduleName && x.returns);
+    if (!m) {
+      alert(t('請選一個有回傳值的模組。', 'Choose a module that returns a value.'));
+      return false;
+    }
+    const args = m.params.map((_, k) => (f.moduleArgs[k] ?? '').trim());
+    if (!checkCall(vars, modules, m.name, args)) return false;
+    if (!f.varSelect.trim()) {
+      alert(t('請選回傳值要存到哪個變數。', 'Choose the variable to save the value in.'));
+      return false;
+    }
+    return checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), callText(m.name, args), 'var');
   }
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
   if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
@@ -68,7 +92,7 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
  * 輸入/輸出積木：回傳積木文字，檢查沒過回傳 null。輸入到清單的寫法：
  *   「輸入 清單」添加到最後、「輸入 清單 插入第 k 項」、「輸入 清單[k]」替換第 k 項
  */
-function ioText(vars: VarStore, f: DialogForm): string | null {
+function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): string | null {
   if (f.radio == '輸入') {
     // 二維清單的一格：輸入 表[列][行]
     if (f.ioTarget == '二維清單') {
@@ -80,6 +104,16 @@ function ioText(vars: VarStore, f: DialogForm): string | null {
     if (!checkVar(vars, f.rectIndex, true)) return null;
     const k = f.rectIndex.trim();
     return f.ioPlace == '插入' ? `輸入 ${f.varSelect} 插入第 ${k} 項` : `輸入 ${f.varSelect}[${k}]`;
+  }
+  // 輸出模組回傳值：模組、參數照「執行模組」的檢查
+  if (f.outputKind == '回傳') {
+    const m = modules.find(x => x.name == f.moduleName && x.returns);
+    if (!m) {
+      alert(t('請選一個有回傳值的模組。', 'Choose a module that returns a value.'));
+      return null;
+    }
+    const args = m.params.map((_, k) => (f.moduleArgs[k] ?? '').trim());
+    return checkCall(vars, modules, m.name, args) ? '輸出 ' + callText(m.name, args) : null;
   }
   if (checkVar(vars, f.varSelectOutput, true)) {
     return f.radio + (f.varSelectOutput ? ' ' + f.varSelectOutput : '');
@@ -108,7 +142,7 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
     case 'Circle':
       return add(f.radio, 'Circle');
     case 'Parallelogram': {
-      const text = ioText(vars, f);
+      const text = ioText(vars, f, modules);
       return text != null && add(text, 'Parallelogram', getCodeVar(vars, text));
     }
     case 'Diamond':
@@ -121,8 +155,9 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
       return false;
     case 'Rectangle':
       if (rectangleValid(vars, f, modules)) {
-        const { text, nodeVar } = rectangleText(vars, f);
-        return add(text, 'Rectangle', nodeVar, f.radio);
+        const g = receiveForm(f, modules);
+        const { text, nodeVar } = rectangleText(vars, g);
+        return add(text, 'Rectangle', nodeVar, g.radio);
       }
       return false;
     case 'Function': {
@@ -147,7 +182,7 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
       node.text = f.radio;
       return done();
     case 'Parallelogram': {
-      const text = ioText(vars, f);
+      const text = ioText(vars, f, modules);
       if (text == null) return false;
       node.text = text;
       node.variables = getCodeVar(vars, text);
@@ -168,9 +203,10 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
     }
     case 'Rectangle': {
       if (!rectangleValid(vars, f, modules)) return false;
-      const { text, nodeVar } = rectangleText(vars, f);
+      const g = receiveForm(f, modules);
+      const { text, nodeVar } = rectangleText(vars, g);
       node.text = text;
-      node.data = f.radio;
+      node.data = g.radio;
       node.variables = nodeVar;
       return done();
     }
@@ -186,14 +222,24 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
   }
 }
 
+/** 整個算式就是執行一個有回傳值的模組（例如 aaa(x)）：回傳模組名稱和參數；不是的話 null */
+function returningCall(expr: string, modules: ModuleInfo[]) {
+  const call = parseCall(expr);
+  if (!call || !modules.some(m => m.name == call.name && m.returns)) return null;
+  if (call.args.some(a => parseExpr(a).t == 'raw')) return null;
+  return callText(call.name, call.args).replace(/\s/g, '') == expr.replace(/\s/g, '') ? call : null;
+}
+
 /** 雙擊積木時：對話框種類與預先填好的內容 */
-export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Partial<DialogForm> } {
+export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = []): { kind: DialogKind; initial: Partial<DialogForm> } {
   const text = node.text ?? '';
   switch (node.figure) {
     case 'Parallelogram': {
       const radio = text.substring(0, 2);
       const rest = text.substring(3);
       if (radio == '輸出') {
+        const call = returningCall(rest, modules);
+        if (call) return { kind: 'Parallelogram', initial: { radio, ioText: '變數或字串：', outputKind: '回傳', moduleName: call.name, moduleArgs: call.args, varSelectOutputDisplay: 'inline-block', varSelectDisplay: 'none' } };
         return {
           kind: 'Parallelogram',
           initial: rest
@@ -225,6 +271,11 @@ export function editDialogFor(node: FlowNode): { kind: DialogKind; initial: Part
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
     case 'Rectangle': {
       const { target, action, index, index2, expr } = splitRectangle(text);
+      // 「a 設為 aaa(x)」：整個值就是執行一個有回傳值的模組（沒有捨去進位）→ 接收模組回傳值
+      const call = action == '設為' && !node.data && !expr.includes('(取') ? returningCall(expr, modules) : null;
+      if (call) {
+        return { kind: 'Rectangle', initial: { rectKind: '接收', rectAction: '設為', varSelect: target, moduleName: call.name, moduleArgs: call.args } };
+      }
       return {
         kind: 'Rectangle',
         initial: {
