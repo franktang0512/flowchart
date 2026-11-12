@@ -298,6 +298,38 @@ export function App() {
     showSheet(sheetRef.current);
   };
 
+  /** 變數表每一列上次確定的名字（名字不能用時改回去） */
+  const committedVarNames = useRef(new Map<number, string>());
+  /** 全域變數的名字跟模組、參數、區域變數一樣：流程圖上分不出是哪一個，回傳原因 */
+  const globalVarProblem = (name: string): string | null => {
+    for (const m of modulesRef.current) {
+      if (m.info.name == name) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
+      if (m.info.params.some(p => p.name == name)) return t(`「${name}」已經是模組「${m.info.name}」的參數了`, `"${name}" is already a parameter of "${m.info.name}"`);
+      if (m.info.locals?.some(v => v.name.trim() == name)) return t(`「${name}」已經是模組「${m.info.name}」的區域變數了`, `"${name}" is already a local variable in "${m.info.name}"`);
+    }
+    return null;
+  };
+  /** 區域變數的名字：不能跟全域變數、模組、這個模組的參數、這個模組的其他區域變數一樣 */
+  const localVarProblem = (m: AppModule, name: string, id: number, rows: LocalVar[]): string | null => {
+    if (varStore.var_list.name.includes(name)) return t(`「${name}」已經是全域變數了`, `"${name}" is already a global variable`);
+    if (modulesRef.current.some(x => x.info.name == name)) return t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`);
+    if (m.info.params.some(p => p.name == name)) return t(`「${name}」已經是這個模組的參數了`, `"${name}" is already a parameter of this module`);
+    if (rows.some(v => v.id != id && v.name.trim() == name)) return t(`已經有叫「${name}」的區域變數了`, `There is already a local variable called "${name}"`);
+    return null;
+  };
+  const sameNameAlert = (why: string) => alert(why + t('：名字一樣的話，流程圖上分不出是哪一個，請換一個名字。', '. With the same name you cannot tell them apart in the flowchart. Choose another name.'));
+  /** 變數表的輸入框確定時：名字不能用就改回原本的名字 */
+  const commitVars = () => {
+    // 只看這次改過名字的列（原本就撞名的舊作品，第四步執行時會說明）
+    const bad = varsRef.current.find(r => r.name.trim() && r.name.trim() != committedVarNames.current.get(r.id)?.trim() && globalVarProblem(r.name.trim()));
+    if (bad) {
+      sameNameAlert(globalVarProblem(bad.name.trim())!);
+      const old = committedVarNames.current.get(bad.id) ?? '';
+      setVars(varsRef.current.map(v => (v.id == bad.id ? { ...v, name: old.trim() == bad.name.trim() ? '' : old } : v)));
+    }
+    syncVarList();
+  };
+
   /** 依變數表格重建變數清單；如果有變數改名，流程圖裡用到的地方也跟著改 */
   const syncVarList = () => {
     const oldNames = [...varStore.var_list.name];
@@ -310,6 +342,7 @@ export function App() {
     varStore.type_var_list.array = rows.filter(r => r.type == '清單').map(r => r.name);
     varStore.type_var_list.grid = rows.filter(r => r.type == '二維清單').map(r => r.name);
 
+    rows.forEach(r => committedVarNames.current.set(r.id, r.name));
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
     const added = varStore.var_list.name.filter(n => !oldNames.includes(n));
     if (replaced.length && added.length) {
@@ -764,7 +797,7 @@ export function App() {
               <VarTable
                 rows={vars}
                 onChange={(id, patch) => setVars(varsRef.current.map(v => v.id == id ? { ...v, ...patch } : v))}
-                onCommit={syncVarList}
+                onCommit={commitVars}
                 onDelete={id => { setVars(varsRef.current.filter(v => v.id != id)); syncVarList(); }}
                 onCreate={() => createRow()}
                 module={(() => {
@@ -775,6 +808,8 @@ export function App() {
                     // 區域變數只有 C++ 有（舊作品換了學習目標還留著的話，也列出來讓學生刪掉）
                     locals: getTarget() == 'cpp' || m.info.locals?.length ? m.info.locals ?? [] : null,
                     onLocals: (next: LocalVar[], rename?: [string, string]) => setLocals(m.id, next, rename),
+                    localProblem: (name: string, id: number, rows: LocalVar[]) => localVarProblem(m, name, id, rows),
+                    onProblem: sameNameAlert,
                   };
                 })()}
               />

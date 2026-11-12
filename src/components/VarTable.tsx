@@ -28,7 +28,15 @@ interface Props {
    * 正在畫模組時：這個模組的參數（名稱、型別在「修改名稱、參數」設定，這裡不能改）、
    * 區域變數（只有 C++；null 是這個語言沒有區域變數）。onLocals 的 rename 是改名（舊名, 新名）
    */
-  module?: { name: string; params: ParamInfo[]; locals: LocalVar[] | null; onLocals: (next: LocalVar[], rename?: [string, string]) => void };
+  module?: {
+    name: string;
+    params: ParamInfo[];
+    locals: LocalVar[] | null;
+    onLocals: (next: LocalVar[], rename?: [string, string]) => void;
+    /** 區域變數的名字不能用時的原因（跟全域變數、參數、模組、其他區域變數撞名） */
+    localProblem: (name: string, id: number, rows: LocalVar[]) => string | null;
+    onProblem: (why: string) => void;
+  };
 }
 
 let localSeq = 1_000_000;
@@ -71,7 +79,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
                 </tbody>
               </table>
             )}
-          {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} head={head} />}
+          {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
           <p className="section_label var_section">{t('全域變數（變數表，主流程和所有模組共用）', 'Global variables (shared by the main flow and all modules)')}</p>
         </>
       )}
@@ -89,7 +97,14 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
 }
 
 /** C++ 模組的區域變數：只有這個模組用得到，每次執行模組都重新從初始值開始 */
-function LocalTable({ module, rows, onLocals, head }: { module: string; rows: LocalVar[]; onLocals: (next: LocalVar[], rename?: [string, string]) => void; head: React.ReactNode }) {
+function LocalTable({ module, rows, onLocals, problem, onProblem, head }: {
+  module: string;
+  rows: LocalVar[];
+  onLocals: (next: LocalVar[], rename?: [string, string]) => void;
+  problem: (name: string, id: number, rows: LocalVar[]) => string | null;
+  onProblem: (why: string) => void;
+  head: React.ReactNode;
+}) {
   // 上次確定的名字：改名確定時，流程圖裡用到的地方也跟著改
   const committed = useRef(new Map<number, string>());
   for (const r of rows) if (!committed.current.has(r.id)) committed.current.set(r.id, r.name.trim());
@@ -101,7 +116,14 @@ function LocalTable({ module, rows, onLocals, head }: { module: string; rows: Lo
     onLocals(next, rename);
   };
   const commit = () => {
-    const now = latest.current;
+    let now = latest.current;
+    // 名字不能用（撞名）：提醒，改回原本的名字
+    const bad = now.find(r => r.name.trim() && r.name.trim() != committed.current.get(r.id) && problem(r.name.trim(), r.id, now));
+    if (bad) {
+      onProblem(problem(bad.name.trim(), bad.id, now)!);
+      const old = committed.current.get(bad.id) ?? '';
+      now = now.map(r => (r.id == bad.id ? { ...r, name: old == bad.name.trim() ? '' : old } : r));
+    }
     const changed = now.find(r => committed.current.get(r.id) != r.name.trim());
     const rename = changed ? [committed.current.get(changed.id) ?? '', changed.name.trim()] as [string, string] : undefined;
     now.forEach(r => committed.current.set(r.id, r.name.trim()));
