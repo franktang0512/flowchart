@@ -28,30 +28,30 @@
   ],
   "en": {
     "title": "Eye Test",
-    "question": "An eye test machine checks your eyes. Input the number from the machine. Output how bad your eyes are.",
+    "question": "An eye test machine measures your eyes and gives a prescription. Input the prescription from the machine. Output the level of nearsightedness.",
     "array": [
       [
-        "number<300",
-        "A little bad"
+        "prescription<300",
+        "Mild nearsightedness"
       ],
       [
-        "300≦number<500",
-        "Bad"
+        "300≦prescription<500",
+        "Moderate nearsightedness"
       ],
       [
-        "500≦number<800",
-        "Very bad"
+        "500≦prescription<800",
+        "High nearsightedness"
       ],
       [
-        "800≦number",
-        "See a doctor"
+        "800≦prescription",
+        "Pathologic nearsightedness"
       ]
     ],
     "test_case": [
       {
         "input": "200",
-        "output": "A little bad",
-        "note": "The number is 200. A little bad"
+        "output": "Mild nearsightedness",
+        "note": "The prescription is 200, which is less than 300, so it is mild nearsightedness."
       }
     ]
   }
