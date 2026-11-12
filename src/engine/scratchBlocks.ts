@@ -243,7 +243,7 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
     },
   };
 
-  // ---- 我的積木（模組）：Scratch 的「定義」帽子積木、執行自訂積木、粉紅色的參數積木 ----
+  // ---- 函式（模組）：Scratch 的「定義」帽子積木、執行函式的積木、粉紅色的參數積木 ----
   // 名稱和參數存在 extraState（{ name, params: [{ name, type }] }），參數個數不固定
   type Proc = { procName: string; procParams: { name: string; type?: string }[] };
   const procState = (b: B & Proc) => ({ name: b.procName, params: b.procParams });
@@ -279,7 +279,8 @@ export function defineBlocks(Blockly: B, zh: boolean): { scratch: B; blockly: B 
       loadProc(this, s);
       this.removeInput('NAME');
       this.appendDummyInput('NAME').appendField(this.procName);
-      this.procParams.forEach((_: unknown, k: number) => this.appendValueInput('ARG' + k).setCheck(null));
+      // 跟練習網頁一樣：每個輸入格前面寫「參數名:」
+      this.procParams.forEach((p: { name: string }, k: number) => this.appendValueInput('ARG' + k).setCheck(null).appendField(p.name + ':'));
     },
   };
   blocks.scratch_proc_arg = {
@@ -380,7 +381,7 @@ export const scratchToolbox = () => ({
     },
     { kind: 'category', name: '變數', categorystyle: 'variable_category', custom: 'SCRATCH_VARIABLES' },
     { kind: 'category', name: '清單', categorystyle: 'list_category', custom: 'SCRATCH_LISTS' },
-    { kind: 'category', name: '我的積木', categorystyle: 'procedure_category', custom: 'SCRATCH_PROCEDURES' },
+    { kind: 'category', name: '函式', categorystyle: 'procedure_category', custom: 'SCRATCH_PROCEDURES' },
   ],
 });
 
@@ -449,7 +450,7 @@ export function setupScratchEditing(Blockly: B, workspace: B) {
     return items;
   });
 
-  // 我的積木：「建立一個積木」放一個「定義」到工作區；分類裡列出每個自訂積木和它的參數
+  // 函式（跟練習網頁一樣叫「函式」）：「建立函式」放一個「定義」到工作區；分類裡列出每個函式和它的參數
   workspace.registerButtonCallback('CREATE_SCRATCH_PROC', (button: B) => {
     const ws = button.getTargetWorkspace();
     const name = window.prompt('積木的名稱：')?.trim();
@@ -458,12 +459,16 @@ export function setupScratchEditing(Blockly: B, workspace: B) {
       window.alert(`已經有「${name}」這個積木了。`);
       return;
     }
-    const raw = window.prompt('參數（用逗號分開，例如 n, 文字；沒有參數就留空）：') ?? '';
-    const params = raw.split(/[,，]/).map(s => s.trim()).filter(Boolean).map(p => ({ name: p, type: '數字' }));
+    // 參數跟變數一樣要決定型別：名稱後面加「:文字」是文字，沒寫就是數字
+    const raw = window.prompt('參數（用逗號分開；文字參數在名稱後面加「:文字」，例如 次數, 名字:文字；沒有參數就留空）：') ?? '';
+    const params = raw.split(/[,，]/).map(s => s.trim()).filter(Boolean).map(p => {
+      const [name, type] = p.split(/[:：]/).map(s => s.trim());
+      return { name, type: type == '文字' ? '文字' : '數字' };
+    });
     Blockly.serialization.blocks.append({ type: 'scratch_proc_def', extraState: { name, params }, x: 40, y: 40 }, ws);
   });
   workspace.registerToolboxCategoryCallback('SCRATCH_PROCEDURES', (ws: B) => {
-    const items: unknown[] = [{ kind: 'button', text: '建立一個積木', callbackkey: 'CREATE_SCRATCH_PROC' }];
+    const items: unknown[] = [{ kind: 'button', text: '建立函式', callbackkey: 'CREATE_SCRATCH_PROC' }];
     for (const def of ws.getBlocksByType('scratch_proc_def')) {
       const params: { name: string }[] = def.procParams;
       items.push({ kind: 'block', type: 'scratch_proc_call', extraState: { name: def.procName, params } });

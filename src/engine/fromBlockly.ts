@@ -356,13 +356,15 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
   const knownModules = new Map(currentModules.map(m => [m.name, m]));
   const defs = defBlocks.map(b => {
     const name = String(scratch ? b.extraState?.name ?? '' : field(b, 'NAME') ?? '').trim();
-    const raw = (b.extraState?.params ?? []) as ({ name: string } | string)[];
+    const raw = (b.extraState?.params ?? []) as ({ name: string; type?: string } | string)[];
     const names = raw.map(p => (typeof p == 'string' ? p : p.name));
+    // Scratch 的函式積木有存參數型別（建立函式時決定的）
+    const types = raw.map(p => (typeof p == 'string' ? undefined : p.type == '文字' ? '文字' as const : p.type == '數字' ? '數字' as const : undefined));
     const list = scratch ? chain(b.next?.block) : chain(b.inputs?.STACK?.block);
     // 有回傳值的函式：最下面「回傳」格子裡的值
     const returns = b.type == 'procedures_defreturn';
     const tail = returns ? inputBlock(b, 'RETURN') : undefined;
-    return { name, names, list, returns, tail };
+    return { name, names, types, list, returns, tail };
   });
   const seen = new Set<string>();
   for (const d of defs) {
@@ -389,7 +391,7 @@ export function fromBlockly(saved: Saved, mode: BlockMode, current: VarInfo[], c
   modules.forEach((m, k) => {
     const old = knownModules.get(m.name);
     m.params = defs[k].names.map((p, i): ParamInfo => {
-      const type = old?.params.find(x => x.name == p)?.type
+      const type = defs[k].types[i] ?? old?.params.find(x => x.name == p)?.type
         ?? ((callArgs.get(m.name) ?? []).some(a => a[i] && isTextValue(a[i])) ? '文字' : '數字');
       return { name: p, type };
     });

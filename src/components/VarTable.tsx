@@ -80,18 +80,25 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
               </table>
             )}
           {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
-          <p className="section_label var_section">{t('全域變數（變數表，主流程和所有模組共用）', 'Global variables (shared by the main flow and all modules)')}</p>
+          {/* 全域變數只在主流程顯示；模組這裡只列這個模組自己的 */}
+          <p className="muted global_note">{module.locals
+            ? t('主流程的變數（全域變數）在模組裡也能用，要新增或修改請回到「主流程」。', 'Main-flow (global) variables can be used here too. To add or change them, go back to the main flow.')
+            : t('Scratch / Blockly 沒有只屬於函式的變數：要用變數，請回到「主流程」新增（主流程的變數在模組裡也能用）。', 'Scratch / Blockly have no variables that belong only to a function. To use one, add it in the main flow (main-flow variables work here too).')}</p>
         </>
       )}
-      <table id="var_table" className="data_table">
-        <tbody>
-          {head}
-          {rows.map(row => (
-            <VarRowView key={row.id} row={row} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
-          ))}
-        </tbody>
-      </table>
-      <button id="createRow" onClick={onCreate}>＋ {t('新增變數', 'Add a variable')}</button>
+      {!module && (
+        <>
+          <table id="var_table" className="data_table">
+            <tbody>
+              {head}
+              {rows.map(row => (
+                <VarRowView key={row.id} row={row} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
+              ))}
+            </tbody>
+          </table>
+          <button id="createRow" onClick={onCreate}>＋ {t('新增變數', 'Add a variable')}</button>
+        </>
+      )}
     </div>
   );
 }

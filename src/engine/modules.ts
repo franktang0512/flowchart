@@ -8,6 +8,7 @@ import type { Diagram } from './diagram';
 
 export interface ParamInfo {
   name: string;
+  /** 參數的型別：學生跟變數表的變數一樣自己決定（三種語言都一樣） */
   type: '數字' | '文字';
 }
 

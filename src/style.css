@@ -1238,3 +1238,7 @@ input, textarea, select, button {
   border-radius: 8px;
   padding: 4px 14px;
 }
+.global_note {
+  margin: 12px 0 0;
+  font-size: 0.9em;
+}
