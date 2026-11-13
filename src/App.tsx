@@ -2,7 +2,7 @@
 //   第一步 讀懂題目、第二步 想測資：同一個畫面，還不能做的那張卡片蓋上半透明灰色
 //   第三步 定義變數、設計流程：左邊變數＋題目，右邊流程圖畫布
 //   第四步 測試執行並除錯：逐步執行流程圖
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { CodeView } from './components/CodeView';
 import { ModuleDialog, type ModuleRequest } from './components/ModuleDialog';
 import { NodeDialog, type DialogRequest } from './components/NodeDialog';
@@ -57,6 +57,8 @@ const ARROW_TOOLS = [
   { id: 'straight', icon: 'arrow', name: () => t('直線箭頭', 'Arrow') },
   { id: 'square', icon: 'turn_arrow', name: () => t('折線箭頭', 'Bent arrow') },
 ];
+/** 從工具列拖積木進畫布時，dataTransfer 用的資料類型（避免接受拖進來的文字、檔案） */
+const DRAG_TYPE = 'application/x-flowchart-block';
 /** 箭頭工具：選了才顯示積木上的連接點 */
 const isArrowTool = (tool: string) => tool == 'straight' || tool == 'square';
 
@@ -584,12 +586,16 @@ export function App() {
 
   // ---------------- 畫布：點一下新增積木 ----------------
   const clickCanvas = () => {
-    const t = toolRef.current;
+    const { x, y } = myMouse.current;
+    addBlockAt(toolRef.current, x, y);
+  };
+
+  /** 在畫布 (x, y) 新增一個 t 種類的積木（點畫布、或把工具拖進畫布都走這裡） */
+  const addBlockAt = (t: string, x: number, y: number) => {
     const d = currentDiagram();
     if (page != 2 || t == 'none' || isArrowTool(t) || d.pause) return;
     syncVarList();
     d.pause = true;
-    const { x, y } = myMouse.current;
     openDialog({
       kind: t as DialogRequest['kind'],
       canReturn: returnsIn(d),
@@ -599,6 +605,21 @@ export function App() {
       onYes: f => addMainNode(t, d, storeFor(d), f, x, y, moduleInfos()),
       onNo: () => { d.pause = false; },
     });
+  };
+
+  // ---------------- 把工具拖進畫布新增積木 ----------------
+  const isBlockDrag = (e: DragEvent) => e.dataTransfer.types.includes(DRAG_TYPE);
+  const dragOverCanvas = (e: DragEvent<HTMLCanvasElement>) => {
+    if (page != 2 || !isBlockDrag(e) || currentDiagram().pause) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  const dropOnCanvas = (e: DragEvent<HTMLCanvasElement>) => {
+    if (!isBlockDrag(e)) return;
+    e.preventDefault();
+    const p = canvasPoint(e.currentTarget, e.nativeEvent);
+    myMouse.current = p;
+    addBlockAt(e.dataTransfer.getData(DRAG_TYPE), p.x, p.y);
   };
 
   const clickTool = (id: string) => {
@@ -837,8 +858,13 @@ export function App() {
       key={t.id} id={t.id} title={t.name()}
       className={'toolbox_btn' + (tool == t.id ? ' selected' : '')}
       onClick={() => clickTool(t.id)}
+      draggable={!isArrowTool(t.id)}
+      onDragStart={e => {
+        e.dataTransfer.setData(DRAG_TYPE, t.id);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
     >
-      <img className="toolbox_img" src={`./libs/icon/${t.icon}.png`} alt={t.name()} />
+      <img className="toolbox_img" src={`./libs/icon/${t.icon}.png`} alt={t.name()} draggable={false} />
     </button>
   );
 
@@ -1038,7 +1064,7 @@ export function App() {
                 {ARROW_TOOLS.map(toolButton)}
               </div>
               <div className="canvas_wrap">
-                <canvas id="my_canvas" ref={myCanvasRef} onClick={clickCanvas}></canvas>
+                <canvas id="my_canvas" ref={myCanvasRef} onClick={clickCanvas} onDragOver={dragOverCanvas} onDrop={dropOnCanvas}></canvas>
               </div>
             </div>
           </div>
