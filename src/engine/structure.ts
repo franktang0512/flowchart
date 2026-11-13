@@ -208,9 +208,11 @@ export type Expr =
   | { t: 'raw'; text: string };
 
 /** 函式：長度( )、項目編號( )、包含( )；C++ 還有 stoi( )（文字變整數）、to_string( )（數字變文字） */
-export type CallFn = 'len' | 'find' | 'has' | 'stoi' | 'tostr';
+export type CallFn = 'len' | 'find' | 'has' | 'stoi' | 'tostr' | 'max' | 'min';
 const CALLS: Record<string, CallFn> = {
   長度: 'len', length: 'len', 項目編號: 'find', indexof: 'find', 包含: 'has', contains: 'has', stoi: 'stoi', to_string: 'tostr',
+  // C++：max(a, b)、min(a, b) 比大小；max(v)、min(v) 是整個 vector / array 裡最大、最小的
+  max: 'max', min: 'min',
 };
 
 /** 學生寫的運算式 → 語法樹；看不懂就整段當成 raw */
@@ -379,6 +381,8 @@ export interface VarInfo {
   size?: string;
   /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字），跟 C++ 的 Edge e = {1, 2, 7}; 一樣 */
   fieldInit?: Record<string, string>;
+  /** C++：全域變數（宣告在 main 外面，每個模組都用得到） */
+  global?: boolean;
 }
 
 /** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用）；struct 是一整筆資料（例如 e、edges[i]） */
@@ -446,7 +450,15 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
       if (e.obj.t == 'idx' && e.obj.obj.t == 'var') return vars.get(e.obj.obj.name)?.init == '文字' ? 'str' : 'num';
       return 'num';
     }
-    case 'call': return e.fn == 'has' ? 'bool' : e.fn == 'tostr' ? 'str' : 'num';
+    case 'call': {
+      if (e.fn == 'max' || e.fn == 'min') {
+        const a = e.args[0];
+        // max(v)：容器裡裝什麼就是什麼；max(a, b)：跟 a 一樣
+        if (e.args.length == 1 && a?.t == 'var') return vars.get(a.name)?.init == '文字' ? 'str' : 'num';
+        return a ? exprType(a, vars, modules) : 'num';
+      }
+      return e.fn == 'has' ? 'bool' : e.fn == 'tostr' ? 'str' : 'num';
+    }
     case 'bin':
       if (['==', '!=', '<', '<=', '>', '>=', 'and', 'or'].includes(e.op)) return 'bool';
       if (e.op == '+') {

@@ -512,6 +512,7 @@ export function App() {
     varStore.structInits = Object.fromEntries(rows.filter(r => r.type == '結構' && r.fieldInit).map(r => [r.name, r.fieldInit!]));
     varStore.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
     varStore.longs = rows.filter(r => r.type == '數字' && r.long).map(r => r.name);
+    varStore.globals = getTarget() == 'cpp' ? rows.filter(r => r.global).map(r => r.name) : [];
 
     rows.forEach(r => committedVarNames.current.set(r.id, r.name));
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
@@ -875,6 +876,7 @@ export function App() {
       desc: String(v.desc ?? ''),
       ...(v.size != null ? { size: String(v.size) } : {}),
       ...(v.fieldInit && typeof v.fieldInit == 'object' ? { fieldInit: Object.fromEntries(Object.entries(v.fieldInit).map(([k, x]) => [k, String(x)])) } : {}),
+      ...(v.global ? { global: true } : {}),
       // 以前的作品沒有 int / float：C++ 初始值有小數點的當成 float
       ...(v.float || (getTarget() == 'cpp' && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
       ...(v.long && v.type == '數字' ? { long: true } : {}),
@@ -1034,11 +1036,12 @@ export function App() {
       <NodeDialog
         request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} modules={modules.map(m => m.info)}
         holds={Object.fromEntries(varStore.var_list.name.map((n, k) => [n, varStore.var_list.value[k]]))}
+        globals={varStore.globals}
       />
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
         open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
-        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, fieldInit: v.fieldInit }))}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, fieldInit: v.fieldInit, global: v.global }))}
       />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>

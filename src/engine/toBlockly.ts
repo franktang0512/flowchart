@@ -89,7 +89,8 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
           : { type: 'math_single', fields: { OP: 'NEG' }, inputs: { NUM: input(expr(e.a)) } };
       case 'not': return { type: 'logic_negate', inputs: { BOOL: input(expr(e.a)) } };
       // stoi、to_string 只有 C++ 有：積木裡數字和文字本來就會自己轉
-      case 'call': return e.fn == 'stoi' || e.fn == 'tostr' ? (e.args[0] ? expr(e.args[0]) : literal('', false)) : call(e.fn, e.args);
+      // stoi、to_string、max、min 只有 C++ 有（積木的算式檢查會先擋下來）
+      case 'call': return e.fn == 'stoi' || e.fn == 'tostr' || e.fn == 'max' || e.fn == 'min' ? (e.args[0] ? expr(e.args[0]) : literal('', false)) : call(e.fn, e.args);
       // C++ 的寫法：v.size() 就是長度；其他（stack、queue 的函式）積木沒有，「看程式」會先擋下來
       // struct 只有 C++ 有，「看程式」會先擋下來
       case 'field': return literal(`${e.obj.t == 'var' ? e.obj.name : ''}.${e.name}`, false);

@@ -188,6 +188,8 @@ interface Props {
   modules: ModuleInfo[];
   /** 每個變數裝什麼（struct 變數、裝 struct 的容器是 struct 的名稱；找欄位用） */
   holds?: Record<string, string>;
+  /** C++ 的全域變數：模組裡也列出來 */
+  globals?: string[];
 }
 
 /**
@@ -292,6 +294,11 @@ function ExprHelper({ inputId, types, holds, value, onChange }: { inputId: strin
     snippets = [
       ...(kind == 'array' ? [] : METHODS[kind].map(m => ({ key: m, text: `${name}.${m}()`, hint: hints[m] }))),
       ...(kind == 'array' || kind == 'vector' ? [{ key: 'index', text: `${name}[]`, label: `${name}[ ]`, caret: name.length + 1, hint: t('某一格：在 [ ] 裡填索引（從 0 開始）', 'One item: put the index (from 0) in [ ]') }] : []),
+      // 整個 vector / array 裡最大、最小的（裝 struct 的不能直接比）
+      ...((kind == 'array' || kind == 'vector') && !struct ? [
+        { key: 'max', text: `max(${name})`, hint: t('裡面最大的值', 'The largest value in it') },
+        { key: 'min', text: `min(${name})`, hint: t('裡面最小的值', 'The smallest value in it') },
+      ] : []),
       // 裝 struct 的容器：vector / array 某一格的欄位 edges[ ].w；stack 頂端、queue 最前面的欄位 s.top().w、q.front().w
       ...(struct?.fields ?? []).flatMap(f => (kind == 'array' || kind == 'vector'
         ? [{ key: `field:${f.name}`, text: `${name}[].${f.name}`, label: `${name}[ ].${f.name}`, caret: name.length + 1, hint: fieldHint }]
@@ -335,7 +342,7 @@ const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string
   替換: (list, k) => t(`輸入的值會換掉清單「${list}」的${itemWord(k || '?')}`, `The value replaces ${itemWord(k || '?')} of "${list}".`),
 };
 
-export function NodeDialog({ request, onClose, varTypes, modules, holds = {} }: Props) {
+export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, globals = [] }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -354,12 +361,12 @@ export function NodeDialog({ request, onClose, varTypes, modules, holds = {} }: 
         onClose();
       }}
     >
-      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} modules={modules} holds={holds} />}
+      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} modules={modules} holds={holds} globals={globals} />}
     </dialog>
   );
 }
 
-function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[]; holds: Record<string, string> }) {
+function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, globals }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[]; holds: Record<string, string>; globals: string[] }) {
   const { kind } = request;
   useLang();
   /** 在模組裡：區域變數照型別分好；allTypes 是全域加區域（判斷選到的是哪一種用） */
@@ -370,7 +377,8 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds }:
   const own = new Set([...(request.params ?? []).map(p => p.name), ...Object.values(localT).flat()]);
   const target = getTarget();
   const shown = (list: string[]) => (!request.inModule ? list
-    : target == 'cpp' ? []
+    // C++：只有勾了「全域」的主流程變數，模組裡才用得到
+    : target == 'cpp' ? list.filter(n => globals.includes(n) && !own.has(n))
     : list.flatMap(n => (!own.has(n) ? [n] : target == 'scratch' ? [GLOBAL_PREFIX + n] : [])));
   varTypes = mapTypes(varTypes, shown);
   const allTypes: VarTypes = joinTypes(varTypes, localT);

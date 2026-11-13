@@ -48,7 +48,7 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
     case 'not': return wrap(`not ${exprText(e.a, cond, 7)}`, 2.5, parent);
     case 'call': {
-      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string' }[e.fn];
+      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min' }[e.fn];
       return `${name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     }
     case 'bin': {

@@ -1,6 +1,6 @@
 // 第四步：逐步執行流程圖，看每一步的變數與輸出
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { RunResult } from '../engine/decoder';
+import { MAX_STEPS, type RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
 import { indexBase } from '../target';
 
@@ -155,6 +155,11 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
           <div className="run_steps">
             <p id="stepCount">{t('步數：', 'Step: ')}{step}</p>
             <span className="muted">/ {total}</span>
+            {run?.skipped ? (
+              <span className="muted run_skipped" title={t(`步驟太多，只記錄前 ${MAX_STEPS} 步；最後一步是執行結束（或出錯）時的樣子，中間 ${run.skipped} 步沒有記錄。`, `Too many steps. Only the first ${MAX_STEPS} are kept; the last one is how it ended. ${run.skipped} steps in between are skipped.`)}>
+                {t(`（中間略過 ${run.skipped} 步）`, `(${run.skipped} steps skipped)`)}
+              </span>
+            ) : null}
             <input
               type="range" id="stepSlider" min="0" max={total} step="1" value={step}
               onChange={e => onStep(Number(e.target.value))}

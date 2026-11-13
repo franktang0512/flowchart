@@ -22,6 +22,8 @@ export interface VarRow {
   long?: boolean;
   /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字） */
   fieldInit?: Record<string, string>;
+  /** C++：全域變數（宣告在 main 外面，每個模組都用得到，例如 DFS 要用的圖和 visited） */
+  global?: boolean;
 }
 
 /** 容器（清單、陣列、堆疊…）：初始值欄改成選裡面裝什麼 */
@@ -122,7 +124,7 @@ export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDele
           {module.locals && <LocalTable module={module.name} rows={module.locals} allowed={allowed} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
           {/* 全域變數只在主流程顯示；模組這裡只列這個模組自己的 */}
           <p className="muted global_note">{getTarget() == 'cpp'
-            ? t('C++ 的主流程變數寫在 main 裡面，模組用不到：要用的值請加參數傳進來，要把結果帶回主流程請用回傳。', 'In C++ the main-flow variables are inside main, so a module cannot use them. Pass values in as parameters, and use a return value to bring a result back.')
+            ? t('C++ 的主流程變數寫在 main 裡面，模組用不到：要用的值請加參數傳進來，要把結果帶回主流程請用回傳。主流程的變數勾了「全域」的話，每個模組都用得到（例如遞迴要用的陣列、圖）。', 'In C++ the main-flow variables are inside main, so a module cannot use them. Pass values in as parameters, and use a return value to bring a result back. Main-flow variables marked "Global" can be used by every module (like an array or graph for recursion).')
             : getTarget() == 'scratch'
             ? t('Scratch 沒有只屬於函式的變數：要用變數，請回到「主流程」新增，模組裡也能用。主流程的變數跟參數同名時，選單裡會寫成「主流程的a」，指的是主流程的那個 a。', 'Scratch has no variables that belong only to a function. Add them in the main flow; modules can use them too. If one has the same name as a parameter, the menu shows it as "主流程的a".')
             : t('Blockly 沒有只屬於函式的變數：要用變數，請回到「主流程」新增，模組裡也能用。', 'Blockly has no variables that belong only to a function. Add them in the main flow; modules can use them too.')}</p>
@@ -135,7 +137,7 @@ export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDele
             <tbody>
               {head}
               {rows.map(row => (
-                <VarRowView key={row.id} row={row} allowed={allowed} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
+                <VarRowView key={row.id} row={row} allowed={allowed} canGlobal={getTarget() == 'cpp'} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
               ))}
             </tbody>
           </table>
@@ -287,7 +289,7 @@ function LocalTable({ module, rows, allowed, onLocals, problem, onProblem, head 
   );
 }
 
-function VarRowView({ row, allowed, onChange, onCommit, onDelete, className }: { row: VarRow; allowed?: VarType[]; className?: string } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
+function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDelete, className }: { row: VarRow; allowed?: VarType[]; canGlobal?: boolean; className?: string } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
   const commit = useCommit<HTMLInputElement>(onCommit);
   const cpp = getTarget() == 'cpp';
   /**
@@ -308,7 +310,16 @@ function VarRowView({ row, allowed, onChange, onCommit, onDelete, className }: {
   });
   return (
     <tr className={className}>
-      <td><input {...text('name')} /></td>
+      <td>
+        <input {...text('name')} />
+        {/* C++：勾了就是全域變數，模組（函式）也用得到；舊作品勾過的照樣顯示，才能取消 */}
+        {(canGlobal || row.global) && (
+          <label className="global_flag" title={t('全域變數：宣告在 main 外面，每個模組都用得到（例如遞迴的 DFS 要用的圖、visited）', 'Global: declared outside main, so every module can use it (like the graph and visited for a recursive DFS)')}>
+            <input type="checkbox" checked={!!row.global} onChange={e => { onChange(row.id, { global: e.target.checked || undefined }); onCommit(); }} />
+            {t('全域', 'Global')}
+          </label>
+        )}
+      </td>
       <td>
         <select
           className="var_input" value={row.type == '結構' ? STRUCT_PREFIX + row.init : typeValue(row.type, row.float, row.long)}

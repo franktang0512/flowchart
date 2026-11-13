@@ -50,6 +50,8 @@ export interface VarStore {
   floats?: string[];
   /** C++：宣告成 long long 的數字變數、參數；int 超過範圍會溢位（跟 C++ 一樣），long long 不會 */
   longs?: string[];
+  /** C++：全域變數（宣告在 main 外面，模組也用得到） */
+  globals?: string[];
 }
 
 /** 區域變數照型別分好（給下拉選單、型別檢查用） */
@@ -124,7 +126,8 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
   const target = getTarget();
   const lt = localTypes(named);
   const own = new Set([...params.map(p => p.name), ...named.map(v => v.name.trim())]);
-  const visible = (n: string) => target != 'cpp' && !own.has(n);
+  // C++ 的模組只看得到全域變數（主流程其他的變數寫在 main 裡面）
+  const visible = (n: string) => (target != 'cpp' || (vars.globals ?? []).includes(n)) && !own.has(n);
   // Scratch：被蓋住的主流程變數改叫「主流程的a」
   const renamed = (n: string) => (target == 'scratch' && own.has(n) ? [GLOBAL_PREFIX + n] : []);
   const g = (list: string[]) => list.flatMap(n => (visible(n) ? [n] : renamed(n)));
@@ -142,6 +145,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
     }),
     sizes: { ...vars.sizes, ...Object.fromEntries(named.filter(v => v.type == '陣列').map(v => [v.name.trim(), v.size ?? ''])) },
     structInits: { ...vars.structInits, ...Object.fromEntries(named.filter(v => v.type == '結構' && v.fieldInit).map(v => [v.name.trim(), v.fieldInit!])) },
+    globals: vars.globals,
     params: params.map(p => p.name),
     paramsReadOnly: getTarget() == 'scratch',
     locals: named.map(v => v.name.trim()),
@@ -178,10 +182,11 @@ const FUNCTIONS: Record<string, string> = {
   包含: '__has', contains: '__has',
   // C++：文字變整數、數字變文字
   stoi: '__stoi', to_string: '__tostr',
+  max: '__max', min: '__min',
 };
 const isFunc = (name: string) => Object.prototype.hasOwnProperty.call(FUNCTIONS, name);
 /** 第 i 個積木的程式有沒有用到上面的函式 */
-const FUNC_CALL = (i: number) => new RegExp(`__(len|find|has|stoi|tostr)_${i}\\(`);
+const FUNC_CALL = (i: number) => new RegExp(`__(len|find|has|stoi|tostr|max|min)_${i}\\(`);
 
 /**
  * 二維 vector 某一列的 size()、empty()：g[u].size() → 長度(g[u])、g[u].empty() → (長度(g[u]) == 0)，
@@ -285,6 +290,10 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     // stoi、to_string 只有 C++ 有
     if ((tk.text == 'stoi' || tk.text == 'to_string') && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
       alert(t(`${tk.text}( ) 是 C++ 的寫法：積木裡數字和文字會自己轉換，不用 ${tk.text}。`, `${tk.text}( ) is C++ only. In blocks, numbers and text convert by themselves.`));
+      return false;
+    }
+    if ((tk.text == 'max' || tk.text == 'min') && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
+      alert(t(`${tk.text}( ) 是 C++ 的寫法：積木請用判斷或迴圈找最大、最小的值。`, `${tk.text}( ) is C++ only. In blocks, use a decision or a loop to find the largest or smallest value.`));
       return false;
     }
     if (tokens[k - 1]?.text == '.' && tokens[k - 1].type == 'op') continue;
@@ -634,7 +643,7 @@ const runtimeMessages = () => ({
   lenNotList: t('長度( ) 的括號裡要放清單或文字。', 'Put a list or text inside length( ).'),
   findNotList: t('項目編號( ) 和 包含( ) 的括號裡，第一個要放清單或文字，例如 包含(名單, "Amy")。', 'The first thing inside indexof( ) or contains( ) must be a list or text. Example: contains(names, "Amy").'),
   countNotNum: t('迴圈的次數不是數字。', 'The loop count is not a number.'),
-  tooManyLoops: t('迴圈一共跑了超過 20000 次，可能停不下來：檢查條件迴圈的條件會不會成立、次數是不是太大。', 'The loops ran more than 20000 times in all. Maybe a loop never stops. Check the loop condition and the number of times.'),
+  tooManyLoops: t('迴圈一共跑了超過 100 萬次，可能停不下來：檢查條件迴圈的條件會不會成立、次數是不是太大。', 'The loops ran more than 1,000,000 times in all. Maybe a loop never stops. Check the loop condition and the number of times.'),
   gridEmpty: t('二維清單「{name}」還沒有建立大小：先用計算積木「建立 幾 列 幾 行」。', 'The 2D list "{name}" has no size yet. First use a Math block to make it (rows × columns).'),
   gridRow: t('二維清單「{name}」有 {len} 列，列的索引只能是 0 到 {max}，沒有索引 {k}。', 'The 2D list "{name}" has {len} rows. The row index must be 0 to {max}. There is no row {k}.'),
   gridCol: t('二維清單「{name}」每列有 {len} 行，行的索引只能是 0 到 {max}，沒有索引 {k}。', 'The 2D list "{name}" has {len} columns. The column index must be 0 to {max}. There is no column {k}.'),
@@ -644,6 +653,9 @@ const runtimeMessages = () => ({
   queueEmpty: t('queue「{name}」是空的，不能用 {m}()：裡面要先有東西（push），可以先用 {name}.empty() 檢查是不是空的。', 'The queue "{name}" is empty, so you cannot use {m}(). Push something first, or check with {name}.empty().'),
   sortRange: t('排序「{name}」：要排前 {n} 個，可是只有 {len} 個（要是 0 到 {len} 的整數）。', 'Sorting "{name}": you want the first {n}, but there are only {len} (it must be a whole number from 0 to {len}).'),
   substrRange: t('「{name}」只有 {len} 個字，substr 的開始位置只能是 0 到 {len}，現在是 {k}。', '"{name}" has only {len} letters. The start of substr must be 0 to {len}. Now it is {k}.'),
+  maxArgs: t('max( )、min( ) 的括號裡要放兩個以上的值（例如 max(a, b)），或一個 vector / array（例如 max(v)）。', 'Put two or more values in max( ) / min( ) (like max(a, b)), or one vector / array (like max(v)).'),
+  maxEmpty: t('max( )、min( ) 裡的「{name}」是空的，沒有最大、最小的值。', 'The list in max( ) / min( ) is empty, so there is no largest or smallest value.'),
+  maxStruct: t('max( )、min( ) 不能比 struct：請比某個欄位，或自己用迴圈找。', 'max( ) / min( ) cannot compare structs. Compare one field, or use a loop.'),
   stoiBad: t('stoi( ) 要把文字變成整數，可是「{v}」開頭不是數字。', 'stoi( ) turns text into a whole number, but "{v}" does not start with a number.'),
   showStruct: t('struct 不能整筆一起輸出（C++ 的 cout 不會印 struct），請一個欄位一個欄位輸出，例如 e.from。', 'A whole struct cannot be printed (cout cannot print a struct). Print one field at a time, like e.from.'),
   fixedRange: t('array「{name}」有 {len} 格，索引只能是 0 到 {max}，沒有索引 {k}（array 的大小是固定的，不會自己變大）。', 'The array "{name}" has {len} items. The index must be 0 to {max}. There is no index {k}. (An array has a fixed size.)'),
@@ -802,6 +814,18 @@ function __sort(list, name, i, n, field, desc) {
     return desc ? -c : c;
   });
   for (var k = 0; k < n; k++) list[k] = part[k];
+}
+// max(a, b, ...)、min(a, b, ...)；只放一個 vector / array 時找裡面最大、最小的（C++ 的 *max_element）
+function __maxmin(args, i, big) {
+  var list = args.length == 1 ? args[0] : Array.prototype.slice.call(args);
+  if (!Array.isArray(list) || (args.length == 1 && list.length && Array.isArray(list[0])) || list.length == 0 && args.length != 1) __err('maxArgs', i, {});
+  if (!list.length) __err('maxEmpty', i, { name: '' });
+  var best = list[0];
+  for (var k = 0; k < list.length; k++) {
+    if (list[k] && typeof list[k] == 'object') __err('maxStruct', i, {});
+    if (big ? list[k] > best : list[k] < best) best = list[k];
+  }
+  return best;
 }
 // stoi：跟 C++ 一樣讀開頭的整數（"12abc" 是 12），開頭不是數字就出錯
 function __stoi(v, i) {
@@ -976,7 +1000,10 @@ class CodeGenerator {
       case 'idx':
         if (e.obj.t == 'var') return array.includes(e.obj.name) && holdsInt(e.obj.name);
         return e.obj.t == 'idx' && e.obj.obj.t == 'var' && grid.includes(e.obj.obj.name) && holdsInt(e.obj.obj.name);
-      case 'call': return e.fn == 'len' || e.fn == 'find' || e.fn == 'stoi';
+      case 'call':
+        // max(v)：容器裝整數就是整數；max(a, b)：每個都是整數才是
+        if (e.fn == 'max' || e.fn == 'min') return e.args.length == 1 ? e.args[0].t == 'var' && holdsInt(e.args[0].name) : e.args.every(a => this.isIntExpr(a));
+        return e.fn == 'len' || e.fn == 'find' || e.fn == 'stoi';
       case 'fcall': {
         const m = this.modules.find(x => x.name == e.name);
         return m?.returns == '數字' && !m.returnsFloat;
@@ -1085,7 +1112,7 @@ class CodeGenerator {
       k += skip;
     }
     // 長度( )、項目編號( )、包含( ) 要把積木編號傳進去，錯誤時才能標出積木
-    out = out.replace(/__(len|find|has|stoi|tostr)\(/g, `__$1_${i}(`);
+    out = out.replace(/__(len|find|has|stoi|tostr|max|min)\(/g, `__$1_${i}(`);
     return condition ? toCondition(out) : out;
   }
 
@@ -1390,7 +1417,9 @@ class CodeGenerator {
       + `function __find_${i}(l, v) { return __find(l, v, ${i}); }\n`
       + `function __has_${i}(l, v) { return __has(l, v, ${i}); }\n`
       + `function __stoi_${i}(v) { return __stoi(v, ${i}); }\n`
-      + `function __tostr_${i}(v) { return __tostr(v); }\n`).join('')
+      + `function __tostr_${i}(v) { return __tostr(v); }\n`
+      + `function __max_${i}() { return __maxmin(arguments, ${i}, true); }\n`
+      + `function __min_${i}() { return __maxmin(arguments, ${i}, false); }\n`).join('')
       // 算式裡執行有回傳值的模組
       + [...this.callHelpers].map(key => {
         const [k, i] = key.split(':');
@@ -1415,7 +1444,14 @@ export interface RunResult {
   stack: number[][];
   /** 執行到一半出錯：前面的步驟照樣保留，最後一步之後就是這個錯誤 */
   error?: FlowError;
+  /** 步驟太多：中間略過幾步沒有記下來（只記前 MAX_STEPS 步和最後一步） */
+  skipped?: number;
 }
+
+/** 所有迴圈加起來最多跑幾次（超過就當成停不下來） */
+const MAX_LOOPS = 1_000_000;
+/** 第四步最多記幾步（太多瀏覽器會卡住）；之後的只記最後一步 */
+export const MAX_STEPS = 3000;
 
 /** 變數的初始值：清單一開始是空的；文字變數沒加引號時自動加上；數字變數要是數字 */
 function initialValue(vars: VarStore, name: string, raw: string | undefined): string {
@@ -1497,24 +1533,24 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     for (const n of locals) {
       if (!syntaxOk(`var ${n};`)) throw new FlowError(t(`模組「${m.info.name}」的區域變數名稱「${n}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${n}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
     }
-    // C++：主流程的變數寫在 main 裡面，模組用不到（要用值就用參數傳進來，要帶回去就用回傳）
+    // C++：主流程的變數寫在 main 裡面，模組用不到（要用值就用參數傳進來，要帶回去就用回傳）；全域變數可以
     if (getTarget() == 'cpp') {
-      const own = new Set([...m.info.params.map(p => p.name), ...locals]);
+      const own = new Set([...m.info.params.map(p => p.name), ...locals, ...(vars.globals ?? [])]);
       const sheet = modules.indexOf(m) + 1;
       m.diagram.nodes.forEach((node, k) => {
         const tokens = node ? tokenize(node.text) : [];
         const used = tokens.find((tk, j) => tk.type == 'name' && names.includes(tk.text) && !own.has(tk.text) && tokens[j - 1]?.text != '.');
         if (used) {
           throw new FlowError(t(
-            `模組「${m.info.name}」裡用了主流程的變數「${used.text}」：C++ 的主流程變數寫在 main 裡面，模組用不到。要用它的值，請加一個參數傳進來；要把結果帶回主流程，請用回傳。`,
-            `The module "${m.info.name}" uses "${used.text}" from the main flow. In C++ those variables are inside main, so a module cannot use them. Pass the value in as a parameter, and use a return value to bring a result back.`,
+            `模組「${m.info.name}」裡用了主流程的變數「${used.text}」：C++ 的主流程變數寫在 main 裡面，模組用不到。要用它的值，請加一個參數傳進來；要把結果帶回主流程，請用回傳。或是到第三步把「${used.text}」勾成「全域」，每個模組就都用得到。`,
+            `The module "${m.info.name}" uses "${used.text}" from the main flow. In C++ those variables are inside main, so a module cannot use them. Pass the value in as a parameter, and use a return value to bring a result back. Or mark "${used.text}" as Global in step 3 so every module can use it.`,
           ), sheetId(sheet, k));
         }
       });
     }
   }
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
-  let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\nvar __frames = [];\n';
+  let code = `var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = ${MAX_LOOPS};\nvar __depth = 0;\nvar __stack = [];\nvar __frames = [];\n`;
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
   const fixedNames = [...vars.type_var_list.fixed, ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列').map(v => v.name.trim()))];
   code += 'var __FIXED = ' + JSON.stringify(Object.fromEntries(fixedNames.map(n => [n, true]))) + ';\n';
@@ -1535,7 +1571,9 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   }).join(', ') + '};\n';
   // 全域變數的值（寫在最外層：模組裡就算有同名的參數，這裡拿到的還是全域的）
   code += 'function __globals(){ return {' + names.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; }\n';
-  code += 'function Update_output(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nif (b && typeof b == "object" && __frames.length) b.__frames = __frames.slice(-20).map(function (f, k, all) { return { sheet: f.sheet, depth: __frames.length - all.length + k + 1, vals: f.get() }; });\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
+  // 每一步都記下來給第四步看；步驟太多時（大的測資、排序）只記前 MAX_STEPS 步，之後只記住最後一步，執行完再補上，瀏覽器才不會卡住
+  code += 'function __record(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nif (b && typeof b == "object" && __frames.length) b.__frames = __frames.slice(-20).map(function (f, k, all) { return { sheet: f.sheet, depth: __frames.length - all.length + k + 1, vals: f.get() }; });\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
+  code += `var __skipped = 0;\nvar __last = null;\nfunction Update_output(a,b){\nif (step_list.step.length < ${MAX_STEPS}) { __record(a, b); return; }\n__skipped++;\n__last = [a, b];\n}\n`;
   const infos = modules.map(m => m.info);
   code += new CodeGenerator(diagram, vars, 0, infos).program();
   // 模組：每個模組一個函式（__mod1、__mod2…）
@@ -1544,7 +1582,9 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   });
   // 執行到一半出錯時，保留出錯前的每一步，學生才看得到變數是怎麼變的
   code += 'var __error = null;\ntry { flowchart_code(); } catch (e) { __error = e; }\n';
-  code += 'return {totalStep: total_step, step: step_list.step, var: step_list.var, output: step_list.output, stack: step_list.stack, error: __error};\n';
+  // 略過的步驟裡最後一步（執行結束或出錯的那一步）補上
+  code += 'if (__last) { __skipped--; __record(__last[0], __last[1]); }\n';
+  code += 'return {totalStep: total_step, step: step_list.step, var: step_list.var, output: step_list.output, stack: step_list.stack, skipped: __skipped, error: __error};\n';
 
   console.log('code = \n', code);
   const diagrams = [diagram, ...modules.map(m => m.diagram)];
@@ -1555,6 +1595,8 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   catch (e) {
     throw explainError(e, diagrams);
   }
+  // 有略過步驟時，第四步的最後一步就是記下來的最後一筆
+  if (result.skipped) result.totalStep = result.step.length - 1;
   if (result.error == null) return { ...result, error: undefined };
   // 連第一步都沒跑到就出錯：當成整個沒辦法執行
   if (result.step.length == 0) throw explainError(result.error, diagrams);

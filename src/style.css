@@ -1445,6 +1445,20 @@ input, textarea, select, button {
   border-color: #cfe6cd;
   background: #f5fbf4;
 }
+/* 變數表：C++ 的「全域」勾選框（勾了模組也用得到） */
+.global_flag {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 2px 0 0 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.global_flag:has(input:checked) {
+  color: var(--green-dark);
+}
+
 /* 變數表：struct 變數每個欄位的初始值（很淡的綠框，表示可以填） */
 .struct_init summary {
   display: inline-block;

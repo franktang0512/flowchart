@@ -61,7 +61,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         // 清單的一項、二維清單的一格（只取一個 [ ] 的二維清單是一整列，不是數字）
         if (e.obj.t == 'var') return (vars.get(e.obj.name)?.type == '清單' || vars.get(e.obj.name)?.type == '陣列') && isIntType(elemType(e.obj.name));
         return e.obj.t == 'idx' && e.obj.obj.t == 'var' && vars.get(e.obj.obj.name)?.type == '二維清單' && isIntType(elemType(e.obj.obj.name));
-      case 'call': return e.fn == 'len' || e.fn == 'find' || e.fn == 'stoi';
+      case 'call':
+        if (e.fn == 'max' || e.fn == 'min') return e.args.length == 1 ? e.args[0].t == 'var' && isIntType(elemType(e.args[0].name)) : e.args.every(isInt);
+        return e.fn == 'len' || e.fn == 'find' || e.fn == 'stoi';
       case 'method': return e.name == 'size' || e.name == 'length' || (e.name != 'empty' && e.name != 'substr' && e.obj.t == 'var' && isIntType(elemType(e.obj.name)));
       case 'field': {
         const f = fieldOf(e, vars);
@@ -99,6 +101,17 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'call': {
         const [a, b] = e.args;
         if (!a) return '0';
+        // max(a, b)；三個以上是 max({a, b, c})；max(v) 是 *max_element(v.begin(), v.end())（array：a, a + 大小）
+        if (e.fn == 'max' || e.fn == 'min') {
+          uses.sort = true;
+          if (e.args.length == 1) {
+            const v = a.t == 'var' ? vars.get(a.name) ?? allVars.find(x => x.name == a.name) : undefined;
+            const range = v?.type == '陣列' ? `${a.t == 'var' ? a.name : expr(a, 9)}, ${expr(a, 9)} + ${v.size?.trim() || '0'}` : `${expr(a, 9)}.begin(), ${expr(a, 9)}.end()`;
+            return `*${e.fn}_element(${range})`;
+          }
+          const args = e.args.map(x => expr(x)).join(', ');
+          return e.args.length == 2 ? `${e.fn}(${args})` : `${e.fn}({${args}})`;
+        }
         // 文字變整數、數字變文字
         if (e.fn == 'stoi' || e.fn == 'tostr') {
           uses.string = true;
@@ -386,8 +399,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   enter(null);
   if (modules.some(m => m.params.some(p => p.type == '文字'))) uses.string = true;
 
-  // 主流程的變數一律宣告在 main 裡面（初學先不用全域變數；模組要用的值用參數傳進去、用回傳帶出來）
-  const decls = [...varList.map(v => declLine(v, INDENT)), ...tmpDecls(body, INDENT)];
+  // 主流程的變數宣告在 main 裡面；勾了「全域」的宣告在 main 外面（每個函式都用得到）
+  const decls = [...varList.filter(v => !v.global).map(v => declLine(v, INDENT)), ...tmpDecls(body, INDENT)];
+  const globalDecls = varList.filter(v => v.global).map(v => declLine(v, ''));
 
   // 用到才 #include：文字變數、裝文字的容器或用到 string 的寫法才要 <string>；有 vector 才要 <vector>；stack、queue 也一樣
   const isList = (v: VarInfo) => v.type == '清單' || v.type == '二維清單';
@@ -436,6 +450,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       '',
     );
   }
+  if (globalDecls.length) head.push('// ' + t('全域變數：main 和每個函式都用得到', 'Global variables: main and every function can use them'), ...globalDecls, '');
   // 模組之間互相執行時，要先宣告才能用
   const protos = modules.length > 1 ? [...modules.map(m => `${retType(m)} ${m.name}(${paramCode(m)});`), ''] : [];
   return [...head, ...protos, ...functions, 'int main() {', ...decls, ...(decls.length ? [''] : []), ...body, `${INDENT}return 0;`, '}', ''].join('\n');
