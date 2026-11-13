@@ -1399,12 +1399,109 @@ input, textarea, select, button {
 #local_table .local_row td {
   background: #f1f7ff;
 }
-#createRow, .create_local {
+#createRow, .create_local, .create_struct, .create_field {
   margin-top: 10px;
   border: 1px dashed #9aa5ad;
   background: #fff;
   border-radius: 8px;
   padding: 4px 14px;
+}
+.create_struct:hover, .create_field:hover {
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+}
+
+/* ---------- 第三步：struct（結構）的定義 ---------- */
+.struct_area {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--card-line);
+}
+.struct_card {
+  margin-top: 8px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  background: #fff;
+}
+.struct_head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.struct_kw {
+  font-family: Consolas, Menlo, monospace;
+  font-weight: bold;
+  color: var(--green-dark);
+}
+.struct_head .struct_name {
+  flex: 1;
+  font-weight: bold;
+  border-color: #cfe6cd;
+  background: #f5fbf4;
+}
+.struct_fields input.var_input {
+  border-color: #cfe6cd;
+  background: #f5fbf4;
+}
+/* 變數表：struct 變數每個欄位的初始值（很淡的綠框，表示可以填） */
+.struct_init summary {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid #cfe6cd;
+  border-radius: 4px;
+  background: #f5fbf4;
+  cursor: pointer;
+  list-style: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.struct_init summary::-webkit-details-marker {
+  display: none;
+}
+/* 收起來時前面一個 ▸，展開時 ▾ */
+.struct_init summary::before {
+  content: '▸ ';
+  color: var(--muted);
+}
+.struct_init[open] summary::before {
+  content: '▾ ';
+}
+.struct_init summary:hover {
+  border-color: #a9d4a6;
+}
+.struct_init summary code {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.struct_init_fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+.struct_init label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.85rem;
+}
+.struct_init input.var_input {
+  width: 4.5em;
+  border-color: #cfe6cd;
+  background: #f5fbf4;
+}
+.struct_card .create_field {
+  margin-top: 6px;
+  padding: 2px 10px;
+  font-size: 0.85rem;
+}
+#node_info .field_select {
+  min-width: 0;
+  width: auto;
 }
 .global_note {
   margin: 12px 0 0;

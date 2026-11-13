@@ -69,13 +69,22 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
   const varBox = (name: string, now: Values | undefined, before: Values | undefined, kind: 'main' | 'module' | 'idle' = 'main') => {
     const v = now?.[name];
     const extra = kind == 'module' ? ' is_param' : kind == 'idle' ? ' is_idle' : '';
+    const isRecord = (x: unknown): x is Record<string, unknown> => x != null && typeof x == 'object' && !Array.isArray(x);
     const isList = Array.isArray(v);
     const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
+    // struct：一筆（e）或裝 struct 的 vector、array（edges）
+    const isRecords = isList && v.length > 0 && isRecord(v[0]);
+    const wide = isList || isRecord(v);
     return (
-      <div key={name} className={'var_box' + (isList ? ' is_list' : '') + extra}>
+      <div key={name} className={'var_box' + (wide ? ' is_list' : '') + extra}>
         <span className="var_box_name">{name}</span>
-        <span className={'var_box_value' + (isList ? ' is_list' : '')}>
-          {kind == 'idle' ? '—' : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} /> : isList ? <ListValue items={v} prev={before?.[name]} kind={kinds[name]} /> : String(v)}
+        <span className={'var_box_value' + (wide ? ' is_list' : '')}>
+          {kind == 'idle' ? '—'
+            : isRecord(v) ? <RecordTable rows={[v]} prev={isRecord(before?.[name]) ? [before![name]] : null} />
+            : isRecords ? <RecordTable rows={v as Record<string, unknown>[]} prev={Array.isArray(before?.[name]) ? before![name] as unknown[] : null} indexed kind={kinds[name]} />
+            : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} />
+            : isList ? <ListValue items={v} prev={before?.[name]} kind={kinds[name]} />
+            : String(v)}
         </span>
       </div>
     );
@@ -214,6 +223,12 @@ function changedIndex(items: unknown[], prev: unknown): number {
   return items.length < prev.length ? items.length - 1 : -1;
 }
 
+/** 二維 vector 一格的字：裝 struct 的寫成「to=2 w=7」 */
+function cellText(cell: unknown): string {
+  if (cell && typeof cell == 'object' && !Array.isArray(cell)) return Object.entries(cell).map(([k, v]) => `${k}=${v}`).join(' ');
+  return String(cell);
+}
+
 /** 二維清單的值：畫成表格，上面和左邊標索引（從 0 開始）；這一步改到的格子標出來，太大可以捲動 */
 function GridValue({ rows, prev }: { rows: unknown[][]; prev: unknown }) {
   const old = Array.isArray(prev) ? prev as unknown[][] : null;
@@ -230,7 +245,43 @@ function GridValue({ rows, prev }: { rows: unknown[][]; prev: unknown }) {
           {rows.map((row, r) => (
             <tr key={r}>
               <th>{r}</th>
-              {row.map((cell, c) => <td key={c} className={sameShape && old![r][c] !== cell ? 'changed' : ''}>{String(cell)}</td>)}
+              {row.map((cell, c) => <td key={c} className={sameShape && JSON.stringify(old![r][c]) !== JSON.stringify(cell) ? 'changed' : ''}>{cellText(cell)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </span>
+  );
+}
+
+/**
+ * struct 的值：表格，上面是欄位名稱；indexed（vector、array 裡的 struct）時每一列一筆、左邊標索引。
+ * 這一步改到的格子標出來
+ */
+function RecordTable({ rows, prev, indexed = false, kind }: { rows: Record<string, unknown>[]; prev: unknown[] | null; indexed?: boolean; kind?: string }) {
+  /** 左邊那一欄：索引；stack 只標 top，queue 標 front、back（中間的拿不到） */
+  const tag = (r: number) => {
+    const last = r == rows.length - 1;
+    if (kind == '堆疊') return last ? 'top' : '';
+    if (kind == '佇列') return [r == 0 ? 'front' : '', last ? 'back' : ''].filter(Boolean).join(' / ');
+    return String(r);
+  };
+  const fields = Object.keys(rows[0] ?? {});
+  const before = (r: number, f: string) => {
+    const p = prev?.[r];
+    return p && typeof p == 'object' ? (p as Record<string, unknown>)[f] : undefined;
+  };
+  return (
+    <span className="grid_value">
+      <table>
+        <thead>
+          <tr>{indexed && <th></th>}{fields.map(f => <th key={f}>{f}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r}>
+              {indexed && <th>{tag(r)}</th>}
+              {fields.map(f => <td key={f} className={prev && prev.length == rows.length && before(r, f) !== row[f] ? 'changed' : ''}>{String(row[f])}</td>)}
             </tr>
           ))}
         </tbody>

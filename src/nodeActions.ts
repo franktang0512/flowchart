@@ -1,13 +1,14 @@
 // 對話框按「確認」之後：新增或修改積木。檢查條件的順序與舊版相同（會影響跳出哪個提示）。
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
-import { checkCall, checkValueType, checkVar, getCodeVar, type VarStore } from './engine/decoder';
+import { checkCall, checkValueType, checkVar, getCodeVar, splitField, type VarStore } from './engine/decoder';
 import { splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { parseExpr } from './engine/structure';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
 import { t } from './i18n';
+import { findStruct } from './engine/structs';
 
 const ROUNDING_TEXT: Record<string, string> = {
   'Math.round': '(取四捨五入)',
@@ -22,7 +23,15 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   const target = f.varSelect ? ' ' + f.varSelect : '';
   // 二維清單的一格：表[列][行]
   const cell = vars.type_var_list.grid.includes(f.varSelect.trim()) ? `[${f.rectIndex.trim()}][${f.rectIndex2.trim()}]` : `[${f.rectIndex}]`;
-  let text = f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
+  // struct 的欄位：「 e.from 設為 x」「 edges[i].w 設為 x」（替換一格的某個欄位）
+  const field = fieldTarget(f);
+  // 二維 vector 的某一列後面添加：「 g[u] 加入 v」
+  const rowPush = f.rectKind == '二維清單' && f.rectAction == '加入';
+  let text = field ? ` ${field} 設為 ${f.code}`
+    : rowPush ? `${target}[${f.rectIndex.trim()}] 加入 ${f.code}`
+    // 排序：「 a 排序 前 n 個 依 w 由小到大」（前幾個、依欄位都可以沒有）
+    : f.rectAction == '排序' ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''}${f.rectField ? ` 依 ${f.rectField}` : ''} ${f.sortDesc ? '由大到小' : '由小到大'}`
+    : f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
     : f.rectAction == '替換' ? `${target}${cell} 設為 ${f.code}`
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
     : f.rectAction == '清空' ? `${target} 刪除所有項目`
@@ -35,6 +44,16 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   // 刪除沒有值，不用捨去進位
   if (hasValue(f)) text += ROUNDING_TEXT[f.radio] ?? '';
   return { text, nodeVar };
+}
+
+/** 計算積木改的是 struct 的欄位：e.from 或 edges[i].w；不是的話 null */
+function fieldTarget(f: DialogForm): string | null {
+  if (!f.rectField) return null;
+  if (f.rectKind == '結構') return `${f.varSelect.trim()}.${f.rectField}`;
+  if ((f.rectKind == '清單' || f.rectKind == '陣列') && f.rectAction == '替換') return `${f.varSelect.trim()}[${f.rectIndex.trim()}].${f.rectField}`;
+  // 二維 vector 的一格：g[u][k].w
+  if (f.rectKind == '二維清單' && f.rectAction == '替換') return `${f.varSelect.trim()}[${f.rectIndex.trim()}][${f.rectIndex2.trim()}].${f.rectField}`;
+  return null;
 }
 
 /** 接收模組回傳值：變成一般的計算積木「a 設為 aaa(x)」（不捨去進位） */
@@ -53,8 +72,8 @@ function changeForm(f: DialogForm): DialogForm {
   return { ...f, rectAction: '設為', radio: '', code: `${f.varSelect.trim()} + ${simple ? by : `(${by})`}` };
 }
 
-/** 刪除第幾項、刪除所有項目、建立二維清單、pop 不用填值 */
-const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立' && f.rectAction != '取出';
+/** 刪除第幾項、刪除所有項目、建立二維清單、pop、排序不用填值 */
+const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立' && f.rectAction != '取出' && f.rectAction != '排序';
 
 function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (!f.rectKind) {
@@ -89,9 +108,39 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     }
     return checkVar(vars, f.code, true) && checkValueType(vars, modules, name, f.code, 'var');
   }
+  // struct 的欄位：要先選變數和欄位（容器還要填索引），值的型別要跟欄位一樣
+  if (f.rectKind == '結構' && !f.rectField) {
+    alert(t('請選要改哪個欄位。', 'Choose a field.'));
+    return false;
+  }
+  const field = fieldTarget(f);
+  if (field) {
+    if (!f.varSelect.trim()) {
+      alert(t('請先選一個變數。', 'Choose a variable first.'));
+      return false;
+    }
+    return checkVar(vars, field, false) && checkVar(vars, f.code, true) && checkValueType(vars, modules, field, f.code, 'var');
+  }
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
   if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
   const list = f.varSelect.trim();
+  // 排序：vector 或 array；裝 struct 的要選依哪個欄位；array 可以只排前幾個
+  if (f.rectAction == '排序') {
+    if (!vars.type_var_list.array.includes(list)) {
+      alert(t('請選一個 vector 或 array。', 'Choose a vector or an array.'));
+      return false;
+    }
+    if (isStructContainer(vars, list) && !f.rectField) {
+      alert(t('裡面裝的是 struct：請選要依哪個欄位排序。', 'It holds structs. Choose the field to sort by.'));
+      return false;
+    }
+    return !f.rectIndex.trim() || checkVar(vars, f.rectIndex, true);
+  }
+  // 二維 vector 的某一列後面添加（鄰接串列）
+  if (vars.type_var_list.grid.includes(list) && f.rectAction == '加入') {
+    const row = `${list}[${f.rectIndex.trim()}]`;
+    return checkVar(vars, f.rectIndex, true) && checkVar(vars, f.code, true) && checkValueType(vars, modules, row, f.code, 'item');
+  }
   // 二維清單：建立（幾列幾行）、替換一格（第幾列第幾行）
   if (vars.type_var_list.grid.includes(list) && (f.rectAction == '建立' || f.rectAction == '替換')) {
     if (!checkVar(vars, f.rectIndex, true) || !checkVar(vars, f.rectIndex2, true)) return false;
@@ -133,12 +182,32 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
  */
 function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): string | null {
   if (f.radio == '輸入') {
-    // 二維清單的一格：輸入 表[列][行]
+    // 二維清單的一格：輸入 表[列][行]；裝 struct 的要選欄位：輸入 g[u][k].w
     if (f.ioTarget == '二維清單') {
-      const text = `${f.varSelect.trim()}[${f.rectIndex.trim()}][${f.rectIndex2.trim()}]`;
+      const holds = vars.var_list.value[vars.var_list.name.indexOf(f.varSelect.trim())];
+      if (findStruct(holds) && !f.rectField) {
+        alert(t('請選要輸入到哪個欄位。', 'Choose the field to input into.'));
+        return null;
+      }
+      const text = `${f.varSelect.trim()}[${f.rectIndex.trim()}][${f.rectIndex2.trim()}]${findStruct(holds) ? `.${f.rectField}` : ''}`;
       return checkVar(vars, text, false) ? '輸入 ' + text : null;
     }
+    // 裝 struct 的 stack、queue：不能一次輸入一整筆
+    if ((f.ioTarget == '堆疊' || f.ioTarget == '佇列') && findStruct(vars.var_list.value[vars.var_list.name.indexOf(f.varSelect.trim())])) {
+      alert(t('裡面裝的是 struct，不能一次輸入一整筆：請先輸入到 struct 變數的欄位，再用計算積木 push 進去。', 'It holds structs, so you cannot input a whole one. Input into a struct variable\'s fields first, then push it with a Math block.'));
+      return null;
+    }
     if (!checkVar(vars, f.varSelect, false)) return null;
+    // struct 的欄位：輸入 e.from；裝 struct 的容器一格的欄位：輸入 edges[i].w（一次只能輸入一個欄位）
+    const holdsStruct = vars.type_var_list.record.includes(f.varSelect.trim()) || (f.ioTarget != '結構' && f.rectField != '') || isStructContainer(vars, f.varSelect.trim());
+    if (holdsStruct) {
+      if (!f.rectField) {
+        alert(t('請選要輸入到哪個欄位。', 'Choose the field to input into.'));
+        return null;
+      }
+      const text = f.ioTarget == '結構' ? `${f.varSelect.trim()}.${f.rectField}` : `${f.varSelect.trim()}[${f.rectIndex.trim()}].${f.rectField}`;
+      return checkVar(vars, text, false) ? '輸入 ' + text : null;
+    }
     // array：存到某一格（大小固定，不能加到最後）
     if (f.ioTarget == '陣列') return checkVar(vars, f.rectIndex, true) ? `輸入 ${f.varSelect}[${f.rectIndex.trim()}]` : null;
     // stack、queue：push 進去
@@ -161,6 +230,12 @@ function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): stri
     return f.radio + (f.varSelectOutput ? ' ' + f.varSelectOutput : '');
   }
   return null;
+}
+
+/** 裝 struct 的 vector、array */
+function isStructContainer(vars: VarStore, name: string) {
+  const holds = vars.var_list.value[vars.var_list.name.indexOf(name)];
+  return vars.type_var_list.array.includes(name) && findStruct(holds) != null;
 }
 
 /** 執行模組積木的文字「模組名稱(引數, …)」；檢查沒過回傳 null */
@@ -302,7 +377,15 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       // 輸入到清單的某一項：拆出清單和第幾項（存到變數還是清單，對話框再依變數表判斷）
       const insert = /^(.*?) 插入第 (.*) 項$/s.exec(rest);
       const item = splitTarget(rest);
-      const place: Partial<DialogForm> = insert ? { varSelect: insert[1].trim(), ioPlace: '插入', rectIndex: insert[2].trim() }
+      // 輸入到 struct 的欄位：e.from、edges[i].w
+      const field = splitField(rest);
+      const fieldItem = field && splitTarget(field.base);
+      const place: Partial<DialogForm> = field ? (fieldItem?.indexes.length == 2
+          ? { varSelect: fieldItem.name, ioTarget: '二維清單', rectIndex: fieldItem.indexes[0], rectIndex2: fieldItem.indexes[1], rectField: field.field }
+          : fieldItem
+          ? { varSelect: fieldItem.name, ioTarget: vars?.type_var_list.fixed.includes(fieldItem.name) ? '陣列' : '清單', ioPlace: '替換', rectIndex: fieldItem.indexes[0], rectField: field.field }
+          : { varSelect: field.base.trim(), ioTarget: '結構', rectField: field.field })
+        : insert ? { varSelect: insert[1].trim(), ioPlace: '插入', rectIndex: insert[2].trim() }
         : item?.indexes.length == 2 ? { varSelect: item.name, ioTarget: '二維清單', rectIndex: item.indexes[0], rectIndex2: item.indexes[1] }
         : item ? { varSelect: item.name, ioPlace: '替換', rectIndex: item.indexes[0] }
         : { varSelect: rest };
@@ -323,6 +406,24 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
     case 'Rectangle': {
       const { target, action, index, index2, expr } = splitRectangle(text);
+      // struct 的欄位：「 e.from 設為 x」「 edges[i].w 設為 x」
+      const field = action == '設為' ? splitField(target) : null;
+      if (field) {
+        const item = splitTarget(field.base);
+        return {
+          kind: 'Rectangle',
+          initial: {
+            ...(node.data != null ? { radio: node.data } : {}),
+            code: expr.split('(取')[0],
+            rectField: field.field,
+            ...(item?.indexes.length == 2
+              ? { rectKind: '二維清單', rectAction: '替換', varSelect: item.name, rectIndex: item.indexes[0], rectIndex2: item.indexes[1] }
+              : item
+              ? { rectKind: vars?.type_var_list.fixed.includes(item.name) ? '陣列' : '清單', rectAction: '替換', varSelect: item.name, rectIndex: item.indexes[0] }
+              : { rectKind: '結構', rectAction: '設為', varSelect: field.base.trim() }),
+          },
+        };
+      }
       // 「a 設為 aaa(x)」：整個值就是執行一個有回傳值的模組（沒有捨去進位）→ 接收模組回傳值
       const call = action == '設為' && !node.data && !expr.includes('(取') ? returningCall(expr, modules) : null;
       // 「x 設為 x + 多少」（數字變數、沒有捨去進位）→ 變數「改變」
@@ -339,13 +440,16 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
+          ...(action == '排序' ? { rectField: index2, sortDesc: expr == '由大到小' } : {}),
           // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
           rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' || (action == '替換' && index2) ? '二維清單'
             : action == '放入' || action == '取出' ? (vars?.type_var_list.queue.includes(target) ? '佇列' : '堆疊')
+            // 二維 vector 某一列 push_back：「 g[u] 加入 v」
+            : action == '加入' && splitTarget(target) ? '二維清單'
             : vars?.type_var_list.fixed.includes(target) ? '陣列' : '清單',
-          rectIndex: index,
-          rectIndex2: index2,
-          varSelect: target,
+          rectIndex: action == '加入' && splitTarget(target) ? splitTarget(target)!.indexes[0] : index,
+          rectIndex2: action == '排序' ? '' : index2,
+          varSelect: action == '加入' && splitTarget(target) ? splitTarget(target)!.name : target,
           code: expr.split('(取')[0],
         },
       };

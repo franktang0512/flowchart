@@ -6,6 +6,7 @@ import type { RectAction } from '../engine/labels';
 import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { byTarget, canReturn as canReturnTarget, getTarget, itemWord } from '../target';
+import { fieldCppType, findStruct, type StructDef } from '../engine/structs';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -30,7 +31,7 @@ export interface DialogForm {
    * 接收（執行有回傳值的模組，把回傳值存進變數：「a 設為 aaa(x)」，模組和參數用 moduleName、moduleArgs）；
    * '' = 還沒選。選了清單、二維清單再選 rectAction（添加、插入…）
    */
-  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列';
+  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列' | '結構';
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 變數：true 是「改變」（Scratch「變數改變」、Blockly「將變數的值加」），code 填加多少；存成「x 設為 x + 多少」 */
@@ -40,7 +41,11 @@ export interface DialogForm {
   /** 二維清單：第幾行（建立時是幾行） */
   rectIndex2: string;
   /** 輸入積木要存到變數、清單還是二維清單的一格；'' = 還沒選（先選類型才出現下拉選單） */
-  ioTarget: '' | '變數' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列';
+  ioTarget: '' | '變數' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列' | '結構';
+  /** struct 的欄位：struct 變數的 e.from，或裝 struct 的容器那一格的 edges[i].w；'' 是一整筆（只有容器可以） */
+  rectField: string;
+  /** 排序：由大到小（false 是由小到大） */
+  sortDesc: boolean;
   /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
   ioPlace: '加入' | '插入' | '替換';
   /** 輸出積木輸出什麼：'' 是變數或字串（自己打）；'回傳' 是執行有回傳值的模組、輸出回傳值（moduleName、moduleArgs） */
@@ -65,6 +70,8 @@ const RECT_ACTIONS: [RectAction, () => string][] = [
   // stack、queue（C++）
   ['放入', () => t('push（放進去）', 'push')],
   ['取出', () => t('pop（拿掉一個）', 'pop')],
+  // C++：vector、array 排序
+  ['排序', () => t('排序（sort）', 'Sort')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
@@ -78,6 +85,7 @@ const RECT_HINT: Record<RectAction, () => string> = {
   回傳: () => t('把這個值交回給執行模組的地方，然後離開模組（後面直接接「結束」）...', 'Give this value back and leave the module (go straight to "End")...'),
   放入: () => t('push：把值放進 stack（放在最上面），或放進 queue（排在最後面）...', 'push: put a value on top of a stack, or at the back of a queue...'),
   取出: () => t('pop：拿掉 stack 最上面的，或 queue 最前面的（要先確定裡面不是空的）。要用那個值，請先用 top() 或 front() 讀出來...', 'pop: remove the top of a stack, or the front of a queue (it must not be empty). To use the value, read it first with top() or front()...'),
+  排序: () => t('sort：把 vector 或 array 由小到大（或由大到小）排好...', 'sort: put a vector or array in order, small to large (or large to small)...'),
 };
 
 /** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
@@ -92,6 +100,7 @@ const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   回傳: null,
   放入: null,
   取出: null,
+  排序: null,
 };
 
 /** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
@@ -109,6 +118,7 @@ const RECT_VERB: Record<RectAction, (() => string) | null> = {
   回傳: () => t('回傳', 'return'),
   放入: () => 'push',
   取出: null,
+  排序: null,
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -137,6 +147,8 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   varChange: false,
   rectIndex: '',
   rectIndex2: '',
+  rectField: '',
+  sortDesc: false,
   ioTarget: '',
   ioPlace: '加入',
   outputKind: '',
@@ -174,6 +186,8 @@ interface Props {
   varTypes: VarTypes;
   /** 可以執行的模組（「執行模組」積木的下拉選單） */
   modules: ModuleInfo[];
+  /** 每個變數裝什麼（struct 變數、裝 struct 的容器是 struct 的名稱；找欄位用） */
+  holds?: Record<string, string>;
 }
 
 /**
@@ -204,57 +218,110 @@ function VarPicker({ id, value, onChange, names, params = [], locals = [] }: { i
 const vectorsOf = (ty: VarTypes) => ty.array.filter(n => !ty.fixed.includes(n));
 
 /** 算式欄位下面「點一下填入」的說明 */
-const SNIPPET_HINT: Record<string, () => string> = {
-  top: () => t('stack 最上面的值（最後放進去的）', 'The top of the stack (the last one in)'),
-  front: () => t('queue 最前面的值（最早放進去的）', 'The front of the queue (the first one in)'),
-  back: () => t('queue 最後面的值（最後放進去的）', 'The back of the queue (the last one in)'),
-  size: () => t('裡面有幾個', 'How many items'),
-  empty: () => t('是不是空的（真／假）', 'Is it empty? (true / false)'),
-  index: () => t('某一格：在 [ ] 裡填索引（從 0 開始）', 'One item: put the index (from 0) in [ ]'),
-};
 
 /**
  * 算式欄位下面的「點一下填入」（只有 C++）：選一個 vector、array、stack 或 queue，
  * 點按鈕就把 s.top()、q.front()、v.size()、a[ ] 這些寫法填到游標的位置，不用自己打。
  * inputId 是要填進去的輸入框（記得游標在哪裡）
  */
-function ExprHelper({ inputId, types, value, onChange }: { inputId: string; types: VarTypes; value: string; onChange: (v: string) => void }) {
-  const items: [string, keyof typeof METHODS | 'array'][] = [
+/** 「點一下填入」的一個按鈕：填進去的字、按鈕上的字、填完游標停在第幾個字（沒有就是最後面）、說明 */
+interface Snippet {
+  key: string;
+  text: string;
+  label?: string;
+  caret?: number;
+  hint: string;
+}
+
+/** 填完游標停在第一個「[]」或「()」中間（接著打索引或引數） */
+const caretInside = (text: string, pair: '[]' | '()') => (text.includes(pair) ? text.indexOf(pair) + 1 : undefined);
+
+/**
+ * 算式欄位下面的「點一下填入」（只有 C++）：選一個 vector、array、stack、queue、string、二維 vector 或 struct，
+ * 點按鈕就把 s.top()、q.front()、v.size()、a[ ]、name.substr( )、g[ ].size() 這些寫法填到游標的位置，不用自己打。
+ * inputId 是要填進去的輸入框（記得游標在哪裡）
+ */
+function ExprHelper({ inputId, types, holds, value, onChange }: { inputId: string; types: VarTypes; holds: Record<string, string>; value: string; onChange: (v: string) => void }) {
+  const items: [string, keyof typeof METHODS | 'array' | 'struct' | 'grid'][] = [
+    ...types.record.map(n => [n, 'struct'] as [string, 'struct']),
     ...types.stack.map(n => [n, 'stack'] as [string, 'stack']),
     ...types.queue.map(n => [n, 'queue'] as [string, 'queue']),
     ...vectorsOf(types).map(n => [n, 'vector'] as [string, 'vector']),
     ...types.fixed.map(n => [n, 'array'] as [string, 'array']),
+    ...types.grid.map(n => [n, 'grid'] as [string, 'grid']),
+    ...types.text.map(n => [n, 'string'] as [string, 'string']),
   ];
   const [pick, setPick] = useState(items[0]?.[0] ?? '');
   if (getTarget() != 'cpp' || !items.length) return null;
   const [name, kind] = items.find(x => x[0] == pick) ?? items[0];
-  const snippets: [string, string][] = [
-    ...(kind == 'array' ? [] : METHODS[kind].map(m => [m, `${name}.${m}()`] as [string, string])),
-    ...(kind == 'array' || kind == 'vector' ? [['index', `${name}[]`] as [string, string]] : []),
-  ];
-  const insert = (snippet: string) => {
+  const struct = findStruct(holds[name]);
+  const fieldHint = t('struct 的欄位', 'A struct field');
+  const hints: Record<string, string> = {
+    top: t('stack 最上面的值（最後放進去的）', 'The top of the stack (the last one in)'),
+    front: t('queue 最前面的值（最早放進去的）', 'The front of the queue (the first one in)'),
+    back: t('queue 最後面的值（最後放進去的）', 'The back of the queue (the last one in)'),
+    size: t('裡面有幾個', 'How many items'),
+    length: t('有幾個字', 'How many letters'),
+    empty: t('是不是空的（真／假）', 'Is it empty? (true / false)'),
+  };
+  let snippets: Snippet[];
+  if (kind == 'struct') {
+    // struct 變數：每個欄位 e.from
+    snippets = (struct?.fields ?? []).map(f => ({ key: `field:${f.name}`, text: `${name}.${f.name}`, hint: fieldHint }));
+  }
+  else if (kind == 'string') {
+    // string：長度、取一段、變成整數
+    snippets = [
+      { key: 'length', text: `${name}.length()`, hint: hints.length },
+      { key: 'index', text: `${name}[]`, label: `${name}[ ]`, caret: name.length + 1, hint: t('第幾個字（索引從 0 開始）', 'One letter (index from 0)') },
+      { key: 'substr', text: `${name}.substr()`, label: `${name}.substr(${t('開始', 'start')}, ${t('幾個字', 'count')})`, caret: caretInside(`${name}.substr()`, '()'), hint: t('從某個索引開始取幾個字，例如 s.substr(0, 3) 是前 3 個字', 'Take some letters from an index, like s.substr(0, 3) for the first 3') },
+      { key: 'stoi', text: `stoi(${name})`, hint: t('把文字變成整數，例如 "123" 變成 123', 'Turn text into a whole number, like "123" into 123') },
+    ];
+  }
+  else if (kind == 'grid') {
+    // 二維 vector：某一格、某一列有幾個（鄰接串列：g[u] 有幾個鄰居）
+    snippets = [
+      { key: 'cell', text: `${name}[][]`, label: `${name}[ ][ ]`, caret: name.length + 1, hint: t('某一格：[列][行]', 'One cell: [row][column]') },
+      { key: 'rowsize', text: `${name}[].size()`, label: `${name}[ ].size()`, caret: name.length + 1, hint: t('某一列有幾個（例如 g[u] 有幾個鄰居）', 'How many in one row (like how many neighbors g[u] has)') },
+      { key: 'rows', text: `${name}.size()`, hint: t('有幾列', 'How many rows') },
+      // 裝 struct：某一格的欄位 g[u][k].to
+      ...(struct?.fields ?? []).map(f => ({ key: `field:${f.name}`, text: `${name}[][].${f.name}`, label: `${name}[ ][ ].${f.name}`, caret: name.length + 1, hint: fieldHint })),
+    ];
+  }
+  else {
+    snippets = [
+      ...(kind == 'array' ? [] : METHODS[kind].map(m => ({ key: m, text: `${name}.${m}()`, hint: hints[m] }))),
+      ...(kind == 'array' || kind == 'vector' ? [{ key: 'index', text: `${name}[]`, label: `${name}[ ]`, caret: name.length + 1, hint: t('某一格：在 [ ] 裡填索引（從 0 開始）', 'One item: put the index (from 0) in [ ]') }] : []),
+      // 裝 struct 的容器：vector / array 某一格的欄位 edges[ ].w；stack 頂端、queue 最前面的欄位 s.top().w、q.front().w
+      ...(struct?.fields ?? []).flatMap(f => (kind == 'array' || kind == 'vector'
+        ? [{ key: `field:${f.name}`, text: `${name}[].${f.name}`, label: `${name}[ ].${f.name}`, caret: name.length + 1, hint: fieldHint }]
+        : (kind == 'stack' ? ['top'] : ['front', 'back']).map(m => ({ key: `field:${m}:${f.name}`, text: `${name}.${m}().${f.name}`, hint: fieldHint })))),
+    ];
+  }
+  const insert = (s: Snippet) => {
     const el = document.getElementById(inputId) as HTMLInputElement | null;
     const start = el?.selectionStart ?? value.length;
     const end = el?.selectionEnd ?? start;
-    onChange(value.slice(0, start) + snippet + value.slice(end));
-    // a[ ]：游標放在中括號裡面，接著打索引
-    const caret = start + (snippet.endsWith('[]') ? snippet.length - 1 : snippet.length);
+    onChange(value.slice(0, start) + s.text + value.slice(end));
+    // a[ ]、s.substr( )：游標放在括號裡面，接著打索引或引數
+    const caret = start + (s.caret ?? s.text.length);
     requestAnimationFrame(() => {
       el?.focus();
       el?.setSelectionRange(caret, caret);
     });
   };
+  const kindName = (k: string) => (k == 'grid' ? t('二維 vector', '2D vector') : k);
   return (
     <p className="expr_helper">
       <span className="muted">{t('點一下填入：', 'Click to insert: ')}</span>
       {items.length > 1 && (
-        <select className="var_select" value={name} onChange={e => setPick(e.target.value)} aria-label={t('選一個容器', 'Choose a container')}>
-          {items.map(([n, k]) => <option key={n} value={n}>{n}（{k}）</option>)}
+        <select className="var_select" value={name} onChange={e => setPick(e.target.value)} aria-label={t('選一個變數', 'Choose a variable')}>
+          {items.map(([n, k]) => <option key={n} value={n}>{n}（{kindName(k)}）</option>)}
         </select>
       )}
-      {snippets.map(([key, snippet]) => (
-        <button type="button" key={key} className="snippet" title={SNIPPET_HINT[key]()} onClick={() => insert(snippet)}>
-          {snippet.endsWith('[]') ? `${name}[ ]` : snippet}
+      {snippets.map(s => (
+        <button type="button" key={s.key} className="snippet" title={s.hint} onClick={() => insert(s)}>
+          {s.label ?? s.text}
         </button>
       ))}
     </p>
@@ -268,7 +335,7 @@ const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string
   替換: (list, k) => t(`輸入的值會換掉清單「${list}」的${itemWord(k || '?')}`, `The value replaces ${itemWord(k || '?')} of "${list}".`),
 };
 
-export function NodeDialog({ request, onClose, varTypes, modules }: Props) {
+export function NodeDialog({ request, onClose, varTypes, modules, holds = {} }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -287,12 +354,12 @@ export function NodeDialog({ request, onClose, varTypes, modules }: Props) {
         onClose();
       }}
     >
-      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} modules={modules} />}
+      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} modules={modules} holds={holds} />}
     </dialog>
   );
 }
 
-function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[] }) {
+function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[]; holds: Record<string, string> }) {
   const { kind } = request;
   useLang();
   /** 在模組裡：區域變數照型別分好；allTypes 是全域加區域（判斷選到的是哪一種用） */
@@ -307,12 +374,16 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
     : list.flatMap(n => (!own.has(n) ? [n] : target == 'scratch' ? [GLOBAL_PREFIX + n] : [])));
   varTypes = mapTypes(varTypes, shown);
   const allTypes: VarTypes = joinTypes(varTypes, localT);
+  /** 每個變數裝什麼（區域變數蓋過全域的） */
+  const holds: Record<string, string> = { ...globalHolds, ...Object.fromEntries((request.locals ?? []).map(v => [v.name.trim(), v.init])) };
+  /** 這個變數（struct 變數或裝 struct 的容器）是哪一種 struct */
+  const structOfVar = (name: string): StructDef | undefined => findStruct(holds[name]);
   const [f, setF] = useState<DialogForm>(() => {
     const form = { ...defaultForm(kind), ...request.initial };
     // 打開已經畫好的輸入積木：依變數表判斷原本存到變數還是清單
     if (form.radio == '輸入' && !form.ioTarget && form.varSelect) {
       const v = form.varSelect;
-      form.ioTarget = allTypes.grid.includes(v) ? '二維清單' : allTypes.fixed.includes(v) ? '陣列' : allTypes.stack.includes(v) ? '堆疊' : allTypes.queue.includes(v) ? '佇列'
+      form.ioTarget = allTypes.record.includes(v) ? '結構' : allTypes.grid.includes(v) ? '二維清單' : allTypes.fixed.includes(v) ? '陣列' : allTypes.stack.includes(v) ? '堆疊' : allTypes.queue.includes(v) ? '佇列'
         : form.ioPlace != '加入' || allTypes.array.includes(v) ? '清單' : '變數';
     }
     return form;
@@ -322,15 +393,30 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
   const paramNames = (request.params ?? []).map(p => p.name);
   /** 輸入積木「存到」選的那一類變數 */
   const ioNames = (ty: VarTypes) => (f.ioTarget == '清單' ? vectorsOf(ty) : f.ioTarget == '二維清單' ? ty.grid
-    : f.ioTarget == '陣列' ? ty.fixed : f.ioTarget == '堆疊' ? ty.stack : f.ioTarget == '佇列' ? ty.queue
+    : f.ioTarget == '陣列' ? ty.fixed : f.ioTarget == '堆疊' ? ty.stack : f.ioTarget == '佇列' ? ty.queue : f.ioTarget == '結構' ? ty.record
     : [...ty.number, ...ty.text]);
   /** C++ 的容器在選項上的名字（積木還是叫「清單」） */
   const listWord = byTarget(t('清單', 'List'), 'vector');
   /** 只有變數表裡有這種容器（或原本就選了）才列出來 */
-  const hasKind = (k: 'fixed' | 'stack' | 'queue', chosen: boolean) => allTypes[k].length > 0 || chosen;
+  const hasKind = (k: 'fixed' | 'stack' | 'queue' | 'record', chosen: boolean) => allTypes[k].length > 0 || chosen;
+  /**
+   * 選 struct 的欄位。whole：可以選「一整筆」（容器的一格整個換掉，例如換成 struct 變數 e）；
+   * 選了容器或 struct 變數之後才出現
+   */
+  const fieldPicker = (s: StructDef | undefined, whole: boolean) => s && (
+    <>
+      {' '}{t('欄位', 'Field')}{' '}
+      <select className="var_select field_select" id="field_select" value={f.rectField} onChange={e => set({ rectField: e.target.value })}>
+        {whole ? <option value="">{t(`一整筆 ${s.name}`, `A whole ${s.name}`)}</option> : <option value="" disabled>{t('請選擇', 'Choose one')}</option>}
+        {s.fields.map(x => <option key={x.name} value={x.name}>{x.name}（{fieldCppType(x)}）</option>)}
+      </select>
+    </>
+  );
+  /** 選了變數：是 struct 變數的話先選第一個欄位 */
+  const pickVar = (v: string, recordKind: boolean) => set({ varSelect: v, rectField: recordKind ? structOfVar(v)?.fields[0]?.name ?? '' : '' });
   /** 算式欄位下面的「點一下填入」 */
   const helper = (inputId: string, value: string, onChange: (v: string) => void) => (
-    <ExprHelper inputId={inputId} types={allTypes} value={value} onChange={onChange} />
+    <ExprHelper inputId={inputId} types={allTypes} holds={holds} value={value} onChange={onChange} />
   );
 
   const yes = () => {
@@ -390,7 +476,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
   const returningModules = modules.filter(x => x.returns);
   /** 回傳值的型別（給學生看） */
   const returnLabel = (m: ModuleInfo) => (m.returns == null ? ''
-    : getTarget() == 'cpp' ? ' ' + cppType(m.returns, m.returnsFloat)
+    : getTarget() == 'cpp' ? ' ' + cppType(m.returns, m.returnsFloat, m.returnsLong)
     : m.returns == '文字' ? t('文字', 'text') : t('數字', 'a number'));
   const conditionHint = <p id="hint">{t('請輸入邏輯判斷式，', 'Write a condition: ')}and, or, not &lt; &gt; = </p>;
 
@@ -432,29 +518,44 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                   {hasKind('queue', f.ioTarget == '佇列') && (
                     <label><input type="radio" name="io_target" checked={f.ioTarget == '佇列'} onChange={() => set({ ioTarget: '佇列', ioPlace: '加入', varSelect: '' })} />queue</label>
                   )}
+                  {hasKind('record', f.ioTarget == '結構') && (
+                    <label><input type="radio" name="io_target" checked={f.ioTarget == '結構'} onChange={() => set({ ioTarget: '結構', varSelect: '', rectField: '' })} />{t('struct 的欄位', 'A struct field')}</label>
+                  )}
                 </p>
                 {f.ioTarget && (
                   <p>
                     <VarPicker
-                      id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
+                      id="var_select" value={f.varSelect} onChange={v => pickVar(v, f.ioTarget == '結構' || !!structOfVar(v))}
                       names={ioNames(varTypes)}
                       params={f.ioTarget == '變數' ? paramNames : []}
                       locals={ioNames(localT)}
                     />
+                    {/* struct 變數：選要輸入到哪個欄位 */}
+                    {f.ioTarget == '結構' && fieldPicker(structOfVar(f.varSelect), false)}
                   </p>
+                )}
+                {f.ioTarget == '結構' && f.varSelect && f.rectField && (
+                  <span className="dialog_note">{t(`輸入的值會存進 ${f.varSelect}.${f.rectField}`, `The value goes into ${f.varSelect}.${f.rectField}.`)}</span>
                 )}
                 {f.ioTarget == '二維清單' && (
                   <p>
                     {t('列（索引）', 'Row index')} <input id="rect_index" style={{ width: '20%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
                     {t('行（索引）', 'Column index')} <input id="rect_index2" style={{ width: '20%' }} value={f.rectIndex2} onChange={e => set({ rectIndex2: e.target.value })} />
+                    {/* 裝 struct：一次輸入一個欄位 */}
+                    {fieldPicker(structOfVar(f.varSelect), false)}
                   </p>
+                )}
+                {(f.ioTarget == '堆疊' || f.ioTarget == '佇列') && structOfVar(f.varSelect) && (
+                  <span className="dialog_note">{t(`裡面裝的是 struct ${holds[f.varSelect]}，不能一次輸入一整筆：請先輸入到 struct 變數的欄位，再用計算積木 push 進去。`, `It holds struct ${holds[f.varSelect]}. Input into a struct variable's fields first, then push it with a Math block.`)}</span>
                 )}
                 {f.ioTarget == '陣列' && (
                   <>
                     <p>
                       {t('索引', 'Index')} <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />
+                      {/* 裝 struct 的 array：一次輸入一個欄位 */}
+                      {fieldPicker(structOfVar(f.varSelect), false)}
                     </p>
-                    {f.varSelect && <span className="dialog_note">{t(`輸入的值會存進 array「${f.varSelect}」的索引 ${f.rectIndex.trim() || '?'}`, `The value goes into index ${f.rectIndex.trim() || '?'} of the array "${f.varSelect}".`)}</span>}
+                    {f.varSelect && <span className="dialog_note">{t(`輸入的值會存進 array「${f.varSelect}」的索引 ${f.rectIndex.trim() || '?'}${f.rectField ? ` 的 .${f.rectField}` : ''}`, `The value goes into index ${f.rectIndex.trim() || '?'}${f.rectField ? ` (.${f.rectField})` : ''} of the array "${f.varSelect}".`)}</span>}
                   </>
                 )}
                 {(f.ioTarget == '堆疊' || f.ioTarget == '佇列') && f.varSelect && (
@@ -462,7 +563,17 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                     ? t(`輸入的值會 push 到 stack「${f.varSelect}」的最上面`, `The value is pushed on top of the stack "${f.varSelect}".`)
                     : t(`輸入的值會 push 到 queue「${f.varSelect}」的最後面`, `The value is pushed to the back of the queue "${f.varSelect}".`)}</span>
                 )}
-                {f.ioTarget == '清單' && (
+                {f.ioTarget == '清單' && structOfVar(f.varSelect) && (
+                  // 裝 struct 的 vector：不能一次輸入一整筆，只能輸入某一格的某個欄位（要加新的一筆：先輸入到 struct 變數，再用計算積木 push_back）
+                  <>
+                    <p>
+                      {t('索引', 'Index')} <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value, ioPlace: '替換' })} />
+                      {fieldPicker(structOfVar(f.varSelect), false)}
+                    </p>
+                    <span className="dialog_note">{t(`vector<${holds[f.varSelect]}> 不能一次輸入一整筆：要加新的一筆，請先輸入到 struct 變數的欄位，再用計算積木「添加」把它放進去。`, `You cannot input a whole ${holds[f.varSelect]}. To add one, input into a struct variable's fields, then add it with a Math block.`)}</span>
+                  </>
+                )}
+                {f.ioTarget == '清單' && !structOfVar(f.varSelect) && (
                   <>
                     <p className="io_choice">
                       {t('放在：', 'Put it: ')}
@@ -596,9 +707,12 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
         : k == '陣列' ? ty.fixed
         : k == '堆疊' ? ty.stack
         : k == '佇列' ? ty.queue
+        : k == '結構' ? ty.record
         : []);
       const cell = kind == '二維清單' && f.rectAction == '替換';
-      const indexLabel = !kind ? null : cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
+      /** 二維 vector 的某一列後面添加（鄰接串列 g[u].push_back(v)） */
+      const rowPush = kind == '二維清單' && f.rectAction == '加入';
+      const indexLabel = !kind ? null : cell || rowPush ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
       const index2Label = !kind ? null : f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
       const verb = kind && kind != '接收' ? RECT_VERB[f.rectAction] : null;
       // 有回傳值的模組（Scratch 的模組不能回傳，看不到這個選項）
@@ -611,7 +725,8 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       const pickKind = (k: DialogForm['rectKind']) => set({
         rectKind: k,
         varChange: false,
-        rectAction: k == '變數' || k == '接收' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' ? '替換' : k == '堆疊' || k == '佇列' ? '放入' : '加入',
+        rectAction: k == '變數' || k == '接收' || k == '結構' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' ? '替換' : k == '堆疊' || k == '佇列' ? '放入' : '加入',
+        rectField: '',
         ...([...namesFor(k), ...(k == '變數' || k == '接收' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
       });
       const actionRadio = (action: RectAction, label: string) => (
@@ -635,6 +750,9 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
             )}
             {hasKind('queue', kind == '佇列') && (
               <label><input type="radio" name="rect_kind" checked={kind == '佇列'} onChange={() => pickKind('佇列')} />queue</label>
+            )}
+            {hasKind('record', kind == '結構') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '結構'} onChange={() => pickKind('結構')} />{t('struct 的欄位', 'A struct field')}</label>
             )}
             {(allTypes.grid.length > 0 || kind == '二維清單') && (
               <label><input type="radio" name="rect_kind" checked={kind == '二維清單'} onChange={() => pickKind('二維清單')} />{t('二維清單', 'A 2D list')}</label>
@@ -668,7 +786,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           {kind == '清單' && (
             <p className="rect_action">
               {t('怎麼改：', 'How: ')}
-              {RECT_ACTIONS.filter(([action]) => ['加入', '插入', '替換', '刪除', '清空'].includes(action)).map(([action, label]) => actionRadio(action, label()))}
+              {RECT_ACTIONS.filter(([action]) => ['加入', '插入', '替換', '刪除', '清空', ...(getTarget() == 'cpp' ? ['排序'] : [])].includes(action)).map(([action, label]) => actionRadio(action, label()))}
             </p>
           )}
           {kind == '變數' && (
@@ -690,13 +808,22 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               {t('怎麼改：', 'How: ')}
               {actionRadio('建立', t('建立（幾列幾行）', 'Make (rows × columns)'))}
               {actionRadio('替換', t('替換一格', 'Change one cell'))}
+              {actionRadio('加入', t('在某一列後面添加（push_back）', 'Add to the end of a row (push_back)'))}
+            </p>
+          )}
+          {rowPush && <p className="dialog_note">{t('鄰接串列：先「建立 n 列 0 行」，每一列一開始是空的，再把鄰居一個一個添加到那一列，例如 g[u].push_back(v)。', 'Adjacency list: first make n rows × 0 columns (every row starts empty), then add neighbors to a row, like g[u].push_back(v).')}</p>}
+          {kind == '陣列' && getTarget() == 'cpp' && (
+            <p className="rect_action">
+              {t('怎麼改：', 'How: ')}
+              {actionRadio('替換', t('替換某一格', 'Change one item'))}
+              {actionRadio('排序', t('排序（sort）', 'Sort'))}
             </p>
           )}
           {kind && kind != '回傳' && (
             <>
               {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ')
-                : kind == '陣列' ? 'array：' : kind == '堆疊' ? 'stack：' : kind == '佇列' ? 'queue：' : byTarget(t('清單：', 'List: '), 'vector：')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={change ? varTypes.number : namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={change ? localT.number : namesFor(kind, localT)} />
+                : kind == '陣列' ? 'array：' : kind == '堆疊' ? 'stack：' : kind == '佇列' ? 'queue：' : kind == '結構' ? 'struct：' : byTarget(t('清單：', 'List: '), 'vector：')}
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => pickVar(v, kind == '結構')} names={change ? varTypes.number : namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={change ? localT.number : namesFor(kind, localT)} />
             </>
           )}
           {indexLabel && (
@@ -704,12 +831,35 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               <br /><br /> {indexLabel()}{' '}
               <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
               {!cell && f.rectAction != '建立' && indexSuffix()}
+              {/* 裝 struct 的 vector、array：替換一整筆，或只改某個欄位 */}
+              {f.rectAction == '替換' && (kind == '清單' || kind == '陣列') && fieldPicker(structOfVar(f.varSelect), true)}
+            </>
+          )}
+          {/* struct 變數：選要改哪個欄位 */}
+          {kind == '結構' && fieldPicker(structOfVar(f.varSelect), false)}
+          {f.rectAction == '排序' && (kind == '清單' || kind == '陣列') && (
+            <>
+              <p className="rect_action">
+                {t('順序：', 'Order: ')}
+                <label><input type="radio" name="sort_dir" checked={!f.sortDesc} onChange={() => set({ sortDesc: false })} />{t('由小到大', 'Small → large')}</label>
+                <label><input type="radio" name="sort_dir" checked={f.sortDesc} onChange={() => set({ sortDesc: true })} />{t('由大到小', 'Large → small')}</label>
+              </p>
+              {/* 裝 struct：要選依哪個欄位排 */}
+              {structOfVar(f.varSelect) && <p>{t('依', 'By')}{fieldPicker(structOfVar(f.varSelect), false)}</p>}
+              {/* array 常常只用到前 n 格：sort(a, a + n) */}
+              {kind == '陣列' && (
+                <p>
+                  {t('只排前', 'Only the first')} <input id="rect_index" style={{ width: '20%' }} value={f.rectIndex} placeholder={t('全部', 'all')} onChange={e => set({ rectIndex: e.target.value })} /> {t('個（空白就是全部）', '(empty = all)')}
+                </p>
+              )}
             </>
           )}
           {index2Label && (
             <>
               {' '}{index2Label}{' '}
               <input id="rect_index2" style={{ width: '25%' }} value={f.rectIndex2} onChange={e => set({ rectIndex2: e.target.value })} />
+              {/* 裝 struct 的二維 vector：替換一整筆，或只改某個欄位 */}
+              {cell && fieldPicker(structOfVar(f.varSelect), true)}
             </>
           )}
           {verb && change && (

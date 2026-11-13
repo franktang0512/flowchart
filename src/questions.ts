@@ -20,12 +20,12 @@ export interface Question extends QuestionText {
   en?: QuestionText;
   /**
    * C++：第三步變數表可以選哪些容器，例如 ["array"]（用 array 自己做 stack 的題目）、["stack", "queue"]。
-   * 可以寫 "vector"、"2d_vector"、"array"、"stack"、"queue"；沒寫就是都可以。數字、文字一定可以選
+   * 可以寫 "vector"、"2d_vector"、"array"、"stack"、"queue"、"struct"；沒寫就是都可以。數字、文字一定可以選
    */
   var_types?: string[];
 }
 
-const VAR_TYPE_KEYS: Record<string, VarType> = { vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列' };
+const VAR_TYPE_KEYS: Record<string, VarType> = { vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列', struct: '結構' };
 
 /** 這一題變數表可以選的容器；undefined 是都可以 */
 export function allowedVarTypes(q: Question): VarType[] | undefined {

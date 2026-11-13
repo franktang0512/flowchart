@@ -41,13 +41,14 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     case 'var': return e.name;
     case 'raw': return e.text;
     case 'idx': return `${exprText(e.obj, cond, 9)}[${exprText(e.index, cond)}]`;
-    case 'method': return `${exprText(e.obj, cond, 9)}.${e.name}()`;
+    case 'method': return `${exprText(e.obj, cond, 9)}.${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
+    case 'field': return `${exprText(e.obj, cond, 9)}.${e.name}`;
     case 'fcall': return `${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     case 'neg': return `-${exprText(e.a, cond, 7)}`;
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
     case 'not': return wrap(`not ${exprText(e.a, cond, 7)}`, 2.5, parent);
     case 'call': {
-      const name = { len: '長度', find: '項目編號', has: '包含' }[e.fn];
+      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string' }[e.fn];
       return `${name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     }
     case 'bin': {
@@ -112,6 +113,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
           回傳: ` 回傳 ${v}`,
           放入: ` ${s.target} 放入 ${v}`,
           取出: ` ${s.target} 取出`,
+          // 排序是另一種結構（kind: 'sort'），不會走到這裡
+          排序: '',
         }[s.action] + (ROUNDING_TEXT[s.round] ?? '');
         return { kind: 'node', node: node(text, 'Rectangle', s.round) };
       }
@@ -125,6 +128,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
         return { kind: 'node', node: node(callText(s.name, s.args.map(a => exprText(a))), 'Function') };
       case 'return':
         return { kind: 'node', ret: true, node: node(` 回傳 ${exprText(s.value)}` + (ROUNDING_TEXT[s.round] ?? ''), 'Rectangle', s.round) };
+      case 'sort':
+        return { kind: 'node', node: node(` ${s.target} 排序${s.count ? ` 前 ${exprText(s.count)} 個` : ''}${s.field ? ` 依 ${s.field}` : ''} ${s.desc ? '由大到小' : '由小到大'}`, 'Rectangle') };
     }
   };
   /** 「回傳」積木：最後都接到「結束」 */

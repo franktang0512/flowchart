@@ -10,11 +10,14 @@ import { PrintView, type PrintData } from './components/PrintView';
 import { QuestionPanel } from './components/QuestionPanel';
 import { RunArea, type RunPane } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
+import { StructTable, type StructRename } from './components/StructTable';
+import { setStructs as setStructRegistry, type StructDef } from './engine/structs';
+import { isContainerType, type VarType } from './engine/structure';
 import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, typeLists, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, cppNameProblem, cppType, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, typeLabel, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
+import { callText, cppNameProblem, cppType, GLOBAL_PREFIX, isName, parseCall, renameFieldInText, renameInText, splitId, typeLabel, usesField, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { allowedVarTypes, EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
@@ -68,6 +71,8 @@ const urlParams = new URLSearchParams(window.location.search);
 const questionPath = `${urlParams.get('w')}/${urlParams.get('h')}`;
 
 let dialogSeq = 0;
+/** 存檔裡認得的變數型別 */
+const VAR_TYPES: VarType[] = ['數字', '文字', '清單', '二維清單', '陣列', '堆疊', '佇列', '結構'];
 let varSeq = 0;
 
 /** 第一步、第二步的卡片：不是目前步驟時蓋上半透明灰色，點一下切過去 */
@@ -107,6 +112,9 @@ export function App() {
   const [printModules, setPrintModules] = useState<{ title: string; src: string }[]>([]);
   /** 模組（每個有自己的一張流程圖）；sheet 是畫面上這一張：0 是主程式，其他是模組的 id */
   const [modules, setModulesState] = useState<AppModule[]>([]);
+  /** C++ 的 struct 定義（執行、檢查、轉程式用的是 engine/structs 裡的那份，兩邊一起改） */
+  const [structs, setStructsState] = useState<StructDef[]>([]);
+  const structsRef = useRef<StructDef[]>([]);
   const modulesRef = useRef<AppModule[]>([]);
   const [sheet, setSheetState] = useState(0);
   const sheetRef = useRef(0);
@@ -312,8 +320,9 @@ export function App() {
       if (i != k) return p;
       const type = patch.type ?? p.type;
       const float = 'float' in patch ? patch.float : p.float;
+      const long = 'long' in patch ? patch.long : p.long;
       const desc = patch.desc ?? p.desc;
-      return { name, type, ...(type == '數字' && float ? { float: true } : {}), ...(desc ? { desc } : {}) };
+      return { name, type, ...(type == '數字' && float ? { float: true } : {}), ...(type == '數字' && long ? { long: true } : {}), ...(desc ? { desc } : {}) };
     });
     setModules(modulesRef.current.map(x => (x.id == m.id ? { ...x, info: { ...x.info, params } } : x)));
     currentDiagram().draw();
@@ -385,6 +394,7 @@ export function App() {
     const cpp = cppNameProblem(name);
     if (cpp) return cpp;
     if (modulesRef.current.some(m => m.info.name == name)) return sameName(t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`));
+    if (structsRef.current.some(s => s.name.trim() == name)) return sameName(t(`「${name}」已經是 struct 的名字了`, `"${name}" is already a struct`));
     // 變數表裡另一個變數（不管什麼型別）已經叫這個名字
     if (varsRef.current.some(v => v.id != id && v.name.trim() == name)) return sameName(t(`已經有叫「${name}」的變數了`, `There is already a variable called "${name}"`));
     return null;
@@ -398,6 +408,84 @@ export function App() {
     if (rows.some(v => v.id != id && v.name.trim() == name)) return sameName(t(`已經有叫「${name}」的區域變數了`, `There is already a local variable called "${name}"`));
     return null;
   };
+  // ---------------- struct（只有 C++） ----------------
+  const setStructs = (next: StructDef[]) => {
+    structsRef.current = next;
+    setStructRegistry(next);
+    setStructsState(next);
+  };
+  /** struct 的名稱：要是 C++ 的名稱，不能跟其他 struct、變數、模組同名 */
+  const structProblem = (name: string, id: number): string | null => {
+    const cpp = cppNameProblem(name);
+    if (cpp) return cpp;
+    if (structsRef.current.some(s => s.id != id && s.name.trim() == name)) return sameName(t(`已經有叫「${name}」的 struct 了`, `There is already a struct called "${name}"`));
+    if (varsRef.current.some(v => v.name.trim() == name)) return sameName(t(`「${name}」已經是變數的名字了`, `"${name}" is already a variable`));
+    if (modulesRef.current.some(m => m.info.name == name)) return sameName(t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`));
+    return null;
+  };
+  /** 欄位名稱：要是 C++ 的名稱，同一個 struct 裡不能重複 */
+  const fieldProblem = (name: string, others: string[]): string | null => {
+    const cpp = cppNameProblem(name);
+    if (cpp) return cpp;
+    if (others.includes(name)) return sameName(t(`這個 struct 已經有「${name}」這個欄位了`, `This struct already has a field "${name}"`));
+    return null;
+  };
+  /** 用到這個 struct 的變數（主流程和每個模組的區域變數） */
+  const holdsStructType = (type: VarType) => type == '結構' || isContainerType(type);
+  const structUsers = (sname: string) => [
+    ...varsRef.current.filter(v => v.init == sname && holdsStructType(v.type)).map(v => v.name.trim() || t('（沒有名字的變數）', '(unnamed)')),
+    ...modulesRef.current.flatMap(m => (m.info.locals ?? []).filter(v => v.init == sname && holdsStructType(v.type)).map(v => v.name.trim())),
+  ];
+  const changeStructs = (next: StructDef[], rename?: StructRename) => {
+    if (rename?.kind == 'struct') {
+      // struct 改名：用到它的變數跟著改
+      const fix = <T extends { init: string; type: VarType }>(v: T): T => (v.init == rename.from && holdsStructType(v.type) ? { ...v, init: rename.to } : v);
+      setVars(varsRef.current.map(fix));
+      setModules(modulesRef.current.map(m => (m.info.locals ? { ...m, info: { ...m.info, locals: m.info.locals.map(fix) } } : m)));
+    }
+    if (rename?.kind == 'field') {
+      // 欄位改名：這種 struct 的變數，欄位初始值跟著改名
+      const fixInit = <T extends { init: string; type: VarType; fieldInit?: Record<string, string> }>(v: T): T => {
+        if (v.type != '結構' || v.init != rename.struct || !v.fieldInit || !(rename.from in v.fieldInit)) return v;
+        const { [rename.from]: value, ...rest } = v.fieldInit;
+        return { ...v, fieldInit: { ...rest, [rename.to]: value } };
+      };
+      setVars(varsRef.current.map(fixInit));
+      setModules(modulesRef.current.map(m => (m.info.locals ? { ...m, info: { ...m.info, locals: m.info.locals.map(fixInit) } } : m)));
+      // 流程圖裡的「.舊名」跟著改。別的 struct 也有同名欄位的話分不出是哪一個，就不自動改
+      const shared = structsRef.current.some(s => s.name != rename.struct && s.fields.some(f => f.name.trim() == rename.from));
+      if (shared) {
+        alert(t(`別的 struct 也有「${rename.from}」這個欄位，流程圖裡的「.${rename.from}」沒有自動改名，請自己檢查。`, `Another struct also has a field "${rename.from}", so ".${rename.from}" in the flowchart was not renamed. Please check it yourself.`));
+      }
+      else {
+        for (const d of allDiagrams()) {
+          for (const node of d.nodes) {
+            if (node && usesField(node.text, rename.from)) {
+              node.text = renameFieldInText(node.text, rename.from, rename.to);
+              d.fitNode(node);
+            }
+          }
+          d.draw();
+        }
+      }
+    }
+    setStructs(next);
+    syncVarList();
+  };
+  const structArea = getTarget() == 'cpp' && (
+    <StructTable
+      structs={structs}
+      onChange={changeStructs}
+      structProblem={structProblem}
+      fieldProblem={fieldProblem}
+      deleteProblem={s => {
+        const users = s.name.trim() ? structUsers(s.name.trim()) : [];
+        return users.length ? t(`變數 ${users.join('、')} 還在用 struct ${s.name}：請先把它們的型別改掉，再刪除。`, `The variables ${users.join(', ')} still use struct ${s.name}. Change their types first.`) : null;
+      }}
+      fieldInUse={(_, field) => allDiagrams().some(d => d.nodes.some(n => n != null && usesField(n.text, field)))}
+    />
+  );
+
   /** 撞名的說明後面加上為什麼不行 */
   const sameName = (why: string) => why + t('：名字一樣的話，流程圖上分不出是哪一個，請換一個名字。', '. With the same name you cannot tell them apart in the flowchart. Choose another name.');
   /** 變數表的輸入框確定時：名字不能用就改回原本的名字 */
@@ -421,7 +509,9 @@ export function App() {
     varStore.var_list.value = rows.map(r => r.init);
     varStore.type_var_list = typeLists(rows);
     varStore.sizes = Object.fromEntries(rows.filter(r => r.type == '陣列').map(r => [r.name, r.size ?? '']));
+    varStore.structInits = Object.fromEntries(rows.filter(r => r.type == '結構' && r.fieldInit).map(r => [r.name, r.fieldInit!]));
     varStore.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
+    varStore.longs = rows.filter(r => r.type == '數字' && r.long).map(r => r.name);
 
     rows.forEach(r => committedVarNames.current.set(r.id, r.name));
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
@@ -696,9 +786,9 @@ export function App() {
       questionName: questionIn(question, getLang()).title,
       questionNote: noteRef.current!.value,
       vars: [
-        ...varsRef.current.map(v => [v.name, typeLabel(v.type, v.float, v.init), v.init, v.desc]),
+        ...varsRef.current.map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long), v.init, v.desc]),
         // C++ 模組的區域變數：說明欄註明是哪個模組的
-        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, typeLabel(v.type, v.float, v.init), v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
+        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long), v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
       ],
       cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     });
@@ -735,6 +825,7 @@ export function App() {
       variables: [],
       flowchart: { nodes: [], links: [] },
       modules: [],
+      structs: [],
     }));
   };
 
@@ -752,11 +843,12 @@ export function App() {
     variables: varsRef.current.map(({ id: _id, ...v }) => v),
     flowchart: main.exportData(),
     modules: modulesRef.current.map(m => ({ ...m.info, flowchart: m.diagram.exportData() })),
+    structs: structsRef.current.map(({ id: _id, ...s }) => s),
   });
 
   const hasWork = () => {
     const w = collectWork();
-    return w.variables.length > 0 || w.flowchart.nodes.length > 0 || (w.modules?.length ?? 0) > 0
+    return w.variables.length > 0 || w.flowchart.nodes.length > 0 || (w.modules?.length ?? 0) > 0 || (w.structs?.length ?? 0) > 0
       || w.cases.flat().some(Boolean) || Object.values(w.step1).some(Boolean);
   };
 
@@ -769,14 +861,23 @@ export function App() {
     hint1Ref.current!.value = work.step1?.hint ?? '';
     hint2Ref.current!.value = work.step1?.hint2 ?? '';
     setCases([0, 1, 2].flatMap(i => [0, 1, 2].map(j => String(work.cases[i]?.[j] ?? ''))));
+    // struct 要先放好，變數表才認得 struct 型別
+    setStructs((work.structs ?? []).map(s => ({
+      id: ++varSeq,
+      name: String(s.name ?? ''),
+      fields: (s.fields ?? []).map(f => ({ name: String(f.name ?? ''), type: f.type == '文字' ? '文字' as const : '數字' as const, ...(f.float && f.type != '文字' ? { float: true } : {}) })),
+    })));
     setVars(work.variables.map(v => ({
       id: ++varSeq,
       name: String(v.name ?? ''),
-      type: v.type == '文字' || v.type == '清單' || v.type == '二維清單' ? v.type : '數字',
+      type: VAR_TYPES.find(x => x == v.type) ?? '數字',
       init: String(v.init ?? '0'),
       desc: String(v.desc ?? ''),
+      ...(v.size != null ? { size: String(v.size) } : {}),
+      ...(v.fieldInit && typeof v.fieldInit == 'object' ? { fieldInit: Object.fromEntries(Object.entries(v.fieldInit).map(([k, x]) => [k, String(x)])) } : {}),
       // 以前的作品沒有 int / float：C++ 初始值有小數點的當成 float
       ...(v.float || (getTarget() == 'cpp' && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
+      ...(v.long && v.type == '數字' ? { long: true } : {}),
     })));
     // 先清空舊的變數清單，不然會被當成「改名」而去改到流程圖裡的字
     varStore.var_list.name = [];
@@ -786,17 +887,21 @@ export function App() {
     replaceModules((work.modules ?? []).map(m => ({
       info: {
         name: String(m.name ?? ''),
-        params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字', ...(p.float && p.type != '文字' ? { float: true } : {}), ...(p.desc ? { desc: String(p.desc) } : {}) })),
+        params: (m.params ?? []).map(p => ({ name: String(p.name ?? ''), type: p.type == '文字' ? '文字' : '數字', ...(p.float && p.type != '文字' ? { float: true } : {}), ...(p.long && p.type != '文字' ? { long: true } : {}), ...(p.desc ? { desc: String(p.desc) } : {}) })),
         ...(m.returns == '數字' || m.returns == '文字' ? { returns: m.returns } : {}),
         ...(m.returns == '數字' && m.returnsFloat ? { returnsFloat: true } : {}),
+        ...(m.returns == '數字' && m.returnsLong ? { returnsLong: true } : {}),
         ...(Array.isArray(m.locals) && m.locals.length ? {
           locals: m.locals.map(v => ({
             id: ++varSeq,
             name: String(v.name ?? ''),
-            type: (['數字', '文字', '清單', '二維清單'] as const).find(x => x == v.type) ?? '數字',
+            type: VAR_TYPES.find(x => x == v.type) ?? '數字',
             init: String(v.init ?? ''),
             desc: String(v.desc ?? ''),
+            ...(v.size != null ? { size: String(v.size) } : {}),
+            ...(v.fieldInit && typeof v.fieldInit == 'object' ? { fieldInit: Object.fromEntries(Object.entries(v.fieldInit).map(([k, x]) => [k, String(x)])) } : {}),
             ...(v.float ? { float: true } : {}),
+            ...(v.long ? { long: true } : {}),
           })),
         } : {}),
       },
@@ -926,11 +1031,14 @@ export function App() {
         </div>
       </div>
 
-      <NodeDialog request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} modules={modules.map(m => m.info)} />
+      <NodeDialog
+        request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} modules={modules.map(m => m.info)}
+        holds={Object.fromEntries(varStore.var_list.name.map((n, k) => [n, varStore.var_list.value[k]]))}
+      />
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
         open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
-        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, size: v.size }))}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, fieldInit: v.fieldInit }))}
       />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>
@@ -949,6 +1057,7 @@ export function App() {
               <VarTable
                 rows={vars}
                 allowed={allowedVarTypes(question)}
+                structArea={structArea}
                 onChange={(id, patch) => setVars(varsRef.current.map(v => v.id == id ? { ...v, ...patch } : v))}
                 onCommit={commitVars}
                 onDelete={id => { setVars(varsRef.current.filter(v => v.id != id)); syncVarList(); }}
@@ -1049,8 +1158,8 @@ export function App() {
                 <div className="module_bar">
                   <span>
                     {t('定義', 'Define')} <b>{m.info.name}</b>
-                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${getTarget() == 'cpp' ? `［${cppType(p.type, p.float)}］` : p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
-                    {m.info.returns && <>{t('，回傳', ', returns ')}{getTarget() == 'cpp' ? ' ' + cppType(m.info.returns, m.info.returnsFloat) : m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
+                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${getTarget() == 'cpp' ? `［${cppType(p.type, p.float, p.long)}］` : p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
+                    {m.info.returns && <>{t('，回傳', ', returns ')}{getTarget() == 'cpp' ? ' ' + cppType(m.info.returns, m.info.returnsFloat, m.info.returnsLong) : m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
                   </span>
                   <span className="muted">{t('從「開始」做到「結束」，做完回到執行它的地方', 'Runs from Start to End, then goes back to where it was run')}</span>
                   <button onClick={() => editModule(m)}>{t('修改名稱、參數', 'Edit name, parameters')}</button>

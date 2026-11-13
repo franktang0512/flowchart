@@ -6,6 +6,7 @@ import type { Diagram } from './diagram';
 import { FlowError, tokenize, type Token } from './decoder';
 import { splitRectangle, splitTarget, type RectAction } from './labels';
 import { parseCall, type ModuleInfo, type ModuleSource } from './modules';
+import { findStruct, type StructField } from './structs';
 import type { FlowNode } from './node';
 
 // ---------------- 流程圖的結構 ----------------
@@ -27,7 +28,9 @@ export type Stmt =
   /** 執行模組（見 modules.ts） */
   | { kind: 'call'; name: string; args: Expr[] }
   /** 模組回傳值（流程圖上後面直接接「結束」） */
-  | { kind: 'return'; value: Expr; round: string };
+  | { kind: 'return'; value: Expr; round: string }
+  /** 排序（C++ 的 sort）：count 是只排前幾個（array 常用 sort(a, a + n)）；field 是 struct 依哪個欄位排 */
+  | { kind: 'sort'; target: string; count?: Expr; field?: string; desc: boolean };
 
 /** 一個模組：名稱、參數、裡面的步驟 */
 export interface ModuleProgram extends ModuleInfo {
@@ -170,6 +173,7 @@ function rectStmt(text: string): Stmt {
   }
   const { target, action, index, index2, expr } = splitRectangle(rest);
   if (action == '回傳') return { kind: 'return', value: parseExpr(expr), round };
+  if (action == '排序') return { kind: 'sort', target, ...(index ? { count: parseExpr(index) } : {}), ...(index2 ? { field: index2 } : {}), desc: expr == '由大到小' };
   return {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,
@@ -188,9 +192,11 @@ export type Expr =
   /** 清單或文字的某一項：obj[index] */
   | { t: 'idx'; obj: Expr; index: Expr }
   /** 長度( )、項目編號( )、包含( ) */
-  | { t: 'call'; fn: 'len' | 'find' | 'has'; args: Expr[] }
+  | { t: 'call'; fn: CallFn; args: Expr[] }
   /** C++ 容器的函式：s.top()、q.front()、q.back()、v.size()、v.empty()（見 decoder 的 METHODS） */
-  | { t: 'method'; obj: Expr; name: string }
+  | { t: 'method'; obj: Expr; name: string; args: Expr[] }
+  /** struct 的欄位：e.from、edges[i].w */
+  | { t: 'field'; obj: Expr; name: string }
   /** 有回傳值的模組：找最大(x, y) */
   | { t: 'fcall'; name: string; args: Expr[] }
   /** + - * / % 、比較（== != < <= > >=）、and or */
@@ -201,8 +207,10 @@ export type Expr =
   /** 看不懂的寫法：原樣保留 */
   | { t: 'raw'; text: string };
 
-const CALLS: Record<string, 'len' | 'find' | 'has'> = {
-  長度: 'len', length: 'len', 項目編號: 'find', indexof: 'find', 包含: 'has', contains: 'has',
+/** 函式：長度( )、項目編號( )、包含( )；C++ 還有 stoi( )（文字變整數）、to_string( )（數字變文字） */
+export type CallFn = 'len' | 'find' | 'has' | 'stoi' | 'tostr';
+const CALLS: Record<string, CallFn> = {
+  長度: 'len', length: 'len', 項目編號: 'find', indexof: 'find', 包含: 'has', contains: 'has', stoi: 'stoi', to_string: 'tostr',
 };
 
 /** 學生寫的運算式 → 語法樹；看不懂就整段當成 raw */
@@ -290,12 +298,22 @@ class Parser {
     let e = this.primary();
     while (this.is('[', '.')) {
       if (this.take().text == '.') {
-        // s.top()：點後面是函式名稱，再接空的括號
+        // s.top()：點後面是函式名稱，再接空的括號；沒有括號是 struct 的欄位（e.from）
         const name = this.take();
         if (name.type != 'name') throw new Error('method');
+        if (!this.is('(')) {
+          e = { t: 'field', obj: e, name: name.text };
+          continue;
+        }
+        // 函式可以有引數：s.substr(1, 3)
         this.expect('(');
+        const args: Expr[] = [];
+        if (!this.is(')')) {
+          args.push(this.or());
+          while (this.is(',')) { this.take(); args.push(this.or()); }
+        }
         this.expect(')');
-        e = { t: 'method', obj: e, name: name.text };
+        e = { t: 'method', obj: e, name: name.text, args };
         continue;
       }
       const index = this.or();
@@ -337,30 +355,70 @@ class Parser {
 /**
  * 變數的型別。清單在 C++ 是 vector；二維清單、陣列（array）、堆疊（stack）、佇列（queue）只有學習目標是 C++ 時才有
  */
-export type VarType = '數字' | '文字' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列';
+export type VarType = '數字' | '文字' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列' | '結構';
 
 /** 容器：初始值欄是「裡面裝什麼」，不是一個值 */
 export const isContainerType = (type: VarType | undefined) => type == '清單' || type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列';
 
 /** 只有 C++ 有的型別（Scratch / Blockly 畫不出來） */
-export const isCppOnlyType = (type: VarType | undefined) => type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列';
+export const isCppOnlyType = (type: VarType | undefined) => type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列' || type == '結構';
 
 export interface VarInfo {
   name: string;
   type: VarType;
-  /** 數字/文字的初始值；容器（清單、陣列…）是裡面裝「數字」、「小數」（C++ 的 float）還是「文字」 */
+  /**
+   * 數字/文字的初始值；容器（清單、陣列…）是裡面裝「數字」、「小數」（C++ 的 float）、「文字」或某個 struct 的名稱；
+   * struct 變數是它的 struct 名稱
+   */
   init: string;
   /** C++：數字變數是 float（小數）；沒有就是 int（整數） */
   float?: boolean;
+  /** C++：數字變數是 long long（很大的整數）；int 超過約 21 億會溢位 */
+  long?: boolean;
   /** 陣列（array）的大小：宣告時就決定，之後不能改 */
   size?: string;
+  /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字），跟 C++ 的 Edge e = {1, 2, 7}; 一樣 */
+  fieldInit?: Record<string, string>;
 }
 
-/** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用） */
-export type ExprType = 'num' | 'str' | 'char' | 'bool' | 'list';
+/** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用）；struct 是一整筆資料（例如 e、edges[i]） */
+export type ExprType = 'num' | 'str' | 'char' | 'bool' | 'list' | 'struct';
+
+/**
+ * 運算式是哪一種 struct 的一整筆資料：struct 變數 e、裝 struct 的 array / vector 的一格 edges[i]、
+ * 二維 vector 的一格 g[u][k]、stack / queue 的 s.top()、q.front()；不是的話 null
+ */
+export function structOf(e: Expr, vars: Map<string, VarInfo>): string | null {
+  if (e.t == 'var') {
+    const v = vars.get(e.name);
+    return v?.type == '結構' && findStruct(v.init) ? v.init : null;
+  }
+  if (e.t == 'idx' && e.obj.t == 'var') {
+    const v = vars.get(e.obj.name);
+    return (v?.type == '清單' || v?.type == '陣列') && findStruct(v.init) ? v.init : null;
+  }
+  // 二維 vector 的一格：g[u][k]（例如有權重的鄰接串列 vector<vector<Edge>>）
+  if (e.t == 'idx' && e.obj.t == 'idx' && e.obj.obj.t == 'var') {
+    const v = vars.get(e.obj.obj.name);
+    return v?.type == '二維清單' && findStruct(v.init) ? v.init : null;
+  }
+  // stack 的 top()、queue 的 front()、back()
+  if (e.t == 'method' && e.obj.t == 'var' && ['top', 'front', 'back'].includes(e.name)) {
+    const v = vars.get(e.obj.name);
+    return (v?.type == '堆疊' || v?.type == '佇列') && findStruct(v.init) ? v.init : null;
+  }
+  return null;
+}
+
+/** struct 欄位 e.from 的定義；前面不是 struct 或沒有這個欄位時 undefined */
+export function fieldOf(e: Expr & { t: 'field' }, vars: Map<string, VarInfo>): StructField | undefined {
+  return findStruct(structOf(e.obj, vars) ?? undefined)?.fields.find(f => f.name == e.name);
+}
 
 export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInfo[] = []): ExprType {
+  if (structOf(e, vars)) return 'struct';
   switch (e.t) {
+    case 'field': return fieldOf(e, vars)?.type == '文字' ? 'str' : 'num';
     case 'fcall': return modules.find(m => m.name == e.name)?.returns == '文字' ? 'str' : 'num';
     case 'num': return 'num';
     case 'str': return 'str';
@@ -369,8 +427,9 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
       return isContainerType(v?.type) ? 'list' : v?.type == '文字' ? 'str' : 'num';
     }
     case 'method': {
-      if (e.name == 'size') return 'num';
+      if (e.name == 'size' || e.name == 'length') return 'num';
       if (e.name == 'empty') return 'bool';
+      if (e.name == 'substr') return 'str';
       // top()、front()、back()：容器裡裝的東西
       return e.obj.t == 'var' && vars.get(e.obj.name)?.init == '文字' ? 'str' : 'num';
     }
@@ -387,7 +446,7 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
       if (e.obj.t == 'idx' && e.obj.obj.t == 'var') return vars.get(e.obj.obj.name)?.init == '文字' ? 'str' : 'num';
       return 'num';
     }
-    case 'call': return e.fn == 'has' ? 'bool' : 'num';
+    case 'call': return e.fn == 'has' ? 'bool' : e.fn == 'tostr' ? 'str' : 'num';
     case 'bin':
       if (['==', '!=', '<', '<=', '>', '>=', 'and', 'or'].includes(e.op)) return 'bool';
       if (e.op == '+') {

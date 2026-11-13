@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
 import { isContainerType, type VarType } from '../engine/structure';
+import { findStruct, getStructs } from '../engine/structs';
 import { t, useLang } from '../i18n';
 import { getTarget } from '../target';
 import { useCommit } from '../useCommit';
@@ -17,6 +18,10 @@ export interface VarRow {
   float?: boolean;
   /** C++ 的 array：大小（宣告時就決定） */
   size?: string;
+  /** C++：數字是 long long（很大的整數）；int 超過約 21 億會溢位 */
+  long?: boolean;
+  /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字） */
+  fieldInit?: Record<string, string>;
 }
 
 /** 容器（清單、陣列、堆疊…）：初始值欄改成選裡面裝什麼 */
@@ -34,6 +39,8 @@ const CPP_CONTAINERS: [VarType, () => string, () => string][] = [
 
 interface Props {
   rows: VarRow[];
+  /** C++：變數表上面的 struct 定義（只在主流程顯示） */
+  structArea?: React.ReactNode;
   /** 這一題可以用的容器（題目的 var_types）；沒有就是都可以 */
   allowed?: VarType[];
   onChange: (id: number, patch: Partial<VarRow>) => void;
@@ -60,7 +67,7 @@ interface Props {
 
 let localSeq = 1_000_000;
 
-export function VarTable({ rows, allowed, onChange, onCommit, onDelete, onCreate, module }: Props) {
+export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDelete, onCreate, module }: Props) {
   useLang();
   const head = (
     <tr>
@@ -88,7 +95,7 @@ export function VarTable({ rows, allowed, onChange, onCommit, onDelete, onCreate
                     <tr key={k + ':' + p.name} className="param_row">
                       <td><ParamName name={p.name} onCommit={name => module.onParam(k, { name })} /></td>
                       <td>
-                        <select className="var_input" value={typeValue(p.type, p.float)} onChange={e => module.onParam(k, fromTypeValue(e.target.value) as Partial<ParamInfo>)}>
+                        <select className="var_input" value={typeValue(p.type, p.float, p.long)} onChange={e => module.onParam(k, fromTypeValue(e.target.value) as Partial<ParamInfo>)}>
                           <TypeOptions />
                         </select>
                       </td>
@@ -123,6 +130,7 @@ export function VarTable({ rows, allowed, onChange, onCommit, onDelete, onCreate
       )}
       {!module && (
         <>
+          {structArea}
           <table id="var_table" className="data_table">
             <tbody>
               {head}
@@ -142,10 +150,26 @@ export function VarTable({ rows, allowed, onChange, onCommit, onDelete, onCreate
  * 型別下拉選單的值：C++ 的數字分 int（'數字'）、float（'float'）；文字是 string。
  * Scratch、Blockly 只有數字、文字
  */
-const typeValue = (type: string, float?: boolean) => (type == '數字' && float && getTarget() == 'cpp' ? 'float' : type);
-const fromTypeValue = (value: string) => (value == 'float'
-  ? { type: '數字' as const, float: true }
-  : { type: value as VarRow['type'], float: undefined });
+/** struct 變數收起來時顯示的初始值，照 C++ 的寫法：{1, 2, "Amy"}；全部沒填是 {} */
+function structInitText(row: VarRow): string {
+  const fields = findStruct(row.init)?.fields ?? [];
+  if (!fields.some(f => (row.fieldInit?.[f.name] ?? '').trim())) return '{}';
+  return '{' + fields.map(f => {
+    const v = (row.fieldInit?.[f.name] ?? '').trim();
+    if (f.type != '文字') return v || '0';
+    return /^(".*"|'.*')$/.test(v) ? v : JSON.stringify(v);
+  }).join(', ') + '}';
+}
+
+/** 型別選單裡 struct 的值：「struct:Edge」 */
+const STRUCT_PREFIX = 'struct:';
+
+export const typeValue =(type: string, float?: boolean, long?: boolean) => (type == '數字' && getTarget() == 'cpp' ? (float ? 'float' : long ? 'long' : type) : type);
+export const fromTypeValue = (value: string) => (value == 'float'
+  ? { type: '數字' as const, float: true, long: undefined }
+  : value == 'long'
+  ? { type: '數字' as const, float: undefined, long: true }
+  : { type: value as VarRow['type'], float: undefined, long: undefined });
 
 /** 數字、文字的選項（C++ 寫成 int、float、string）；beforeString 放在 float 和 string 中間（變數表的 array） */
 export function TypeOptions({ beforeString }: { beforeString?: React.ReactNode } = {}) {
@@ -153,6 +177,8 @@ export function TypeOptions({ beforeString }: { beforeString?: React.ReactNode }
     return (
       <>
         <option value="數字">{t('int（整數）', 'int')}</option>
+        {/* 很大的整數：int 超過約 21 億會溢位 */}
+        <option value="long" title={t('int 最大大約 21 億，超過會溢位變成負的；要存更大的整數用 long long', 'An int goes up to about 2.1 billion; bigger numbers overflow. Use long long for bigger whole numbers.')}>{t('long long（大整數）', 'long long')}</option>
         <option value="float">{t('float（小數）', 'float')}</option>
         {beforeString}
         <option value="文字">{t('string（文字）', 'string')}</option>
@@ -285,23 +311,42 @@ function VarRowView({ row, allowed, onChange, onCommit, onDelete, className }: {
       <td><input {...text('name')} /></td>
       <td>
         <select
-          className="var_input" value={typeValue(row.type, row.float)}
+          className="var_input" value={row.type == '結構' ? STRUCT_PREFIX + row.init : typeValue(row.type, row.float, row.long)}
           onChange={e => {
-            const { type, float } = fromTypeValue(e.target.value);
+            // 選了某個 struct（例如 Edge）：型別是 struct，初始值欄記是哪一個
+            const structName = e.target.value.startsWith(STRUCT_PREFIX) ? e.target.value.slice(STRUCT_PREFIX.length) : null;
+            if (structName != null) {
+              onChange(row.id, { type: '結構', init: structName, float: undefined, long: undefined, fieldInit: undefined });
+              onCommit();
+              return;
+            }
+            const { type, float, long } = fromTypeValue(e.target.value);
             // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字；改成 int 時初始值的小數去掉
-            let init = isListType(type) ? (row.init == '文字' || row.init == '小數' ? row.init : '數字')
+            // 換成別的容器時，原本裝的 struct 照樣留著
+            const keepStruct = isListType(type) && findStruct(row.init);
+            let init = isListType(type) ? (row.init == '文字' || row.init == '小數' || row.init == '長整數' || keepStruct ? row.init : '數字')
+              : row.type == '結構' ? (type == '數字' ? '0' : '')
               : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
             if (type == '數字' && !float && /^\s*-?\d+\.\d*\s*$/.test(init)) init = String(Math.trunc(Number(init)));
             // array 要先有大小：預設 5 格
-            onChange(row.id, { type, init, float, ...(type == '陣列' && !row.size?.trim() ? { size: '5' } : {}) });
-            onCommit();
+            onChange(row.id, { type, init, float, long, ...(type == '陣列' && !row.size?.trim() ? { size: '5' } : {}) });            onCommit();
           }}
         >
           {/* C++：array 放在 float 和 string 中間，其他容器放在後面 */}
           <TypeOptions beforeString={cpp && containerOptions(['陣列'])} />
           {cpp
-            ? containerOptions(['清單', '二維清單', '堆疊', '佇列'])
+            ? <>
+                {containerOptions(['清單', '二維清單', '堆疊', '佇列'])}
+                {/* 定義好的 struct 直接當型別（跟 C++ 寫 Edge e; 一樣）；題目也可以不給 struct */}
+                {(!allowed || allowed.includes('結構') || row.type == '結構') && getStructs().length > 0 && (
+                  <optgroup label={t('自己定義的 struct', 'Your structs')}>
+                    {getStructs().map(s => <option key={s.name} value={STRUCT_PREFIX + s.name}>{s.name}（struct）</option>)}
+                  </optgroup>
+                )}
+                {/* 選的 struct 被刪掉或改名了：照樣列出來，才看得出原本是什麼 */}
+                {row.type == '結構' && !findStruct(row.init) && <option value={STRUCT_PREFIX + row.init} disabled>{row.init || 'struct'}（{t('不存在', 'missing')}）</option>}
+              </>
             : <>
                 <option value="清單">{t('清單', 'List')}</option>
                 {/* 從 C++ 換過來的舊作品：只有 C++ 有的型別照樣列出來，才不會被悄悄改掉 */}
@@ -313,11 +358,34 @@ function VarRowView({ row, allowed, onChange, onCommit, onDelete, className }: {
         {row.type == '清單' && getTarget() != 'cpp'
           // 積木（Scratch / Blockly）的清單跟 Scratch 一樣，數字、文字都能放，不用先決定型別（C++ 才要選）
           ? <span className="muted list_any" title={t('清單一開始是空的，數字和文字都可以放', 'The list starts empty. It can hold numbers and text.')}>{t('數字、文字都可以', 'Numbers or text')}</span>
+          : row.type == '結構'
+          // struct 變數：型別欄已經選了是哪一個 struct；每個欄位一開始是 0（string 是空的）
+          ? (
+            // struct 變數：每個欄位填初始值（跟 C++ 的 Edge e = {1, 2, 7}; 一樣），沒填是 0（string 是空的）
+            // 平常只顯示一行 {1, 2, 7}，點一下展開才改每個欄位（欄位多的 struct 這一列才不會太高）
+            <details className="struct_init">
+              <summary title={t('點一下展開，修改每個欄位的初始值；沒填就是 0（string 是空的）', 'Click to edit the start value of each field. Empty means 0 (or empty text).')}>
+                <code>{structInitText(row)}</code>
+              </summary>
+              <span className="struct_init_fields">
+                {(findStruct(row.init)?.fields ?? []).map(f => (
+                  <label key={f.name}>
+                    <span className="muted">{f.name}</span>
+                    <input
+                      className="var_input" value={row.fieldInit?.[f.name] ?? ''} placeholder={f.type == '文字' ? '""' : '0'}
+                      onChange={e => onChange(row.id, { fieldInit: { ...row.fieldInit, [f.name]: e.target.value } })}
+                      {...commit}
+                    />
+                  </label>
+                ))}
+              </span>
+            </details>
+          )
           : isListType(row.type)
           ? (
-            // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>）
+            // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>，或 vector<Edge>）
             <select
-              className="var_input" value={row.init == '文字' || row.init == '小數' ? row.init : '數字'}
+              className="var_input" value={row.init == '文字' || row.init == '小數' || row.init == '長整數' || findStruct(row.init) ? row.init : '數字'}
               title={row.type == '二維清單'
                 ? t('二維清單一開始是空的，要先用計算積木「建立 幾 列 幾 行」；這裡選裡面要裝什麼', 'The 2D list starts empty. Make it with a Math block (rows × columns). Choose what it holds.')
                 : row.type == '陣列'
@@ -328,8 +396,11 @@ function VarRowView({ row, allowed, onChange, onCommit, onDelete, className }: {
               {getTarget() == 'cpp'
                 ? <>
                     <option value="數字">{t('裝 int', 'int')}</option>
+                    <option value="長整數">{t('裝 long long', 'long long')}</option>
                     <option value="小數">{t('裝 float', 'float')}</option>
                     <option value="文字">{t('裝 string', 'string')}</option>
+                    {/* 每一種容器都可以裝自己定義的 struct，例如 vector<vector<Edge>>（有權重的鄰接串列）、queue<Node> */}
+                    {getStructs().map(s => <option key={s.name} value={s.name}>{t(`裝 ${s.name}`, s.name)}</option>)}
                   </>
                 : <>
                     <option value="數字">{t('裝數字', 'Numbers')}</option>

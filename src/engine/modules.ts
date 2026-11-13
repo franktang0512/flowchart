@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { getTarget } from '../target';
 import type { Diagram } from './diagram';
 import type { VarType } from './structure';
+import { findStruct } from './structs';
 
 export interface ParamInfo {
   name: string;
@@ -15,6 +16,8 @@ export interface ParamInfo {
   type: '數字' | '文字';
   /** C++：數字是 float（小數）；沒有就是 int（整數）。Scratch、Blockly 不分 */
   float?: boolean;
+  /** C++：數字是 long long（很大的整數） */
+  long?: boolean;
   /** 說明：學生自己寫這個參數是做什麼用的（像註解） */
   desc?: string;
 }
@@ -30,6 +33,8 @@ export interface ModuleInfo {
   returns?: '數字' | '文字';
   /** C++：回傳的數字是 float（小數）；沒有就是 int */
   returnsFloat?: boolean;
+  /** C++：回傳的數字是 long long */
+  returnsLong?: boolean;
   /**
    * 區域變數（只有 C++ 有：寫在函式裡面，每次執行模組都重新從初始值開始，別的地方用不到）。
    * Scratch、Blockly 沒有區域變數（在模組裡建的變數也是全域的），所以只有學習目標是 C++ 時才能新增
@@ -48,21 +53,33 @@ export interface LocalVar {
   float?: boolean;
   /** C++ 的 array：大小 */
   size?: string;
+  /** C++：數字是 long long */
+  long?: boolean;
+  /** struct 變數每個欄位的初始值 */
+  fieldInit?: Record<string, string>;
 }
 
 /**
  * C++ 的型別名稱（給學生看的）：數字分 int（整數）、float（小數），文字是 string。
  * 只是過渡用，不讓學生碰太多型別：清單只能裝這三種
  */
-export const cppType = (type: '數字' | '文字', float?: boolean) => (type == '文字' ? 'string' : float ? 'float' : 'int');
+export const cppType = (type: '數字' | '文字', float?: boolean, long?: boolean) => (type == '文字' ? 'string' : float ? 'float' : long ? 'long long' : 'int');
+
+/** 容器裡裝的東西（變數表「初始值」欄選的）→ C++ 的型別：int、long long、float、string，或 struct 的名稱 */
+export const elemCppType = (init: string | undefined) => (findStruct(init) ? init!
+  : init == '文字' ? 'string' : init == '小數' ? 'float' : init == '長整數' ? 'long long' : 'int');
 
 /** 給學生看的型別名稱：C++ 寫 int / float / string、vector<int>…；Scratch、Blockly 寫數字、文字、清單 */
-export function typeLabel(type: string, float?: boolean, init?: string): string {
+export function typeLabel(type: string, float?: boolean, init?: string, size?: string, long?: boolean): string {
   if (getTarget() == 'cpp') {
-    const elem = init == '文字' ? 'string' : init == '小數' ? 'float' : 'int';
+    const elem = elemCppType(init);
     if (type == '清單') return `vector<${elem}>`;
     if (type == '二維清單') return `vector<vector<${elem}>>`;
-    return cppType(type == '文字' ? '文字' : '數字', float);
+    if (type == '陣列') return `${elem}[${size ?? ''}]`;
+    if (type == '堆疊') return `stack<${elem}>`;
+    if (type == '佇列') return `queue<${elem}>`;
+    if (type == '結構') return init ?? 'struct';
+    return cppType(type == '文字' ? '文字' : '數字', float, long);
   }
   return type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : type == '二維清單' ? t('二維清單', '2D list') : t('數字', 'Number');
 }
@@ -89,6 +106,11 @@ function outsideQuotes(text: string, f: (part: string) => string) {
 const wordRe = (name: string) => new RegExp(`(?<![\\p{L}\\p{N}_$])${name}(?![\\p{L}\\p{N}_$])`, 'gu');
 /** 把積木文字裡的變數名稱 from 換成 to（只換完整的名稱：改 a 不會動到 abc、主流程的a） */
 export const renameInText = (text: string, from: string, to: string) => outsideQuotes(text, part => part.replace(wordRe(from), to));
+/** struct 的欄位改名：把「.from」換成「.to」（後面接括號的是 s.top() 這種函式，不動） */
+export const renameFieldInText = (text: string, from: string, to: string) =>
+  outsideQuotes(text, part => part.replace(new RegExp(`\\.(\\s*)${from}(?![\\p{L}\\p{N}_$(])`, 'gu'), `.$1${to}`));
+/** 積木文字裡有沒有用到欄位「.name」 */
+export const usesField = (text: string, name: string) => renameFieldInText(text, name, '\u0000') != text;
 /** 積木文字裡有沒有用到名稱 name */
 export const usesName = (text: string, name: string) => {
   let found = false;
@@ -105,6 +127,7 @@ const CPP_RESERVED = new Set([
   'double', 'else', 'endl', 'enum', 'false', 'float', 'for', 'fmod', 'if', 'include', 'indexOf', 'inputFloat', 'inputNumber', 'inputText',
   'int', 'long', 'main', 'namespace', 'new', 'not', 'or', 'private', 'public', 'return', 'short', 'signed', 'sizeof', 'static', 'std',
   'string', 'struct', 'switch', 'template', 'this', 'throw', 'to_string', 'true', 'try', 'typename', 'unsigned', 'using', 'vector', 'void', 'while',
+  'stack', 'queue', 'sort', 'stoi', 'greater',
 ]);
 
 /**

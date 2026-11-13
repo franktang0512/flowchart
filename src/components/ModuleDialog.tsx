@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { isName, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { canReturn, getTarget } from '../target';
-import { TypeOptions } from './VarTable';
+import { fromTypeValue, TypeOptions, typeValue } from './VarTable';
 
 export interface ModuleRequest {
   /** 每次開對話框都不同，用來重設表單 */
@@ -44,7 +44,8 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
   const [name, setName] = useState(request.initial?.name ?? '');
   const [params, setParams] = useState<ParamRow[]>(request.initial?.params.map((p, k) => ({ ...p, orig: k })) ?? []);
   // C++ 回傳 float 時選單的值是 'float'
-  const [returns, setReturns] = useState<'' | '數字' | '文字' | 'float'>(request.initial?.returns == '數字' && request.initial.returnsFloat && getTarget() == 'cpp' ? 'float' : request.initial?.returns ?? '');
+  const [returns, setReturns] = useState<'' | '數字' | '文字' | 'float' | 'long'>(request.initial?.returns == '數字' && getTarget() == 'cpp' && (request.initial.returnsFloat || request.initial.returnsLong)
+    ? (request.initial.returnsFloat ? 'float' : 'long') : request.initial?.returns ?? '');
   const [problem, setProblem] = useState<string | null>(null);
 
   const setParam = (k: number, patch: Partial<ParamInfo>) => setParams(params.map((p, i) => (i == k ? { ...p, ...patch } : p)));
@@ -64,7 +65,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
   const save = () => {
     const n = name.trim();
     const rows = params.map(p => ({ ...p, name: p.name.trim() })).filter(p => p.name);
-    const list: ParamInfo[] = rows.map(p => ({ name: p.name, type: p.type, ...(p.float && p.type == '數字' && getTarget() == 'cpp' ? { float: true } : {}), ...(p.desc ? { desc: p.desc } : {}) }));
+    const list: ParamInfo[] = rows.map(p => ({ name: p.name, type: p.type, ...(p.float && p.type == '數字' && getTarget() == 'cpp' ? { float: true } : {}), ...(p.long && p.type == '數字' && getTarget() == 'cpp' ? { long: true } : {}), ...(p.desc ? { desc: p.desc } : {}) }));
     const bad = (s: string, kind: 'module' | 'param') => {
       if (!isName(s)) return t(`「${s}」不能當名稱：只能用中英文、數字和底線，不能有空白，也不能用數字開頭。`, `"${s}" cannot be a name. Use letters, numbers and _ only, with no spaces, and do not start with a number.`);
       return request.nameProblem(s, kind);
@@ -81,7 +82,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
     const old = request.initial?.params ?? [];
     const renames = rows.filter(p => p.orig != null && old[p.orig].name != p.name).map(p => [old[p.orig!].name, p.name] as [string, string]);
     const removed = old.map((_, k) => k).filter(k => !rows.some(p => p.orig == k));
-    const ret = returns && canReturn() ? (returns == 'float' ? { returns: '數字' as const, returnsFloat: true } : { returns }) : {};
+    const ret = returns && canReturn() ? (returns == 'float' ? { returns: '數字' as const, returnsFloat: true } : returns == 'long' ? { returns: '數字' as const, returnsLong: true } : { returns }) : {};
     request.onSave({ name: n, params: list, ...ret }, renames, removed);
     onClose();
   };
@@ -97,7 +98,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
       {params.map((p, k) => (
         <p key={k} className="module_param">
           <input value={p.name} placeholder={t('參數名稱', 'name')} onChange={e => setParam(k, { name: e.target.value })} />
-          <select value={p.type == '數字' && p.float && getTarget() == 'cpp' ? 'float' : p.type} onChange={e => setParam(k, e.target.value == 'float' ? { type: '數字', float: true } : { type: e.target.value as ParamInfo['type'], float: undefined })}>
+          <select value={typeValue(p.type, p.float, p.long)} onChange={e => setParam(k, fromTypeValue(e.target.value) as Partial<ParamInfo>)}>
             <TypeOptions />
           </select>
           <button onClick={() => removeParam(k)}>{t('刪除', 'Remove')}</button>
@@ -115,6 +116,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
                 {getTarget() == 'cpp'
                   ? <>
                       <option value="數字">{t('回傳 int（整數）', 'Returns int')}</option>
+                      <option value="long">{t('回傳 long long（大整數）', 'Returns long long')}</option>
                       <option value="float">{t('回傳 float（小數）', 'Returns float')}</option>
                       <option value="文字">{t('回傳 string（文字）', 'Returns string')}</option>
                     </>

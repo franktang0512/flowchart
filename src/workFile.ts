@@ -3,6 +3,7 @@ import type { VarRow } from './components/VarTable';
 import { t } from './i18n';
 import type { DiagramData } from './engine/diagram';
 import type { ModuleInfo } from './engine/modules';
+import type { StructDef } from './engine/structs';
 
 const APP = 'flowchart-worksheet';
 const VERSION = 1;
@@ -27,6 +28,8 @@ export interface WorkFile {
   flowchart: DiagramData;
   /** 第三步：模組（名稱、參數、各自的流程圖）；舊的作品檔沒有 */
   modules?: (ModuleInfo & { flowchart: DiagramData })[];
+  /** 第三步：C++ 的 struct 定義；舊的作品檔沒有 */
+  structs?: Omit<StructDef, 'id'>[];
 }
 
 export type WorkContent = Omit<WorkFile, 'app' | 'version' | 'savedAt'>;
