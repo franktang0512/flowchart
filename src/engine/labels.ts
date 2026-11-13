@@ -16,6 +16,23 @@ const ROUNDING: [string, string][] = [
  */
 export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立' | '回傳' | '放入' | '取出' | '排序';
 
+/** struct 排序的一個條件：依哪個欄位、由大到小嗎（前面的一樣大，才比後面的） */
+export interface SortKey {
+  field: string;
+  desc: boolean;
+}
+
+/** 排序條件寫成積木上的字：「score 由大到小、name 由小到大」 */
+export const sortKeysText = (keys: SortKey[]) => keys.map(k => `${k.field} ${k.desc ? '由大到小' : '由小到大'}`).join('、');
+
+/** 「score 由大到小、name 由小到大」→ 排序條件（看不懂的那段略過） */
+export function parseSortKeys(spec: string): SortKey[] {
+  return spec.split('、').flatMap(part => {
+    const m = /^\s*(\S+)\s+(由小到大|由大到小)\s*$/.exec(part);
+    return m ? [{ field: m[1], desc: m[2] == '由大到小' }] : [];
+  });
+}
+
 /**
  * 「名稱[a]」「名稱[a][b]」拆成名稱和中括號裡的東西（中括號裡還有中括號也沒關係，例如 表[a[1]][b]）；
  * 不是這種寫法回傳 null
@@ -48,7 +65,7 @@ export function splitTarget(s: string): { name: string; indexes: string[] } | nu
  *   「 x 設為 運算式」「 清單[位置] 設為 運算式」（替換）「 清單 加入 運算式」
  *   「 清單 在第 位置 項插入 運算式」「 清單 刪除第 位置 項」「 清單 刪除所有項目」
  *   堆疊、佇列（C++）：「 s 放入 運算式」（push）「 s 取出」（pop）
- *   排序（C++）：「 a 排序 [前 n 個] [依 欄位] 由小到大|由大到小」
+ *   排序（C++）：「 a 排序 [前 n 個] 由小到大|由大到小」；struct 依欄位：「 a 排序 [前 n 個] 依 score 由大到小、name 由小到大」
  *   二維清單的某一列（C++ 的鄰接串列）：「 g[u] 加入 運算式」（g[u].push_back）
  *   二維清單（C++）：「 表 建立 r 列 c 行」（設定大小，每格都是 0 或空的文字）「 表[i][j] 設為 運算式」（替換一格，index2 是第二個位置）
  */
@@ -65,9 +82,10 @@ export function splitRectangle(text: string): { target: string; action: RectActi
   m = /^(.*?) 建立 (.*?) 列 (.*) 行$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '建立', index: m[2].trim(), index2: m[3].trim(), expr: '' };
   // 排序（C++ 的 sort）：「 a 排序 由小到大」「 a 排序 前 n 個 由小到大」「 edges 排序 依 w 由大到小」
-  //   index 是只排前幾個（沒有就是全部），index2 是 struct 依哪個欄位排，expr 是由小到大 / 由大到小
-  m = /^(.*?) 排序(?: 前 (.*?) 個)?(?: 依 (\S+))? (由小到大|由大到小)$/s.exec(text);
-  if (m) return { target: m[1].trim(), action: '排序', index: (m[2] ?? '').trim(), index2: m[3] ?? '', expr: m[4] };
+  //   「 s 排序 依 score 由大到小、name 由小到大」（分數一樣時再比名字）
+  //   index 是只排前幾個（沒有就是全部），index2 是 struct 的排序條件（見 parseSortKeys），expr 是最後一個由小到大 / 由大到小
+  m = /^(.*?) 排序(?: 前 (.*?) 個)?(?: 依 (.+?))? (由小到大|由大到小)$/s.exec(text);
+  if (m) return { target: m[1].trim(), action: '排序', index: (m[2] ?? '').trim(), index2: m[3] ? `${m[3]} ${m[4]}` : '', expr: m[4] };
   // 堆疊、佇列（C++ 的 stack、queue）：「 s 放入 x」是 push，「 s 取出」是 pop
   m = /^(.*?) 取出$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '取出', index: '', index2: '', expr: '' };
@@ -96,9 +114,16 @@ function rectangleLabel(text: string, en: boolean): string {
   if (action == '建立') return en ? `make ${target} ${index} rows × ${index2} columns` : `${target} 建立 ${index} 列 × ${index2} 行`;
   if (action == '回傳') return en ? `return ${value}` : `回傳 ${value}`;
   if (action == '排序') {
-    const part = (index ? (en ? ` first ${index}` : `前 ${index} 個`) : '') + (index2 ? (en ? ` by ${index2}` : `依 ${index2}`) : '');
-    const dir = expr == '由大到小' ? (en ? 'large → small' : '由大到小') : (en ? 'small → large' : '由小到大');
-    return en ? `sort ${target}${part} (${dir})` : `排序 ${target}${part ? `（${part}）` : ''} ${dir}`;
+    const dirText = (desc: boolean) => (desc ? (en ? 'large → small' : '由大到小') : (en ? 'small → large' : '由小到大'));
+    const first = index ? (en ? ` first ${index}` : `前 ${index} 個`) : '';
+    // struct：依每個條件「score 由大到小、name 由小到大」
+    const keys = index2 ? parseSortKeys(index2) : [];
+    if (keys.length) {
+      return en
+        ? `sort ${target}${first} by ${keys.map(k => `${k.field} (${dirText(k.desc)})`).join(', then ')}`
+        : `排序 ${target}${first ? `（${first}）` : ''} 依 ${keys.map(k => `${k.field} ${dirText(k.desc)}`).join('，再依 ')}`;
+    }
+    return en ? `sort ${target}${first} (${dirText(expr == '由大到小')})` : `排序 ${target}${first ? `（${first}）` : ''} ${dirText(expr == '由大到小')}`;
   }
   // stack、queue：照 C++ 的寫法
   if (action == '放入') return `${target}.push(${value})`;

@@ -2,7 +2,7 @@
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
 import { checkCall, checkValueType, checkVar, getCodeVar, splitField, type VarStore } from './engine/decoder';
-import { splitRectangle, splitTarget } from './engine/labels';
+import { parseSortKeys, sortKeysText, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { parseExpr } from './engine/structure';
 import type { Diagram } from './engine/diagram';
@@ -30,7 +30,7 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   let text = field ? ` ${field} 設為 ${f.code}`
     : rowPush ? `${target}[${f.rectIndex.trim()}] 加入 ${f.code}`
     // 排序：「 a 排序 前 n 個 依 w 由小到大」（前幾個、依欄位都可以沒有）
-    : f.rectAction == '排序' ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''}${f.rectField ? ` 依 ${f.rectField}` : ''} ${f.sortDesc ? '由大到小' : '由小到大'}`
+    : f.rectAction == '排序' ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''}${sortKeysOf(vars, f).length ? ` 依 ${sortKeysText(sortKeysOf(vars, f))}` : ` ${f.sortDesc ? '由大到小' : '由小到大'}`}`
     : f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
     : f.rectAction == '替換' ? `${target}${cell} 設為 ${f.code}`
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
@@ -54,6 +54,11 @@ function fieldTarget(f: DialogForm): string | null {
   // 二維 vector 的一格：g[u][k].w
   if (f.rectKind == '二維清單' && f.rectAction == '替換') return `${f.varSelect.trim()}[${f.rectIndex.trim()}][${f.rectIndex2.trim()}].${f.rectField}`;
   return null;
+}
+
+/** 排序的條件：裝 struct 的才有（依哪些欄位）；沒選欄位的那一列不算 */
+function sortKeysOf(vars: VarStore, f: DialogForm) {
+  return isStructContainer(vars, f.varSelect.trim()) ? f.sortKeys.filter(k => k.field) : [];
 }
 
 /** 接收模組回傳值：變成一般的計算積木「a 設為 aaa(x)」（不捨去進位） */
@@ -130,9 +135,17 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
       alert(t('請選一個 vector 或 array。', 'Choose a vector or an array.'));
       return false;
     }
-    if (isStructContainer(vars, list) && !f.rectField) {
-      alert(t('裡面裝的是 struct：請選要依哪個欄位排序。', 'It holds structs. Choose the field to sort by.'));
-      return false;
+    if (isStructContainer(vars, list)) {
+      const fields = sortKeysOf(vars, f).map(k => k.field);
+      if (!fields.length) {
+        alert(t('裡面裝的是 struct：請選要依哪個欄位排序。', 'It holds structs. Choose the field to sort by.'));
+        return false;
+      }
+      const twice = fields.find((x, k) => fields.indexOf(x) != k);
+      if (twice) {
+        alert(t(`「${twice}」選了兩次：每個欄位只要排一次。`, `"${twice}" is chosen twice. Use each field once.`));
+        return false;
+      }
     }
     return !f.rectIndex.trim() || checkVar(vars, f.rectIndex, true);
   }
@@ -440,7 +453,7 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
-          ...(action == '排序' ? { rectField: index2, sortDesc: expr == '由大到小' } : {}),
+          ...(action == '排序' ? { sortKeys: index2 ? parseSortKeys(index2) : [], sortDesc: expr == '由大到小' } : {}),
           // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
           rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' || (action == '替換' && index2) ? '二維清單'
             : action == '放入' || action == '取出' ? (vars?.type_var_list.queue.includes(target) ? '佇列' : '堆疊')

@@ -20,7 +20,7 @@
 import { t } from '../i18n';
 import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
-import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
+import { displayLinkText, displayNodeText, parseSortKeys, splitRectangle, splitTarget } from './labels';
 import { cppNameProblem, elemCppType, GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { exprType, fieldOf, parseExpr, structOf, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
@@ -803,15 +803,20 @@ function __method(c, name, i, m, kind, a, b) {
   if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : 'queueEmpty', i, { name: name, m: m });
   return m == 'front' ? c[0] : c[c.length - 1];
 }
-// C++ 的 sort：只排前 n 個（沒給就是全部）；field 是 struct 依哪個欄位排；desc 由大到小
-function __sort(list, name, i, n, field, desc) {
+// C++ 的 sort：只排前 n 個（沒給就是全部）；desc 由大到小
+// keys 是 struct 的排序條件 [[欄位, 由大到小嗎], …]：前面的一樣大，才比下一個；全部一樣大照原本的順序（stable_sort）
+function __sort(list, name, i, n, keys, desc) {
   if (n === null) n = list.length;
   if (!(Number.isInteger(n) && n >= 0 && n <= list.length)) __err('sortRange', i, { name: name, n: n, len: list.length });
   var part = list.slice(0, n);
+  var cmp = function (x, y, down) { var c = x < y ? -1 : x > y ? 1 : 0; return down ? -c : c; };
   part.sort(function (p, q) {
-    var x = field ? p[field] : p, y = field ? q[field] : q;
-    var c = x < y ? -1 : x > y ? 1 : 0;
-    return desc ? -c : c;
+    if (!keys) return cmp(p, q, desc);
+    for (var k = 0; k < keys.length; k++) {
+      var c = cmp(p[keys[k][0]], q[keys[k][0]], keys[k][1]);
+      if (c != 0) return c;
+    }
+    return 0;
   });
   for (var k = 0; k < n; k++) list[k] = part[k];
 }
@@ -1332,7 +1337,7 @@ class CodeGenerator {
           this.checkSyntax(node, code);
           return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
         }
-        const code = action == '排序' ? `__sort(${target}, ${name}, ${i}, ${index ? `(${expr(index)})` : 'null'}, ${index2 ? JSON.stringify(index2) : 'null'}, ${rest == '由大到小'});\n`
+        const code = action == '排序' ? `__sort(${target}, ${name}, ${i}, ${index ? `(${expr(index)})` : 'null'}, ${index2 ? JSON.stringify(parseSortKeys(index2).map(k => [k.field, k.desc])) : 'null'}, ${rest == '由大到小'});\n`
           : action == '放入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
           : action == '取出' ? `__pop(${target}, ${name}, ${i}, ${JSON.stringify(kind)});\n`
           : action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`

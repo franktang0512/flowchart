@@ -317,14 +317,19 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         const isArray = v?.type == '陣列';
         const n = s.count ? expr(s.count, 5) : isArray ? (v?.size?.trim() || '0') : '';
         const range = isArray ? `${s.target}, ${s.target} + ${n}` : `${s.target}.begin(), ${s.count ? `${s.target}.begin() + ${n}` : `${s.target}.end()`}`;
-        if (s.field) {
-          // struct 依欄位排：寫一個比較函式；用 stable_sort，一樣大的照原本的順序（跟流程圖執行的結果一樣）
-          const name = `by_${s.field}${s.desc ? '_desc' : ''}`;
+        if (s.keys?.length) {
+          // struct 依欄位排：寫一個比較函式，前面的欄位不一樣就比前面的，一樣才比下一個；
+          // 用 stable_sort，全部一樣大的照原本的順序（跟流程圖執行的結果一樣）
+          const keys = s.keys;
+          const name = 'by_' + keys.map(k => `${k.field}${k.desc ? '_desc' : ''}`).join('_');
+          const op = (desc: boolean) => (desc ? '>' : '<');
+          const dir = (desc: boolean) => (desc ? t('由大到小', 'large to small') : t('由小到大', 'small to large'));
           if (!comparators.has(name)) {
             comparators.set(name, [
-              `// ${t(`排序 ${elem} 用：依 ${s.field} ${s.desc ? '由大到小' : '由小到大'}`, `Sort ${elem} by ${s.field} (${s.desc ? 'large to small' : 'small to large'})`)}`,
+              `// ${t(`排序 ${elem} 用：`, `Sort ${elem}: `)}${keys.map(k => `${k.field} ${dir(k.desc)}`).join(t('，一樣大再比 ', ', then '))}`,
               `bool ${name}(${elem} a, ${elem} b) {`,
-              `${INDENT}return a.${s.field} ${s.desc ? '>' : '<'} b.${s.field};`,
+              ...keys.slice(0, -1).map(k => `${INDENT}if (a.${k.field} != b.${k.field}) return a.${k.field} ${op(k.desc)} b.${k.field};`),
+              `${INDENT}return a.${keys[keys.length - 1].field} ${op(keys[keys.length - 1].desc)} b.${keys[keys.length - 1].field};`,
               '}',
               '',
             ]);

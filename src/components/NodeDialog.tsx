@@ -2,7 +2,7 @@
 // 版面要跟舊版一模一樣，所以元素之間的空白（{' '}）與 <p> 的巢狀方式都照舊版 HTML 被瀏覽器解析後的結果。
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { joinTypes, localTypes, mapTypes, METHODS, type VarStore } from '../engine/decoder';
-import type { RectAction } from '../engine/labels';
+import type { RectAction, SortKey } from '../engine/labels';
 import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { byTarget, canReturn as canReturnTarget, getTarget, itemWord } from '../target';
@@ -46,6 +46,8 @@ export interface DialogForm {
   rectField: string;
   /** 排序：由大到小（false 是由小到大） */
   sortDesc: boolean;
+  /** 排序裝 struct 的：依哪些欄位，前面的一樣大才比後面的（例如分數由大到小、一樣再比名字） */
+  sortKeys: SortKey[];
   /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
   ioPlace: '加入' | '插入' | '替換';
   /** 輸出積木輸出什麼：'' 是變數或字串（自己打）；'回傳' 是執行有回傳值的模組、輸出回傳值（moduleName、moduleArgs） */
@@ -149,6 +151,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   rectIndex2: '',
   rectField: '',
   sortDesc: false,
+  sortKeys: [],
   ioTarget: '',
   ioPlace: '加入',
   outputKind: '',
@@ -847,13 +850,43 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           {kind == '結構' && fieldPicker(structOfVar(f.varSelect), false)}
           {f.rectAction == '排序' && (kind == '清單' || kind == '陣列') && (
             <>
-              <p className="rect_action">
-                {t('順序：', 'Order: ')}
-                <label><input type="radio" name="sort_dir" checked={!f.sortDesc} onChange={() => set({ sortDesc: false })} />{t('由小到大', 'Small → large')}</label>
-                <label><input type="radio" name="sort_dir" checked={f.sortDesc} onChange={() => set({ sortDesc: true })} />{t('由大到小', 'Large → small')}</label>
-              </p>
-              {/* 裝 struct：要選依哪個欄位排 */}
-              {structOfVar(f.varSelect) && <p>{t('依', 'By')}{fieldPicker(structOfVar(f.varSelect), false)}</p>}
+              {structOfVar(f.varSelect)
+                // 裝 struct：一層一層選欄位和順序，前面的一樣大才比下一個
+                ? (() => {
+                  const s = structOfVar(f.varSelect)!;
+                  const keys = f.sortKeys.length ? f.sortKeys : [{ field: '', desc: false }];
+                  const setKey = (k: number, patch: Partial<SortKey>) => set({ sortKeys: keys.map((x, j) => (j == k ? { ...x, ...patch } : x)) });
+                  return (
+                    <div className="sort_keys">
+                      {keys.map((key, k) => (
+                        <p key={k}>
+                          {k == 0 ? t('先依', 'Sort by') : t('一樣大時再依', 'If equal, by')}{' '}
+                          <select className="var_select field_select" value={key.field} onChange={e => setKey(k, { field: e.target.value })}>
+                            <option value="" disabled>{t('請選擇欄位', 'Choose a field')}</option>
+                            {s.fields.map(x => <option key={x.name} value={x.name}>{x.name}（{fieldCppType(x)}）</option>)}
+                          </select>{' '}
+                          <select className="var_select field_select" value={key.desc ? 'desc' : 'asc'} onChange={e => setKey(k, { desc: e.target.value == 'desc' })}>
+                            <option value="asc">{t('由小到大', 'small → large')}</option>
+                            <option value="desc">{t('由大到小', 'large → small')}</option>
+                          </select>
+                          {k > 0 && <button type="button" className="snippet" title={t('拿掉這個條件', 'Remove')} onClick={() => set({ sortKeys: keys.filter((_, j) => j != k) })}>✕</button>}
+                        </p>
+                      ))}
+                      {keys.length < s.fields.length && (
+                        <button type="button" className="snippet" onClick={() => set({ sortKeys: [...keys, { field: '', desc: false }] })}>
+                          {t('＋ 一樣大的時候，再依另一個欄位排', '+ If equal, sort by another field')}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()
+                : (
+                  <p className="rect_action">
+                    {t('順序：', 'Order: ')}
+                    <label><input type="radio" name="sort_dir" checked={!f.sortDesc} onChange={() => set({ sortDesc: false })} />{t('由小到大', 'Small → large')}</label>
+                    <label><input type="radio" name="sort_dir" checked={f.sortDesc} onChange={() => set({ sortDesc: true })} />{t('由大到小', 'Large → small')}</label>
+                  </p>
+                )}
               {/* array 常常只用到前 n 格：sort(a, a + n) */}
               {kind == '陣列' && (
                 <p>

@@ -4,7 +4,7 @@
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
 import { FlowError, tokenize, type Token } from './decoder';
-import { splitRectangle, splitTarget, type RectAction } from './labels';
+import { parseSortKeys, splitRectangle, splitTarget, type RectAction, type SortKey } from './labels';
 import { parseCall, type ModuleInfo, type ModuleSource } from './modules';
 import { findStruct, type StructField } from './structs';
 import type { FlowNode } from './node';
@@ -29,8 +29,8 @@ export type Stmt =
   | { kind: 'call'; name: string; args: Expr[] }
   /** 模組回傳值（流程圖上後面直接接「結束」） */
   | { kind: 'return'; value: Expr; round: string }
-  /** 排序（C++ 的 sort）：count 是只排前幾個（array 常用 sort(a, a + n)）；field 是 struct 依哪個欄位排 */
-  | { kind: 'sort'; target: string; count?: Expr; field?: string; desc: boolean };
+  /** 排序（C++ 的 sort）：count 是只排前幾個（array 常用 sort(a, a + n)）；keys 是 struct 依哪些欄位排（前面一樣大才比後面） */
+  | { kind: 'sort'; target: string; count?: Expr; keys?: SortKey[]; desc: boolean };
 
 /** 一個模組：名稱、參數、裡面的步驟 */
 export interface ModuleProgram extends ModuleInfo {
@@ -173,7 +173,7 @@ function rectStmt(text: string): Stmt {
   }
   const { target, action, index, index2, expr } = splitRectangle(rest);
   if (action == '回傳') return { kind: 'return', value: parseExpr(expr), round };
-  if (action == '排序') return { kind: 'sort', target, ...(index ? { count: parseExpr(index) } : {}), ...(index2 ? { field: index2 } : {}), desc: expr == '由大到小' };
+  if (action == '排序') return { kind: 'sort', target, ...(index ? { count: parseExpr(index) } : {}), ...(index2 ? { keys: parseSortKeys(index2) } : {}), desc: expr == '由大到小' };
   return {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,

@@ -7,6 +7,7 @@ import { createConnectors } from './connector';
 import { getCodeVar, type VarStore } from './decoder';
 import type { Diagram } from './diagram';
 import type { FigureName } from './figures';
+import { sortKeysText } from './labels';
 import type { Point } from './link';
 import { callText } from './modules';
 import type { FlowNode } from './node';
@@ -129,7 +130,7 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
       case 'return':
         return { kind: 'node', ret: true, node: node(` 回傳 ${exprText(s.value)}` + (ROUNDING_TEXT[s.round] ?? ''), 'Rectangle', s.round) };
       case 'sort':
-        return { kind: 'node', node: node(` ${s.target} 排序${s.count ? ` 前 ${exprText(s.count)} 個` : ''}${s.field ? ` 依 ${s.field}` : ''} ${s.desc ? '由大到小' : '由小到大'}`, 'Rectangle') };
+        return { kind: 'node', node: node(` ${s.target} 排序${s.count ? ` 前 ${exprText(s.count)} 個` : ''}${s.keys?.length ? ` 依 ${sortKeysText(s.keys)}` : ` ${s.desc ? '由大到小' : '由小到大'}`}`, 'Rectangle') };
     }
   };
   /** 「回傳」積木：最後都接到「結束」 */
