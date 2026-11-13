@@ -178,7 +178,14 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
           case '替換': return [listSet(s.target, expr(s.index!), value)];
           case '刪除': return [listRemove(s.target, expr(s.index!))];
           case '清空': return [listEmpty(s.target)];
-          default: return [setVar(s.target, value)];
+          default: {
+            // 「x 設為 x + 多少」（數字變數）→ Scratch「變數改變」、Blockly「將變數的值加」
+            const v = s.value;
+            if (!s.round && v?.t == 'bin' && v.op == '+' && v.a.t == 'var' && v.a.name == s.target && vars.get(s.target)?.type == '數字' && exprType(v, vars, modules) == 'num') {
+              return [{ type: scratch ? 'scratch_variables_change' : 'math_change', fields: { VAR: field(s.target) }, inputs: { DELTA: input(expr(v.b)) } }];
+            }
+            return [setVar(s.target, value)];
+          }
         }
       }
       case 'if': {

@@ -27,7 +27,7 @@ const BLOCK_NAME: Record<string, string> = {
   scratch_if: '如果', scratch_ifElse: '如果…否則', controls_if: '如果',
   scratch_repeat_ext: '重複幾次', controls_repeat_ext: '重複幾次', controls_repeat: '重複幾次',
   scratch_whileUntil: '重複直到', scratch_while: '重複當', controls_whileUntil: '重複當/直到',
-  scratch_variables_set: '變數設為', variables_set: '設定變數', math_round: '四捨五入',
+  scratch_variables_set: '變數設為', variables_set: '設定變數', scratch_variables_change: '變數改變', math_change: '將變數的值加', math_round: '四捨五入',
   text_prompt_ext: '輸入', text_prompt: '輸入',
   scratch_proc_def: '定義', scratch_proc_call: '自訂積木', procedures_defnoreturn: '函式', procedures_callnoreturn: '執行函式',
 };

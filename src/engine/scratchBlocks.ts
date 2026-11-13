@@ -184,6 +184,14 @@ export function defineBlocks(Blockly: B): { scratch: B; blockly: B } {
       statement(this, 'variable_blocks');
     },
   };
+  // Scratch「變數 [x] 改變 (1)」
+  blocks.scratch_variables_change = {
+    init(this: B) {
+      this.appendDummyInput().appendField(en() ? 'change' : '變數').appendField(varField(), 'VAR').appendField(en() ? 'by' : '改變');
+      this.appendValueInput('DELTA').setCheck(null);
+      statement(this, 'variable_blocks');
+    },
+  };
   blocks.scratch_variables_get = {
     init(this: B) {
       this.appendDummyInput().appendField(varField(), 'VAR');
@@ -504,7 +512,12 @@ export function setupScratchEditing(Blockly: B, workspace: B, onCreateProc: (exi
   workspace.registerToolboxCategoryCallback('SCRATCH_VARIABLES', (ws: B) => {
     const vars: B[] = ws.getVariablesOfType('');
     const items: unknown[] = [{ kind: 'button', text: getLang() == 'en' ? 'Make a Variable' : '建立變數', callbackkey: 'CREATE_SCRATCH_VARIABLE' }];
-    if (vars.length) items.push({ kind: 'block', type: 'scratch_variables_set', fields: { VAR: ref(vars[0], '') }, inputs: { VALUE: text('0') } });
+    if (vars.length) {
+      items.push(
+        { kind: 'block', type: 'scratch_variables_set', fields: { VAR: ref(vars[0], '') }, inputs: { VALUE: text('0') } },
+        { kind: 'block', type: 'scratch_variables_change', fields: { VAR: ref(vars[0], '') }, inputs: { DELTA: text('1') } },
+      );
+    }
     for (const v of vars) items.push({ kind: 'block', type: 'scratch_variables_get', fields: { VAR: ref(v, '') } });
     return items;
   });

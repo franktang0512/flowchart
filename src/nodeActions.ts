@@ -44,6 +44,14 @@ function receiveForm(f: DialogForm, modules: ModuleInfo[]): DialogForm {
   return { ...f, rectAction: '設為', radio: '', code: callText(f.moduleName, args) };
 }
 
+/** 變數「改變」：變成「x 設為 x + 多少」（不捨去進位）；多少是算式時加括號，看程式時轉回「改變」積木 */
+function changeForm(f: DialogForm): DialogForm {
+  if (f.rectKind != '變數' || !f.varChange) return f;
+  const by = f.code.trim();
+  const simple = parseExpr(by).t != 'bin';
+  return { ...f, rectAction: '設為', radio: '', code: `${f.varSelect.trim()} + ${simple ? by : `(${by})`}` };
+}
+
 /** 刪除第幾項、刪除所有項目、建立二維清單不用填值 */
 const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立';
 
@@ -66,6 +74,19 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
       return false;
     }
     return checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), callText(m.name, args), 'var');
+  }
+  if (f.rectKind == '變數' && f.varChange) {
+    const name = f.varSelect.trim();
+    if (!checkVar(vars, f.varSelect, false)) return false;
+    if (!vars.type_var_list.number.includes(name)) {
+      alert(t(`「${name}」不是數字變數：只有數字變數可以「改變」。`, `"${name}" is not a number variable. Only number variables can change by an amount.`));
+      return false;
+    }
+    if (!f.code.trim()) {
+      alert(t('請填要加多少。', 'Enter how much to add.'));
+      return false;
+    }
+    return checkVar(vars, f.code, true) && checkValueType(vars, modules, name, f.code, 'var');
   }
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
   if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
@@ -155,7 +176,7 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
       return false;
     case 'Rectangle':
       if (rectangleValid(vars, f, modules)) {
-        const g = receiveForm(f, modules);
+        const g = changeForm(receiveForm(f, modules));
         const { text, nodeVar } = rectangleText(vars, g);
         return add(text, 'Rectangle', nodeVar, g.radio);
       }
@@ -203,7 +224,7 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
     }
     case 'Rectangle': {
       if (!rectangleValid(vars, f, modules)) return false;
-      const g = receiveForm(f, modules);
+      const g = changeForm(receiveForm(f, modules));
       const { text, nodeVar } = rectangleText(vars, g);
       node.text = text;
       node.data = g.radio;
@@ -222,6 +243,16 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
   }
 }
 
+/** 「x + 多少」：回傳多少（外面的括號拿掉）；不是這種寫法回傳 null */
+function changeAmount(target: string, expr: string): string | null {
+  const e = parseExpr(expr);
+  if (e.t != 'bin' || e.op != '+' || e.a.t != 'var' || e.a.name != target) return null;
+  const m = new RegExp('^\\s*' + target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\+\\s*(.*)$', 's').exec(expr);
+  if (!m) return null;
+  const by = m[1].trim();
+  return /^\(.*\)$/s.test(by) && parseExpr(by.slice(1, -1)).t == 'bin' ? by.slice(1, -1).trim() : by;
+}
+
 /** 整個算式就是執行一個有回傳值的模組（例如 aaa(x)）：回傳模組名稱和參數；不是的話 null */
 function returningCall(expr: string, modules: ModuleInfo[]) {
   const call = parseCall(expr);
@@ -231,7 +262,7 @@ function returningCall(expr: string, modules: ModuleInfo[]) {
 }
 
 /** 雙擊積木時：對話框種類與預先填好的內容 */
-export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = []): { kind: DialogKind; initial: Partial<DialogForm> } {
+export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?: VarStore): { kind: DialogKind; initial: Partial<DialogForm> } {
   const text = node.text ?? '';
   switch (node.figure) {
     case 'Parallelogram': {
@@ -273,6 +304,11 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = []): { kin
       const { target, action, index, index2, expr } = splitRectangle(text);
       // 「a 設為 aaa(x)」：整個值就是執行一個有回傳值的模組（沒有捨去進位）→ 接收模組回傳值
       const call = action == '設為' && !node.data && !expr.includes('(取') ? returningCall(expr, modules) : null;
+      // 「x 設為 x + 多少」（數字變數、沒有捨去進位）→ 變數「改變」
+      const by = action == '設為' && !node.data && !expr.includes('(取') ? changeAmount(target, expr) : null;
+      if (by != null && vars?.type_var_list.number.includes(target)) {
+        return { kind: 'Rectangle', initial: { rectKind: '變數', rectAction: '設為', varChange: true, varSelect: target, code: by } };
+      }
       if (call) {
         return { kind: 'Rectangle', initial: { rectKind: '接收', rectAction: '設為', varSelect: target, moduleName: call.name, moduleArgs: call.args } };
       }

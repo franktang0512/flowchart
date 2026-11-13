@@ -33,6 +33,8 @@ export interface DialogForm {
   rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收';
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
+  /** 變數：true 是「改變」（Scratch「變數改變」、Blockly「將變數的值加」），code 填加多少；存成「x 設為 x + 多少」 */
+  varChange: boolean;
   /** 第幾項：計算積木的「插入」「替換」「刪除」，輸入到清單的「插入」「替換」；二維清單是第幾列（建立時是幾列） */
   rectIndex: string;
   /** 二維清單：第幾行（建立時是幾行） */
@@ -123,6 +125,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   showWhile: false,
   rectKind: '',
   rectAction: '設為',
+  varChange: false,
   rectIndex: '',
   rectIndex2: '',
   ioTarget: '',
@@ -496,9 +499,12 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       const returning = modules.filter(x => x.returns);
       const recvModule = returning.find(x => x.name == f.moduleName);
       const noLists = allTypes.array.length == 0;
+      /** 變數「改變」：只能選數字變數，值是加多少、沒有捨去進位 */
+      const change = kind == '變數' && f.varChange;
       /** 選了一類：動作換成這一類的第一個，原本選的變數不能用就清掉 */
       const pickKind = (k: DialogForm['rectKind']) => set({
         rectKind: k,
+        varChange: false,
         rectAction: k == '變數' || k == '接收' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : '加入',
         ...([...namesFor(k), ...(k == '變數' || k == '接收' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
       });
@@ -507,7 +513,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       );
       body = (
         <>
-          <p id="hint">{kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
+          <p id="hint">{change ? t('將數字變數的值加上多少（減少就填負數）...', 'Add an amount to a number variable (use a negative number to take away)...') : kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
           <p className="io_choice rect_kind">
             {t('要改：', 'Change: ')}
             <label><input type="radio" name="rect_kind" checked={kind == '變數'} onChange={() => pickKind('變數')} />{t('變數', 'A variable')}</label>
@@ -550,6 +556,13 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               {RECT_ACTIONS.filter(([action]) => ['加入', '插入', '替換', '刪除', '清空'].includes(action)).map(([action, label]) => actionRadio(action, label()))}
             </p>
           )}
+          {kind == '變數' && (
+            <p className="rect_action">
+              {t('怎麼改：', 'How: ')}
+              <label><input type="radio" name="var_action" checked={!f.varChange} onChange={() => set({ varChange: false })} />{t('設為', 'Set to')}</label>
+              <label><input type="radio" name="var_action" checked={f.varChange} onChange={() => set({ varChange: true, radio: '' })} />{t('改變（加多少）', 'Change by')}</label>
+            </p>
+          )}
           {kind == '二維清單' && (
             <p className="rect_action">
               {t('怎麼改：', 'How: ')}
@@ -560,7 +573,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           {kind && kind != '回傳' && (
             <>
               {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={namesFor(kind, localT)} />
+              <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={change ? varTypes.number : namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={change ? localT.number : namesFor(kind, localT)} />
             </>
           )}
           {indexLabel && (
@@ -576,7 +589,13 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               <input id="rect_index2" style={{ width: '25%' }} value={f.rectIndex2} onChange={e => set({ rectIndex2: e.target.value })} />
             </>
           )}
-          {verb && (
+          {verb && change && (
+            <>
+              <br /><br /> {t('改變', 'by')} {codeInput}
+              <p className="dialog_note">{t('填 1 就是加 1，填 -1 就是減 1', '1 adds one, -1 takes one away')}</p>
+            </>
+          )}
+          {verb && !change && (
             <>
               <br /><br /> {verb()} {codeInput}{' '}
               <br /><br />

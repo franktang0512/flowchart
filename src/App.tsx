@@ -448,7 +448,7 @@ export function App() {
     const node = d.nodes[index];
     if (!node) return;
     syncVarList();
-    const { kind, initial } = editDialogFor(node, moduleInfos());
+    const { kind, initial } = editDialogFor(node, moduleInfos(), storeFor(d));
     openDialog({
       kind,
       initial,
