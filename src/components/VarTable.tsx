@@ -1,6 +1,7 @@
 // 第三步左邊的「變數」表格
 import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
+import { isContainerType, type VarType } from '../engine/structure';
 import { t, useLang } from '../i18n';
 import { getTarget } from '../target';
 import { useCommit } from '../useCommit';
@@ -8,19 +9,33 @@ import { useCommit } from '../useCommit';
 export interface VarRow {
   id: number;
   name: string;
-  /** 二維清單只有學習目標是 C++ 時可以選（Scratch 沒有） */
-  type: '數字' | '文字' | '清單' | '二維清單';
+  /** 二維清單、陣列、堆疊、佇列只有學習目標是 C++ 時可以選（Scratch 沒有） */
+  type: VarType;
   init: string;
   desc: string;
   /** C++：數字是 float（小數）；沒有就是 int（整數）。Scratch、Blockly 不分 */
   float?: boolean;
+  /** C++ 的 array：大小（宣告時就決定） */
+  size?: string;
 }
 
-/** 清單、二維清單：一開始是空的，初始值欄改成選裡面裝什麼 */
-const isListType = (type: VarRow['type']) => type == '清單' || type == '二維清單';
+/** 容器（清單、陣列、堆疊…）：初始值欄改成選裡面裝什麼 */
+const isListType = isContainerType;
+
+/** C++ 的容器在型別選單裡的名字（滑鼠移上去看說明） */
+const CPP_CONTAINERS: [VarType, () => string, () => string][] = [
+  ['清單', () => 'vector', () => t('vector：可以變長變短的清單', 'vector: a list that can grow')],
+  ['二維清單', () => t('二維 vector', '2D vector'), () => t('二維 vector：表格', '2D vector: a table')],
+  // 跟 int（整數）、string（文字）一樣，C++ 的名字後面加中文
+  ['陣列', () => t('array（陣列）', 'array'), () => t('array（陣列）：大小固定', 'array: fixed size')],
+  ['堆疊', () => 'stack', () => t('stack（堆疊）：後放進去的先拿出來', 'stack: last in, first out')],
+  ['佇列', () => 'queue', () => t('queue（佇列）：先放進去的先拿出來', 'queue: first in, first out')],
+];
 
 interface Props {
   rows: VarRow[];
+  /** 這一題可以用的容器（題目的 var_types）；沒有就是都可以 */
+  allowed?: VarType[];
   onChange: (id: number, patch: Partial<VarRow>) => void;
   /** 輸入框內容確定（離開或 Enter）時，重新整理變數清單 */
   onCommit: () => void;
@@ -45,7 +60,7 @@ interface Props {
 
 let localSeq = 1_000_000;
 
-export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module }: Props) {
+export function VarTable({ rows, allowed, onChange, onCommit, onDelete, onCreate, module }: Props) {
   useLang();
   const head = (
     <tr>
@@ -97,7 +112,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
               ? t('參數的值由「執行模組」傳進來。C++ 其實可以替參數設預設值，這裡先專心練習傳參數。參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'The value is passed in by "Run module". C++ can give a parameter a default value, but here we practice passing values. You can change a parameter in the flow; only the module\'s own copy changes.')
               : t('參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'A parameter is a variable too. You can change it in the flow, but only the module\'s own copy changes.')}</p>
           )}
-          {module.locals && <LocalTable module={module.name} rows={module.locals} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
+          {module.locals && <LocalTable module={module.name} rows={module.locals} allowed={allowed} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
           {/* 全域變數只在主流程顯示；模組這裡只列這個模組自己的 */}
           <p className="muted global_note">{getTarget() == 'cpp'
             ? t('C++ 的主流程變數寫在 main 裡面，模組用不到：要用的值請加參數傳進來，要把結果帶回主流程請用回傳。', 'In C++ the main-flow variables are inside main, so a module cannot use them. Pass values in as parameters, and use a return value to bring a result back.')
@@ -112,7 +127,7 @@ export function VarTable({ rows, onChange, onCommit, onDelete, onCreate, module 
             <tbody>
               {head}
               {rows.map(row => (
-                <VarRowView key={row.id} row={row} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
+                <VarRowView key={row.id} row={row} allowed={allowed} onChange={onChange} onCommit={onCommit} onDelete={onDelete} />
               ))}
             </tbody>
           </table>
@@ -132,13 +147,14 @@ const fromTypeValue = (value: string) => (value == 'float'
   ? { type: '數字' as const, float: true }
   : { type: value as VarRow['type'], float: undefined });
 
-/** 數字、文字的選項（C++ 寫成 int、float、string） */
-export function TypeOptions() {
+/** 數字、文字的選項（C++ 寫成 int、float、string）；beforeString 放在 float 和 string 中間（變數表的 array） */
+export function TypeOptions({ beforeString }: { beforeString?: React.ReactNode } = {}) {
   if (getTarget() == 'cpp') {
     return (
       <>
         <option value="數字">{t('int（整數）', 'int')}</option>
         <option value="float">{t('float（小數）', 'float')}</option>
+        {beforeString}
         <option value="文字">{t('string（文字）', 'string')}</option>
       </>
     );
@@ -189,9 +205,10 @@ function ParamName({ name, onCommit }: { name: string; onCommit: (name: string) 
 }
 
 /** C++ 模組的區域變數：只有這個模組用得到，每次執行模組都重新從初始值開始 */
-function LocalTable({ module, rows, onLocals, problem, onProblem, head }: {
+function LocalTable({ module, rows, allowed, onLocals, problem, onProblem, head }: {
   module: string;
   rows: LocalVar[];
+  allowed?: VarType[];
   onLocals: (next: LocalVar[], rename?: [string, string]) => void;
   problem: (name: string, id: number, rows: LocalVar[]) => string | null;
   onProblem: (why: string) => void;
@@ -230,7 +247,7 @@ function LocalTable({ module, rows, onLocals, problem, onProblem, head }: {
             {head}
             {rows.map(row => (
               <VarRowView
-                key={row.id} row={row} className="local_row"
+                key={row.id} row={row} allowed={allowed} className="local_row"
                 onChange={(id, patch) => update(latest.current.map(r => (r.id == id ? { ...r, ...patch } : r)))}
                 onCommit={commit}
                 onDelete={id => update(latest.current.filter(r => r.id != id))}
@@ -244,11 +261,22 @@ function LocalTable({ module, rows, onLocals, problem, onProblem, head }: {
   );
 }
 
-function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: VarRow; className?: string } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
+function VarRowView({ row, allowed, onChange, onCommit, onDelete, className }: { row: VarRow; allowed?: VarType[]; className?: string } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
   const commit = useCommit<HTMLInputElement>(onCommit);
-  const text = (field: 'name' | 'init' | 'desc') => ({
+  const cpp = getTarget() == 'cpp';
+  /**
+   * C++ 容器的選項（照 types 的順序）。題目可以限制能用哪些容器
+   * （例如「用 array 自己做 stack」的題目就不給 stack）；已經選了的照樣列出來
+   */
+  const containerOptions = (types: VarType[]) => types
+    .filter(type => !allowed || allowed.includes(type) || row.type == type)
+    .map(type => {
+      const [, short, long] = CPP_CONTAINERS.find(c => c[0] == type)!;
+      return <option key={type} value={type} title={long()}>{short()}</option>;
+    });
+  const text = (field: 'name' | 'init' | 'desc' | 'size') => ({
     className: 'var_input',
-    value: row[field],
+    value: row[field] ?? '',
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(row.id, { [field]: e.target.value }),
     ...commit,
   });
@@ -265,13 +293,20 @@ function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: Var
               : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
             if (type == '數字' && !float && /^\s*-?\d+\.\d*\s*$/.test(init)) init = String(Math.trunc(Number(init)));
-            onChange(row.id, { type, init, float });
+            // array 要先有大小：預設 5 格
+            onChange(row.id, { type, init, float, ...(type == '陣列' && !row.size?.trim() ? { size: '5' } : {}) });
             onCommit();
           }}
         >
-          <TypeOptions />
-          <option value="清單">{getTarget() == 'cpp' ? 'vector' : t('清單', 'List')}</option>
-          {(getTarget() == 'cpp' || row.type == '二維清單') && <option value="二維清單">{getTarget() == 'cpp' ? t('二維 vector', '2D vector') : t('二維清單', '2D list')}</option>}
+          {/* C++：array 放在 float 和 string 中間，其他容器放在後面 */}
+          <TypeOptions beforeString={cpp && containerOptions(['陣列'])} />
+          {cpp
+            ? containerOptions(['清單', '二維清單', '堆疊', '佇列'])
+            : <>
+                <option value="清單">{t('清單', 'List')}</option>
+                {/* 從 C++ 換過來的舊作品：只有 C++ 有的型別照樣列出來，才不會被悄悄改掉 */}
+                {CPP_CONTAINERS.filter(([type]) => type != '清單' && row.type == type).map(([type, short]) => <option key={type} value={type}>{short()}</option>)}
+              </>}
         </select>
       </td>
       <td>
@@ -285,7 +320,9 @@ function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: Var
               className="var_input" value={row.init == '文字' || row.init == '小數' ? row.init : '數字'}
               title={row.type == '二維清單'
                 ? t('二維清單一開始是空的，要先用計算積木「建立 幾 列 幾 行」；這裡選裡面要裝什麼', 'The 2D list starts empty. Make it with a Math block (rows × columns). Choose what it holds.')
-                : t('清單一開始是空的，這裡選裡面要裝什麼', 'The list starts empty. Choose what it holds.')}
+                : row.type == '陣列'
+                ? t('array 一開始就有固定的格數，每格是 0（string 是空的）；這裡選裡面要裝什麼', 'An array has a fixed number of items from the start. Each is 0 (or empty text). Choose what it holds.')
+                : t('一開始是空的，這裡選裡面要裝什麼', 'It starts empty. Choose what it holds.')}
               onChange={e => { onChange(row.id, { init: e.target.value }); onCommit(); }}
             >
               {getTarget() == 'cpp'
@@ -301,6 +338,12 @@ function VarRowView({ row, onChange, onCommit, onDelete, className }: { row: Var
             </select>
           )
           : <input {...text('init')} />}
+        {row.type == '陣列' && (
+          // array 的大小：C++ 宣告時就要寫，例如 int a[5]
+          <label className="array_size" title={t('array 有幾格（宣告時就決定，之後不能改）', 'How many items (fixed when declared)')}>
+            {t('大小', 'Size')} <input {...text('size')} inputMode="numeric" />
+          </label>
+        )}
       </td>
       <td><input {...text('desc')} /></td>
       <td><button className="delete_var" title={t('刪除這個變數', 'Delete this variable')} aria-label={t('刪除', 'Delete')} onClick={() => onDelete(row.id)}><TrashIcon /></button></td>

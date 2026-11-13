@@ -89,6 +89,8 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
           : { type: 'math_single', fields: { OP: 'NEG' }, inputs: { NUM: input(expr(e.a)) } };
       case 'not': return { type: 'logic_negate', inputs: { BOOL: input(expr(e.a)) } };
       case 'call': return call(e.fn, e.args);
+      // C++ 的寫法：v.size() 就是長度；其他（stack、queue 的函式）積木沒有，「看程式」會先擋下來
+      case 'method': return e.name == 'size' ? call('len', [e.obj]) : literal(`${e.obj.t == 'var' ? e.obj.name : ''}.${e.name}()`, false);
       case 'bin': {
         if (e.op == '+' && exprType(e, vars, modules) == 'str') return join(joinParts(e));
         if (ARITH[e.op]) return { type: scratch ? 'scratch_math_arithmetic' : 'math_arithmetic', fields: { OP: ARITH[e.op] }, inputs: { A: input(expr(e.a)), B: input(expr(e.b)) } };

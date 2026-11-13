@@ -9,7 +9,7 @@ import { applyBlocklyMessages, blocklyToolbox, defineBlocks, scratchToolbox, set
 import { ScratchProcDialog } from './ScratchProcDialog';
 import { cppNameProblem, GLOBAL_PREFIX, type ParamInfo } from '../engine/modules';
 import type { ModuleSource } from '../engine/modules';
-import { structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
+import { isCppOnlyType, structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
 import { toCpp } from '../engine/toCpp';
 import { getLang, t, useLang } from '../i18n';
@@ -292,9 +292,9 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
     }
   };
 
-  // 二維清單只有 C++ 有（Scratch 沒有），積木畫不出來
-  if (vars.some(v => v.type == '二維清單')) {
-    return <p className="run_error">{t('Scratch / Blockly 沒有二維清單：用到二維清單的流程圖，請把學習目標換成 C++ 再看程式。', 'Scratch / Blockly have no 2D lists. To see this flowchart as code, change the learning goal to C++.')}</p>;
+  // 二維清單、array、stack、queue 只有 C++ 有（Scratch 沒有），積木畫不出來
+  if (vars.some(v => isCppOnlyType(v.type))) {
+    return <p className="run_error">{t('Scratch / Blockly 沒有二維清單、array、stack、queue：用到這些的流程圖，請把學習目標換成 C++ 再看程式。', 'Scratch / Blockly have no 2D lists, arrays, stacks or queues. To see this flowchart as code, change the learning goal to C++.')}</p>;
   }
   // 「主流程的a」只有 Scratch 分得出來（Blockly 的參數跟同名變數是同一個）
   const withGlobalRef = mode == 'blockly' && modules.find(m => m.diagram.nodes.some(n => n?.text.includes(GLOBAL_PREFIX)));

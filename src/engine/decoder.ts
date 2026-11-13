@@ -23,13 +23,18 @@ import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, splitRectangle, splitTarget } from './labels';
 import { cppNameProblem, GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
-import { exprType, parseExpr, type Expr, type ExprType, type VarInfo } from './structure';
+import { exprType, parseExpr, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 
 /** 第三步「變數」表格整理出來的變數清單 */
 export interface VarStore {
   var_list: { name: string[]; value: string[] };
-  /** grid：二維清單（只有學習目標是 C++ 時才有） */
-  type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[] };
+  /**
+   * array：清單（C++ 的 vector）和陣列（C++ 的 array，也在 fixed 裡）——都可以用 [索引]。
+   * 只有學習目標是 C++ 時才有：grid 二維清單、fixed 陣列（大小固定，不能加入或刪除）、stack 堆疊、queue 佇列
+   */
+  type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[]; fixed: string[]; stack: string[]; queue: string[] };
+  /** 陣列的大小（變數表填的） */
+  sizes?: Record<string, string>;
   /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用） */
   params?: string[];
   /** 參數不能存值進去（Scratch 的自訂積木參數不能改；Blockly、C++ 可以） */
@@ -45,8 +50,55 @@ export interface VarStore {
 /** 區域變數照型別分好（給下拉選單、型別檢查用） */
 export function localTypes(locals: LocalVar[] = []): VarStore['type_var_list'] {
   const named = locals.filter(v => v.name.trim() != '');
-  const of = (type: LocalVar['type']) => named.filter(v => v.type == type).map(v => v.name.trim());
-  return { number: of('數字'), text: of('文字'), array: of('清單'), grid: of('二維清單') };
+  const of = (type: VarType) => named.filter(v => v.type == type).map(v => v.name.trim());
+  return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列') };
+}
+
+/** 變數表的每一列（名稱、型別）→ 依型別分好的名稱 */
+export function typeLists(rows: { name: string; type: VarType }[]): VarStore['type_var_list'] {
+  const of = (type: VarType) => rows.filter(r => r.type == type).map(r => r.name);
+  return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列') };
+}
+
+/** 兩組依型別分好的名稱接起來 */
+export function joinTypes(a: VarStore['type_var_list'], b: VarStore['type_var_list']): VarStore['type_var_list'] {
+  return {
+    number: [...a.number, ...b.number], text: [...a.text, ...b.text], array: [...a.array, ...b.array], grid: [...a.grid, ...b.grid],
+    fixed: [...a.fixed, ...b.fixed], stack: [...a.stack, ...b.stack], queue: [...a.queue, ...b.queue],
+  };
+}
+
+/** 每一種依型別分好的名稱都套用 f（例如把模組裡看不到的拿掉） */
+export function mapTypes(a: VarStore['type_var_list'], f: (list: string[]) => string[]): VarStore['type_var_list'] {
+  return { number: f(a.number), text: f(a.text), array: f(a.array), grid: f(a.grid), fixed: f(a.fixed), stack: f(a.stack), queue: f(a.queue) };
+}
+
+/**
+ * C++ 容器在算式裡可以用的函式（點了對話框的按鈕就填進去，不用自己打）：
+ * stack：top() 最上面那個、size()、empty()；queue：front() 最前面、back() 最後面、size()、empty()；
+ * vector：size()、empty()（array 的大小是固定的，沒有這些函式）
+ */
+export const METHODS = {
+  stack: ['top', 'size', 'empty'],
+  queue: ['front', 'back', 'size', 'empty'],
+  vector: ['size', 'empty'],
+} as const;
+
+/** 這個名稱是哪一種容器（用來決定可以用哪些函式）；不是容器回傳 null */
+export function containerKind(vars: VarStore, name: string): 'stack' | 'queue' | 'vector' | 'array' | 'grid' | null {
+  const ty = vars.type_var_list;
+  return ty.stack.includes(name) ? 'stack' : ty.queue.includes(name) ? 'queue' : ty.fixed.includes(name) ? 'array'
+    : ty.array.includes(name) ? 'vector' : ty.grid.includes(name) ? 'grid' : null;
+}
+
+/** C++ 型別的名稱（給學生看的說明用），例如 stack<int> */
+export function cppContainerName(vars: VarStore, name: string): string {
+  const holds = vars.var_list.value[vars.var_list.name.indexOf(name)];
+  const elem = holds == '文字' ? 'string' : holds == '小數' ? 'float' : 'int';
+  const kind = containerKind(vars, name);
+  if (kind == 'array') return `${elem} ${name}[${vars.sizes?.[name] ?? ''}]`;
+  if (kind == 'grid') return `vector<vector<${elem}>>`;
+  return `${kind ?? 'vector'}<${elem}>`;
 }
 
 /**
@@ -73,12 +125,12 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
       name: [...globalNames, ...named.map(v => v.name.trim())],
       value: [...globalNames.map(valueOf), ...named.map(v => v.init)],
     },
-    type_var_list: {
-      number: [...g(vars.type_var_list.number), ...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
-      text: [...g(vars.type_var_list.text), ...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
-      array: [...g(vars.type_var_list.array), ...lt.array],
-      grid: [...g(vars.type_var_list.grid), ...lt.grid],
-    },
+    type_var_list: joinTypes(mapTypes(vars.type_var_list, g), {
+      ...lt,
+      number: [...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
+      text: [...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
+    }),
+    sizes: { ...vars.sizes, ...Object.fromEntries(named.filter(v => v.type == '陣列').map(v => [v.name.trim(), v.size ?? ''])) },
     params: params.map(p => p.name),
     paramsReadOnly: getTarget() == 'scratch',
     locals: named.map(v => v.name.trim()),
@@ -89,7 +141,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
 
 export const createVarStore = (): VarStore => ({
   var_list: { name: [], value: [] },
-  type_var_list: { number: [], text: [], array: [], grid: [] },
+  type_var_list: { number: [], text: [], array: [], grid: [], fixed: [], stack: [], queue: [] },
 });
 
 const isNumeric = (s: string) => !isNaN(parseFloat(s)) && isFinite(s as unknown as number);
@@ -135,8 +187,7 @@ function listItemTarget(str: string): { list: string; index: string } | null {
 export function checkVar(vars: VarStore, str: string | undefined, can_number: boolean): boolean {
   if (!str || !str.trim()) return false;
   const { type_var_list } = vars;
-  const defined = (name: string) =>
-    type_var_list.number.includes(name) || type_var_list.text.includes(name) || type_var_list.array.includes(name) || type_var_list.grid.includes(name);
+  const defined = (name: string) => Object.values(type_var_list).some(list => list.includes(name));
 
   if (!can_number) {
     if (vars.paramsReadOnly && vars.params?.includes(str.trim())) {
@@ -169,9 +220,45 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     alert(t(`「${str.trim()}」不是變數：請填一個在變數表裡的變數名稱。`, `"${str.trim()}" is not a variable. Write a variable name from the variable table.`));
     return false;
   }
-  for (const tk of tokenize(str)) {
+  const tokens = tokenize(str);
+  for (const [k, tk] of tokens.entries()) {
+    // s.top()：點後面的名稱是容器的函式
+    if (tk.text == '.' && tk.type == 'op') {
+      if (!methodOk(vars, tokens, k)) return false;
+      continue;
+    }
+    if (tokens[k - 1]?.text == '.' && tokens[k - 1].type == 'op') continue;
     if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || isFunc(tk.text) || vars.calls?.includes(tk.text)) continue;
     alert(t(`「${tk.text}」沒有定義：請先在變數表新增這個變數。如果是文字，要用 "雙引號" 括起來。`, `"${tk.text}" is not a variable yet. Add it to the variable table first. For words, use "quotes".`));
+    return false;
+  }
+  return true;
+}
+
+/** 容器可以用的函式，寫成說明用的一串，例如 s.top()、s.size()、s.empty() */
+const methodList = (name: string, kind: keyof typeof METHODS) => METHODS[kind].map(m => `${name}.${m}()`).join(t('、', ', '));
+
+/** 算式裡 tokens[k] 是一個點：前面要是容器，後面要是它有的函式再接 ( )；不行時跳出提示 */
+function methodOk(vars: VarStore, tokens: Token[], k: number): boolean {
+  const obj = tokens[k - 1];
+  const method = tokens[k + 1];
+  const kind = obj?.type == 'name' ? containerKind(vars, obj.text) : null;
+  if (!obj || obj.type != 'name' || !kind || kind == 'grid') {
+    alert(t(`「.」前面要是 vector、stack 或 queue，例如 s.top()。`, `Put a vector, stack or queue before ".", like s.top().`));
+    return false;
+  }
+  if (kind == 'array') {
+    alert(t(`「${obj.text}」是 array（陣列）：大小是固定的 ${vars.sizes?.[obj.text] ?? ''}，沒有 .${method?.text ?? ''}() 這種函式。要用第幾格請寫 ${obj.text}[索引]。`, `"${obj.text}" is an array. Its size is fixed (${vars.sizes?.[obj.text] ?? ''}), so it has no .${method?.text ?? ''}(). Use ${obj.text}[index] to get one item.`));
+    return false;
+  }
+  const allowed: readonly string[] = METHODS[kind];
+  const kindName = kind == 'vector' ? 'vector' : kind;
+  if (method?.type != 'name' || !allowed.includes(method.text)) {
+    alert(t(`「${obj.text}」是 ${kindName}，可以用：${methodList(obj.text, kind)}。`, `"${obj.text}" is a ${kindName}. You can use: ${methodList(obj.text, kind)}.`));
+    return false;
+  }
+  if (tokens[k + 2]?.text != '(' || tokens[k + 3]?.text != ')') {
+    alert(t(`${obj.text}.${method.text} 後面要加上 ( )，寫成 ${obj.text}.${method.text}()。`, `Add ( ) after ${obj.text}.${method.text}: write ${obj.text}.${method.text}().`));
     return false;
   }
   return true;
@@ -252,7 +339,8 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
     const fix = elem == 'string' && type == 'num'
       ? t(`要放文字請加上引號，例如 "${v}"。`, `For text, add quotes, like "${v}".`)
       : t(`請改放${elem == 'string' ? '文字' : '數字'}，或到第三步把清單改成裝 ${type == 'num' ? 'int / float' : 'string'}。`, `Put ${elem == 'string' ? 'text' : 'a number'} instead, or change what the list holds (step 3).`);
-    alert(t(`清單「${target}」是 vector<${elem}>，只能放${elem == 'string' ? '文字' : '數字'}，但「${v}」是${what}。${fix}`, `"${target}" is a vector<${elem}>, so it holds ${elem == 'string' ? 'text' : 'numbers'} only, but "${v}" is ${what}. ${fix}`));
+    const kind = cppContainerName(vars, target);
+    alert(t(`「${target}」是 ${kind}，只能放${elem == 'string' ? '文字' : '數字'}，但「${v}」是${what}。${fix}`, `"${target}" is ${kind}, so it holds ${elem == 'string' ? 'text' : 'numbers'} only, but "${v}" is ${what}. ${fix}`));
     return false;
   }
   return true;
@@ -266,6 +354,9 @@ function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   add(vars.type_var_list.text, '文字');
   add(vars.type_var_list.array, '清單');
   add(vars.type_var_list.grid, '二維清單');
+  add(vars.type_var_list.fixed, '陣列');
+  add(vars.type_var_list.stack, '堆疊');
+  add(vars.type_var_list.queue, '佇列');
   return map;
 }
 
@@ -355,6 +446,9 @@ const runtimeMessages = () => ({
   gridCol: t('二維清單「{name}」每列有 {len} 行，行的索引只能是 0 到 {max}，沒有索引 {k}。', 'The 2D list "{name}" has {len} columns. The column index must be 0 to {max}. There is no column {k}.'),
   gridSize: t('二維清單「{name}」的列數和行數要是 0 以上的整數，現在是 {r} 列 {c} 行。', 'The rows and columns of "{name}" must be whole numbers 0 or more. Now it is {r} × {c}.'),
   notGrid: t('「{name}」不是二維清單，不能用 [列][行]。', '"{name}" is not a 2D list. You cannot use [row][column].'),
+  stackEmpty: t('stack「{name}」是空的，不能用 {m}()：裡面要先有東西（push），可以先用 {name}.empty() 檢查是不是空的。', 'The stack "{name}" is empty, so you cannot use {m}(). Push something first, or check with {name}.empty().'),
+  queueEmpty: t('queue「{name}」是空的，不能用 {m}()：裡面要先有東西（push），可以先用 {name}.empty() 檢查是不是空的。', 'The queue "{name}" is empty, so you cannot use {m}(). Push something first, or check with {name}.empty().'),
+  fixedRange: t('array「{name}」有 {len} 格，索引只能是 0 到 {max}，沒有索引 {k}（array 的大小是固定的，不會自己變大）。', 'The array "{name}" has {len} items. The index must be 0 to {max}. There is no index {k}. (An array has a fixed size.)'),
   noReturn: t('模組「{name}」要回傳值，可是這次走到「結束」都沒有經過「回傳」：每一條路在「結束」前都要有「回傳」。', 'The module "{name}" must return a value, but it reached "End" without "Return". Every path needs a "Return" before "End".'),
   argCount: t('執行模組「{name}」時給了 {got} 個值，可是它有 {n} 個參數。', 'The module "{name}" got {got} values, but it has {n} parameters.'),
   tooDeep: t('模組一直執行自己（或互相執行）停不下來：檢查模組裡是不是在某個時候就不再執行自己。', 'A module keeps running itself and never stops. Check that it stops at some point.'),
@@ -416,7 +510,8 @@ function __index(list, name, i, k) {
   var isText = typeof list == 'string';
   if (!Array.isArray(list) && !isText) __err('notList', i, { name: name });
   if (!(Number.isInteger(k) && k >= __BASE && k < list.length + __BASE)) {
-    var key = isText ? (list.length ? 'textOutOfRange' : 'emptyText') : (list.length ? 'outOfRange' : 'emptyList');
+    // C++ 的 array（__FIXED 是 array 的名稱）：大小固定，說明不一樣
+    var key = isText ? (list.length ? 'textOutOfRange' : 'emptyText') : __FIXED[name] ? 'fixedRange' : (list.length ? 'outOfRange' : 'emptyList');
     __err(key, i, { name: name, len: list.length, max: list.length - 1 + __BASE, k: k });
   }
   return k - __BASE;
@@ -480,8 +575,21 @@ function __grid(name, i, r, c, fill) {
   for (var k = 0; k < r; k++) { var row = []; for (var j = 0; j < c; j++) row.push(fill); g.push(row); }
   return g;
 }
+// C++ 的 stack、queue（都用陣列存：stack 最後一個是頂端；queue 第一個是最前面）
+function __method(c, name, i, m, kind) {
+  if (m == 'size') return c.length;
+  if (m == 'empty') return c.length == 0;
+  if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : 'queueEmpty', i, { name: name, m: m });
+  return m == 'front' ? c[0] : c[c.length - 1];
+}
+function __pop(c, name, i, kind) {
+  if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : 'queueEmpty', i, { name: name, m: 'pop' });
+  if (kind == 'stack') c.pop(); else c.shift();
+}
 // 輸出清單：一項一項用空白隔開；二維清單一列一行
 function __show(v) {
+  // C++ 的 cout 印 true / false 是 1 / 0（例如 s.empty()）
+  if (typeof v == 'boolean' && __BASE == 0) return v ? 1 : 0;
   if (!Array.isArray(v)) return v;
   if (v.length && Array.isArray(v[0])) return v.map(function (row) { return row.join(' '); }).join('\\n');
   return v.join(' ');
@@ -551,6 +659,16 @@ class CodeGenerator {
     return this.vars.type_var_list.array.includes(name);
   }
 
+  /** C++ 的 array：大小固定，不能加入、插入、刪除 */
+  private isFixed(name: string) {
+    return this.vars.type_var_list.fixed.includes(name);
+  }
+
+  /** C++ 的 stack、queue：只能從一端放入、取出 */
+  private containerKind(name: string): 'stack' | 'queue' | null {
+    return this.vars.type_var_list.stack.includes(name) ? 'stack' : this.vars.type_var_list.queue.includes(name) ? 'queue' : null;
+  }
+
   /** 變數後面接 [ ] 一律交給 __at/__set 檢查：清單是第幾項、文字是第幾個字，數字會提示不能用 */
   private isVar(name: string) {
     return this.vars.var_list.name.includes(name);
@@ -575,7 +693,7 @@ class CodeGenerator {
    * Scratch、Blockly 的清單什麼都能放，照原樣
    */
   private item(list: string, value: string, i: number) {
-    if (getTarget() != 'cpp' || !(this.isList(list) || this.isGrid(list))) return value;
+    if (getTarget() != 'cpp' || !(this.isList(list) || this.isGrid(list) || this.containerKind(list))) return value;
     const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
     const elem = holds == '文字' ? 'string' : holds == '小數' ? 'float' : 'int';
     return `__listItem(${value}, ${i}, ${JSON.stringify(list)}, ${JSON.stringify(elem)})`;
@@ -601,10 +719,11 @@ class CodeGenerator {
   /** 學生寫的運算式 → JavaScript：清單或文字[第幾項]、二維清單[列][行]、長度(清單或文字)、判斷式的 and/or/= */
   /** C++：運算式是不是整數（int）——整數 / 整數 要照 C++ 去掉小數 */
   private isIntExpr(e: Expr): boolean {
-    const { array, grid } = this.vars.type_var_list;
-    const holdsInt = (name: string) => (array.includes(name) || grid.includes(name)) && this.vars.var_list.value[this.vars.var_list.name.indexOf(name)] == '數字';
+    const { array, grid, stack, queue } = this.vars.type_var_list;
+    const holdsInt = (name: string) => (array.includes(name) || grid.includes(name) || stack.includes(name) || queue.includes(name)) && this.vars.var_list.value[this.vars.var_list.name.indexOf(name)] == '數字';
     switch (e.t) {
       case 'num': return !e.v.includes('.');
+      case 'method': return e.name == 'size' || (e.name != 'empty' && e.obj.t == 'var' && holdsInt(e.obj.name));
       case 'var': return this.isIntVar(e.name);
       case 'idx':
         if (e.obj.t == 'var') return array.includes(e.obj.name) && holdsInt(e.obj.name);
@@ -642,6 +761,7 @@ class CodeGenerator {
           }
           break;
         case 'idx': visit(e.obj); visit(e.index); break;
+        case 'method': visit(e.obj); break;
         case 'call': case 'fcall': e.args.forEach(visit); break;
         case 'neg': case 'not': visit(e.a); break;
       }
@@ -658,10 +778,19 @@ class CodeGenerator {
     let secondBracket = false;
     let out = '';
     let prevWord = false;
-    tokens.forEach((t, k) => {
+    for (let k = 0; k < tokens.length; k++) {
+      const t = tokens[k];
       const word = t.type != 'op';
       let piece = t.text;
-      if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '[') {
+      /** s.top() 這種寫法一次用掉後面幾個 token（. 名稱 ( )） */
+      let skip = 0;
+      const method = tokens[k + 2];
+      if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '.' && method?.type == 'name' && tokens[k + 3]?.text == '(' && tokens[k + 4]?.text == ')') {
+        const kind = this.vars.type_var_list.stack.includes(t.text) ? 'stack' : this.vars.type_var_list.queue.includes(t.text) ? 'queue' : 'vector';
+        piece = `__method(${t.text}, ${JSON.stringify(t.text)}, ${i}, ${JSON.stringify(method.text)}, ${JSON.stringify(kind)})`;
+        skip = 4;
+      }
+      else if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '[') {
         piece = this.isCell(tokens, k + 1)
           ? `__at2(${t.text}, ${JSON.stringify(t.text)}, ${i}, `
           : `__at(${t.text}, ${JSON.stringify(t.text)}, ${i}, `;
@@ -696,10 +825,14 @@ class CodeGenerator {
       }
       // C++ 的整數除法：a / b → __idiv(a, b, 積木編號)
       if (div.ops.has(k)) piece = ', ';
-      piece = '__idiv('.repeat(div.open.get(k) ?? 0) + piece + `, ${i})`.repeat(div.close.get(k) ?? 0);
+      // 用掉的 token 上如果有整數除法的結尾，也要補上
+      let closes = 0;
+      for (let j = k; j <= k + skip; j++) closes += div.close.get(j) ?? 0;
+      piece = '__idiv('.repeat(div.open.get(k) ?? 0) + piece + `, ${i})`.repeat(closes);
       out += (word && prevWord ? ' ' : '') + piece;
-      prevWord = word && !div.close.has(k);
-    });
+      prevWord = word && closes == 0;
+      k += skip;
+    }
     // 長度( )、項目編號( )、包含( ) 要把積木編號傳進去，錯誤時才能標出積木
     out = out.replace(/__(len|find|has)\(/g, `__$1_${i}(`);
     return condition ? toCondition(out) : out;
@@ -821,13 +954,20 @@ class CodeGenerator {
             const list = JSON.stringify(item.list);
             code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), ${this.item(item.list, `${this.listReader(item.list)}(input_list, ${i}, ${list})`, i)});\n`;
           }
-          else if (this.isList(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
+          else if (this.isFixed(v)) {
+            this.fail(t(`${label(node)}：「${v}」是 array，大小是固定的，不能把值加到最後面。請雙擊積木，選要存到第幾格（索引）。`, `${label(node)}: "${v}" is an array with a fixed size. You cannot add to the end. Double-click the block and choose an index.`), node);
+          }
+          // stack、queue：輸入的值 push 進去
+          else if (this.isList(v) || this.containerKind(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
           else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
           // C++ 的 int：讀到小數時小數去掉
           else code = `${v} = ${this.isIntVar(v) ? 'Math.trunc' : ''}(__inNum(input_list, ${i}, ${name}));\n`;
         }
         else {
-          code = 'output_result += (__show(' + expr(parts.slice(1).join(' ')) + ') + "\\n");\n';
+          const what = parts.slice(1).join(' ').trim();
+          // 輸出整個 stack：跟 C++ 一樣從頂端（最後放進去的）開始一個一個拿出來
+          const shown = this.containerKind(what) == 'stack' ? `${what}.slice().reverse()` : expr(what);
+          code = 'output_result += (__show(' + shown + ') + "\\n");\n';
         }
         this.checkSyntax(node, code);
         return { code: code + 'total_step ++;\n' + update, next: this.nextOf(node) };
@@ -877,7 +1017,20 @@ class CodeGenerator {
           return { code: code + 'total_step ++;' + update, next };
         }
         const name = JSON.stringify(target);
-        const code = action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
+        const kind = this.containerKind(target);
+        // array 大小固定；stack、queue 只能 push、pop（積木是用對話框選的，這裡擋舊作品或型別改過的情況）
+        if (this.isFixed(target) && ['加入', '插入', '刪除', '清空'].includes(action)) {
+          this.fail(t(`${label(node)}：「${target}」是 array，大小是固定的，不能加入、插入或刪除，只能替換某一格。`, `${label(node)}: "${target}" is an array with a fixed size. You cannot add, insert or delete. You can only change one item.`), node);
+        }
+        if (kind && action != '放入' && action != '取出') {
+          this.fail(t(`${label(node)}：「${target}」是 ${kind}，只能用 push（放入）和 pop（取出）。請雙擊積木重新選。`, `${label(node)}: "${target}" is a ${kind}. You can only push and pop. Double-click the block to choose again.`), node);
+        }
+        if (!kind && (action == '放入' || action == '取出')) {
+          this.fail(t(`${label(node)}：「${target}」不是 stack 或 queue，不能 push、pop。請雙擊積木重新選。`, `${label(node)}: "${target}" is not a stack or queue, so it cannot push or pop. Double-click the block to choose again.`), node);
+        }
+        const code = action == '放入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
+          : action == '取出' ? `__pop(${target}, ${name}, ${i}, ${JSON.stringify(kind)});\n`
+          : action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
           : action == '插入' ? `__insert(${target}, ${name}, ${i}, (${expr(index)}), ${this.item(target, value, i)});\n`
           : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
           : action == '清空' ? `__clear(${target}, ${name}, ${i});\n`
@@ -986,7 +1139,15 @@ export interface RunResult {
 
 /** 變數的初始值：清單一開始是空的；文字變數沒加引號時自動加上；數字變數要是數字 */
 function initialValue(vars: VarStore, name: string, raw: string | undefined): string {
-  if (vars.type_var_list.array.includes(name) || vars.type_var_list.grid.includes(name)) return '[]';
+  // C++ 的 array：一開始就有固定的格數，每格是 0（裝 string 的是空的文字），跟 int a[5] = {}; 一樣
+  if (vars.type_var_list.fixed.includes(name)) {
+    const size = (vars.sizes?.[name] ?? '').trim();
+    if (!/^\d+$/.test(size) || Number(size) < 1 || Number(size) > 1000) {
+      throw new FlowError(t(`array「${name}」的大小要是 1 到 1000 的整數，現在是「${size}」：請到第三步的變數表修改。`, `The size of the array "${name}" must be a whole number from 1 to 1000. Now it is "${size}". Change it in the variable table (step 3).`));
+    }
+    return `Array(${Number(size)}).fill(${raw == '文字' ? '""' : '0'})`;
+  }
+  if (vars.type_var_list.array.includes(name) || vars.type_var_list.grid.includes(name) || vars.type_var_list.stack.includes(name) || vars.type_var_list.queue.includes(name)) return '[]';
   const value = (raw ?? '').trim();
   if (vars.type_var_list.text.includes(name)) {
     return /^(".*"|'.*')$/.test(value) ? value : JSON.stringify(value);
@@ -1006,6 +1167,9 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
 
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');
+  // 兩個變數同名（舊作品，或匯入的作品）：流程圖上分不出是哪一個
+  const twice = names.find((n, k) => names.indexOf(n) != k);
+  if (twice) throw new FlowError(t(`變數表裡有兩個變數都叫「${twice}」：流程圖上分不出是哪一個，請到第三步把其中一個改名。`, `Two variables are both called "${twice}". You cannot tell them apart in the flowchart. Rename one of them in step 3.`));
   // C++：名稱只能用英文（舊作品、從別的語言換過來的還留著中文名稱時，在這裡說明）
   const cppNames: [string, string][] = [
     ...names.map(n => [t('變數', 'Variable'), n] as [string, string]),
@@ -1052,6 +1216,8 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
   let code = 'var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = 20000;\nvar __depth = 0;\nvar __stack = [];\nvar __frames = [];\n';
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
+  const fixedNames = [...vars.type_var_list.fixed, ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列').map(v => v.name.trim()))];
+  code += 'var __FIXED = ' + JSON.stringify(Object.fromEntries(fixedNames.map(n => [n, true]))) + ';\n';
   code += runtime();
   for (const name of names) {
     const decl = 'var ' + name + ' = ' + initialValue(vars, name, vars.var_list.value[vars.var_list.name.indexOf(name)]) + '\n';

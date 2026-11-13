@@ -41,6 +41,7 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     case 'var': return e.name;
     case 'raw': return e.text;
     case 'idx': return `${exprText(e.obj, cond, 9)}[${exprText(e.index, cond)}]`;
+    case 'method': return `${exprText(e.obj, cond, 9)}.${e.name}()`;
     case 'fcall': return `${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     case 'neg': return `-${exprText(e.a, cond, 7)}`;
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
@@ -109,6 +110,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
           清空: ` ${s.target} 刪除所有項目`,
           建立: ` ${s.target} 建立 ${k} 列 ${k2} 行`,
           回傳: ` 回傳 ${v}`,
+          放入: ` ${s.target} 放入 ${v}`,
+          取出: ` ${s.target} 取出`,
         }[s.action] + (ROUNDING_TEXT[s.round] ?? '');
         return { kind: 'node', node: node(text, 'Rectangle', s.round) };
       }

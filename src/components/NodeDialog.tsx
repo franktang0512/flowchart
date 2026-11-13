@@ -1,7 +1,7 @@
 // 新增/編輯積木、選箭頭標籤、清空流程圖時跳出的對話框（舊版 shapes.js 的 node_model）。
 // 版面要跟舊版一模一樣，所以元素之間的空白（{' '}）與 <p> 的巢狀方式都照舊版 HTML 被瀏覽器解析後的結果。
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { localTypes, type VarStore } from '../engine/decoder';
+import { joinTypes, localTypes, mapTypes, METHODS, type VarStore } from '../engine/decoder';
 import type { RectAction } from '../engine/labels';
 import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
@@ -30,7 +30,7 @@ export interface DialogForm {
    * 接收（執行有回傳值的模組，把回傳值存進變數：「a 設為 aaa(x)」，模組和參數用 moduleName、moduleArgs）；
    * '' = 還沒選。選了清單、二維清單再選 rectAction（添加、插入…）
    */
-  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收';
+  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列';
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 變數：true 是「改變」（Scratch「變數改變」、Blockly「將變數的值加」），code 填加多少；存成「x 設為 x + 多少」 */
@@ -40,7 +40,7 @@ export interface DialogForm {
   /** 二維清單：第幾行（建立時是幾行） */
   rectIndex2: string;
   /** 輸入積木要存到變數、清單還是二維清單的一格；'' = 還沒選（先選類型才出現下拉選單） */
-  ioTarget: '' | '變數' | '清單' | '二維清單';
+  ioTarget: '' | '變數' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列';
   /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
   ioPlace: '加入' | '插入' | '替換';
   /** 輸出積木輸出什麼：'' 是變數或字串（自己打）；'回傳' 是執行有回傳值的模組、輸出回傳值（moduleName、moduleArgs） */
@@ -62,6 +62,9 @@ const RECT_ACTIONS: [RectAction, () => string][] = [
   ['建立', () => t('建立二維清單', 'Make 2D list')],
   // 只有在有回傳值的模組裡才出現
   ['回傳', () => t('回傳', 'Return')],
+  // stack、queue（C++）
+  ['放入', () => t('push（放進去）', 'push')],
+  ['取出', () => t('pop（拿掉一個）', 'pop')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
@@ -73,6 +76,8 @@ const RECT_HINT: Record<RectAction, () => string> = {
   清空: () => t('刪除清單的所有項目，清單會變成空的...', 'Delete all items. The list will be empty...'),
   建立: () => t('設定二維清單有幾列、幾行，每一格先放 0（裝文字的放空的文字）...', 'Set how many rows and columns. Every cell starts as 0 (or empty text)...'),
   回傳: () => t('把這個值交回給執行模組的地方，然後離開模組（後面直接接「結束」）...', 'Give this value back and leave the module (go straight to "End")...'),
+  放入: () => t('push：把值放進 stack（放在最上面），或放進 queue（排在最後面）...', 'push: put a value on top of a stack, or at the back of a queue...'),
+  取出: () => t('pop：拿掉 stack 最上面的，或 queue 最前面的（要先確定裡面不是空的）。要用那個值，請先用 top() 或 front() 讀出來...', 'pop: remove the top of a stack, or the front of a queue (it must not be empty). To use the value, read it first with top() or front()...'),
 };
 
 /** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
@@ -85,6 +90,8 @@ const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   清空: null,
   建立: () => t('列數', 'Rows'),
   回傳: null,
+  放入: null,
+  取出: null,
 };
 
 /** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
@@ -100,6 +107,8 @@ const RECT_VERB: Record<RectAction, (() => string) | null> = {
   清空: null,
   建立: null,
   回傳: () => t('回傳', 'return'),
+  放入: () => 'push',
+  取出: null,
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -191,6 +200,67 @@ function VarPicker({ id, value, onChange, names, params = [], locals = [] }: { i
   );
 }
 
+/** vector（可以變長變短的清單）：清單裡拿掉 array（array 也可以用 [索引]，但大小固定） */
+const vectorsOf = (ty: VarTypes) => ty.array.filter(n => !ty.fixed.includes(n));
+
+/** 算式欄位下面「點一下填入」的說明 */
+const SNIPPET_HINT: Record<string, () => string> = {
+  top: () => t('stack 最上面的值（最後放進去的）', 'The top of the stack (the last one in)'),
+  front: () => t('queue 最前面的值（最早放進去的）', 'The front of the queue (the first one in)'),
+  back: () => t('queue 最後面的值（最後放進去的）', 'The back of the queue (the last one in)'),
+  size: () => t('裡面有幾個', 'How many items'),
+  empty: () => t('是不是空的（真／假）', 'Is it empty? (true / false)'),
+  index: () => t('某一格：在 [ ] 裡填索引（從 0 開始）', 'One item: put the index (from 0) in [ ]'),
+};
+
+/**
+ * 算式欄位下面的「點一下填入」（只有 C++）：選一個 vector、array、stack 或 queue，
+ * 點按鈕就把 s.top()、q.front()、v.size()、a[ ] 這些寫法填到游標的位置，不用自己打。
+ * inputId 是要填進去的輸入框（記得游標在哪裡）
+ */
+function ExprHelper({ inputId, types, value, onChange }: { inputId: string; types: VarTypes; value: string; onChange: (v: string) => void }) {
+  const items: [string, keyof typeof METHODS | 'array'][] = [
+    ...types.stack.map(n => [n, 'stack'] as [string, 'stack']),
+    ...types.queue.map(n => [n, 'queue'] as [string, 'queue']),
+    ...vectorsOf(types).map(n => [n, 'vector'] as [string, 'vector']),
+    ...types.fixed.map(n => [n, 'array'] as [string, 'array']),
+  ];
+  const [pick, setPick] = useState(items[0]?.[0] ?? '');
+  if (getTarget() != 'cpp' || !items.length) return null;
+  const [name, kind] = items.find(x => x[0] == pick) ?? items[0];
+  const snippets: [string, string][] = [
+    ...(kind == 'array' ? [] : METHODS[kind].map(m => [m, `${name}.${m}()`] as [string, string])),
+    ...(kind == 'array' || kind == 'vector' ? [['index', `${name}[]`] as [string, string]] : []),
+  ];
+  const insert = (snippet: string) => {
+    const el = document.getElementById(inputId) as HTMLInputElement | null;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? start;
+    onChange(value.slice(0, start) + snippet + value.slice(end));
+    // a[ ]：游標放在中括號裡面，接著打索引
+    const caret = start + (snippet.endsWith('[]') ? snippet.length - 1 : snippet.length);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
+  };
+  return (
+    <p className="expr_helper">
+      <span className="muted">{t('點一下填入：', 'Click to insert: ')}</span>
+      {items.length > 1 && (
+        <select className="var_select" value={name} onChange={e => setPick(e.target.value)} aria-label={t('選一個容器', 'Choose a container')}>
+          {items.map(([n, k]) => <option key={n} value={n}>{n}（{k}）</option>)}
+        </select>
+      )}
+      {snippets.map(([key, snippet]) => (
+        <button type="button" key={key} className="snippet" title={SNIPPET_HINT[key]()} onClick={() => insert(snippet)}>
+          {snippet.endsWith('[]') ? `${name}[ ]` : snippet}
+        </button>
+      ))}
+    </p>
+  );
+}
+
 /** 輸入到清單時，下面那行說明 */
 const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string> = {
   加入: list => t(`輸入的值會添加到清單「${list}」的最後面`, `The value goes to the end of the list "${list}".`),
@@ -235,18 +305,15 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
   const shown = (list: string[]) => (!request.inModule ? list
     : target == 'cpp' ? []
     : list.flatMap(n => (!own.has(n) ? [n] : target == 'scratch' ? [GLOBAL_PREFIX + n] : [])));
-  varTypes = { number: shown(varTypes.number), text: shown(varTypes.text), array: shown(varTypes.array), grid: shown(varTypes.grid) };
-  const allTypes: VarTypes = {
-    number: [...varTypes.number, ...localT.number],
-    text: [...varTypes.text, ...localT.text],
-    array: [...varTypes.array, ...localT.array],
-    grid: [...varTypes.grid, ...localT.grid],
-  };
+  varTypes = mapTypes(varTypes, shown);
+  const allTypes: VarTypes = joinTypes(varTypes, localT);
   const [f, setF] = useState<DialogForm>(() => {
     const form = { ...defaultForm(kind), ...request.initial };
     // 打開已經畫好的輸入積木：依變數表判斷原本存到變數還是清單
     if (form.radio == '輸入' && !form.ioTarget && form.varSelect) {
-      form.ioTarget = allTypes.grid.includes(form.varSelect) ? '二維清單' : form.ioPlace != '加入' || allTypes.array.includes(form.varSelect) ? '清單' : '變數';
+      const v = form.varSelect;
+      form.ioTarget = allTypes.grid.includes(v) ? '二維清單' : allTypes.fixed.includes(v) ? '陣列' : allTypes.stack.includes(v) ? '堆疊' : allTypes.queue.includes(v) ? '佇列'
+        : form.ioPlace != '加入' || allTypes.array.includes(v) ? '清單' : '變數';
     }
     return form;
   });
@@ -254,7 +321,17 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
   /** 在模組裡：這個模組的參數（數字、文字都可以設定） */
   const paramNames = (request.params ?? []).map(p => p.name);
   /** 輸入積木「存到」選的那一類變數 */
-  const ioNames = (ty: VarTypes) => (f.ioTarget == '清單' ? ty.array : f.ioTarget == '二維清單' ? ty.grid : [...ty.number, ...ty.text]);
+  const ioNames = (ty: VarTypes) => (f.ioTarget == '清單' ? vectorsOf(ty) : f.ioTarget == '二維清單' ? ty.grid
+    : f.ioTarget == '陣列' ? ty.fixed : f.ioTarget == '堆疊' ? ty.stack : f.ioTarget == '佇列' ? ty.queue
+    : [...ty.number, ...ty.text]);
+  /** C++ 的容器在選項上的名字（積木還是叫「清單」） */
+  const listWord = byTarget(t('清單', 'List'), 'vector');
+  /** 只有變數表裡有這種容器（或原本就選了）才列出來 */
+  const hasKind = (k: 'fixed' | 'stack' | 'queue', chosen: boolean) => allTypes[k].length > 0 || chosen;
+  /** 算式欄位下面的「點一下填入」 */
+  const helper = (inputId: string, value: string, onChange: (v: string) => void) => (
+    <ExprHelper inputId={inputId} types={allTypes} value={value} onChange={onChange} />
+  );
 
   const yes = () => {
     if (request.onYes(f)) onClose();
@@ -342,9 +419,18 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                 <p className="io_choice">
                   {t('存到：', 'Save to: ')}
                   <label><input type="radio" name="io_target" checked={f.ioTarget == '變數'} onChange={() => set({ ioTarget: '變數', varSelect: '' })} />{t('變數', 'Variable')}</label>
-                  <label><input type="radio" name="io_target" checked={f.ioTarget == '清單'} onChange={() => set({ ioTarget: '清單', varSelect: '' })} />{t('清單', 'List')}</label>
+                  <label><input type="radio" name="io_target" checked={f.ioTarget == '清單'} onChange={() => set({ ioTarget: '清單', varSelect: '' })} />{listWord}</label>
                   {(allTypes.grid.length > 0 || f.ioTarget == '二維清單') && (
                     <label><input type="radio" name="io_target" checked={f.ioTarget == '二維清單'} onChange={() => set({ ioTarget: '二維清單', varSelect: '' })} />{t('二維清單的一格', 'A 2D list cell')}</label>
+                  )}
+                  {hasKind('fixed', f.ioTarget == '陣列') && (
+                    <label><input type="radio" name="io_target" checked={f.ioTarget == '陣列'} onChange={() => set({ ioTarget: '陣列', ioPlace: '替換', varSelect: '' })} />{t('array 的一格', 'An array item')}</label>
+                  )}
+                  {hasKind('stack', f.ioTarget == '堆疊') && (
+                    <label><input type="radio" name="io_target" checked={f.ioTarget == '堆疊'} onChange={() => set({ ioTarget: '堆疊', ioPlace: '加入', varSelect: '' })} />stack</label>
+                  )}
+                  {hasKind('queue', f.ioTarget == '佇列') && (
+                    <label><input type="radio" name="io_target" checked={f.ioTarget == '佇列'} onChange={() => set({ ioTarget: '佇列', ioPlace: '加入', varSelect: '' })} />queue</label>
                   )}
                 </p>
                 {f.ioTarget && (
@@ -362,6 +448,19 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                     {t('列（索引）', 'Row index')} <input id="rect_index" style={{ width: '20%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />{' '}
                     {t('行（索引）', 'Column index')} <input id="rect_index2" style={{ width: '20%' }} value={f.rectIndex2} onChange={e => set({ rectIndex2: e.target.value })} />
                   </p>
+                )}
+                {f.ioTarget == '陣列' && (
+                  <>
+                    <p>
+                      {t('索引', 'Index')} <input id="rect_index" style={{ width: '25%' }} value={f.rectIndex} onChange={e => set({ rectIndex: e.target.value })} />
+                    </p>
+                    {f.varSelect && <span className="dialog_note">{t(`輸入的值會存進 array「${f.varSelect}」的索引 ${f.rectIndex.trim() || '?'}`, `The value goes into index ${f.rectIndex.trim() || '?'} of the array "${f.varSelect}".`)}</span>}
+                  </>
+                )}
+                {(f.ioTarget == '堆疊' || f.ioTarget == '佇列') && f.varSelect && (
+                  <span className="dialog_note">{f.ioTarget == '堆疊'
+                    ? t(`輸入的值會 push 到 stack「${f.varSelect}」的最上面`, `The value is pushed on top of the stack "${f.varSelect}".`)
+                    : t(`輸入的值會 push 到 queue「${f.varSelect}」的最後面`, `The value is pushed to the back of the queue "${f.varSelect}".`)}</span>
                 )}
                 {f.ioTarget == '清單' && (
                   <>
@@ -417,6 +516,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
                           onChange={e => set({ varSelectOutput: e.target.value })}
                         />
                       </p>
+                      {helper('var_select_output', f.varSelectOutput, v => set({ varSelectOutput: v }))}
                     </>
                   )}
               </>
@@ -432,6 +532,7 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
         <>
           {conditionHint}{' '}
           {codeInput}{' '}
+          {helper('code', f.code, v => set({ code: v }))}
           <br />{buttons}
         </>
       );
@@ -448,10 +549,12 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           <div id="while_div" style={{ display: f.showWhile ? 'block' : 'none' }}>{' '}
             {conditionHint}{' '}
             {codeInput}{' '}
+            {f.showWhile && helper('code', f.code, v => set({ code: v }))}
           </div>{' '}
           <div id="for_div" style={{ display: f.showWhile ? 'none' : 'block' }}>{' '}
             <p id="hint">{t('請輸入次數', 'How many times?')}</p>{' '}
             <input id="for_number" style={{ width: '80%' }} value={f.forNumber} onChange={e => set({ forNumber: e.target.value })} />{' '}
+            {!f.showWhile && helper('for_number', f.forNumber, v => set({ forNumber: v }))}
           </div>{' '}
           <br />{buttons}
         </>
@@ -488,8 +591,11 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       // 先選要改什麼（變數、清單、二維清單、回傳），清單、二維清單再選怎麼改；每一類可以選的變數
       const kind = f.rectKind;
       const namesFor = (k: DialogForm['rectKind'], ty: VarTypes = allTypes) => (k == '變數' || k == '接收' ? [...ty.number, ...ty.text]
-        : k == '清單' ? ty.array
+        : k == '清單' ? vectorsOf(ty)
         : k == '二維清單' ? ty.grid
+        : k == '陣列' ? ty.fixed
+        : k == '堆疊' ? ty.stack
+        : k == '佇列' ? ty.queue
         : []);
       const cell = kind == '二維清單' && f.rectAction == '替換';
       const indexLabel = !kind ? null : cell ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
@@ -498,14 +604,14 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
       // 有回傳值的模組（Scratch 的模組不能回傳，看不到這個選項）
       const returning = modules.filter(x => x.returns);
       const recvModule = returning.find(x => x.name == f.moduleName);
-      const noLists = allTypes.array.length == 0;
+      const noLists = vectorsOf(allTypes).length == 0;
       /** 變數「改變」：只能選數字變數，值是加多少、沒有捨去進位 */
       const change = kind == '變數' && f.varChange;
       /** 選了一類：動作換成這一類的第一個，原本選的變數不能用就清掉 */
       const pickKind = (k: DialogForm['rectKind']) => set({
         rectKind: k,
         varChange: false,
-        rectAction: k == '變數' || k == '接收' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : '加入',
+        rectAction: k == '變數' || k == '接收' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' ? '替換' : k == '堆疊' || k == '佇列' ? '放入' : '加入',
         ...([...namesFor(k), ...(k == '變數' || k == '接收' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
       });
       const actionRadio = (action: RectAction, label: string) => (
@@ -518,9 +624,18 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
             {t('要改：', 'Change: ')}
             <label><input type="radio" name="rect_kind" checked={kind == '變數'} onChange={() => pickKind('變數')} />{t('變數', 'A variable')}</label>
             <label title={noLists ? t('變數表還沒有清單：要用清單，請先到變數表新增', 'No lists yet. Add one in the variable table first.') : undefined} className={noLists && kind != '清單' ? 'disabled_choice' : undefined}>
-              <input type="radio" name="rect_kind" checked={kind == '清單'} disabled={noLists && kind != '清單'} onChange={() => pickKind('清單')} />{t('清單', 'A list')}
-              {noLists && kind != '清單' && <span className="muted">{t('（變數表還沒有清單）', ' (no lists yet)')}</span>}
+              <input type="radio" name="rect_kind" checked={kind == '清單'} disabled={noLists && kind != '清單'} onChange={() => pickKind('清單')} />{byTarget(t('清單', 'A list'), 'vector')}
+              {noLists && kind != '清單' && <span className="muted">{byTarget(t('（變數表還沒有清單）', ' (no lists yet)'), t('（變數表還沒有 vector）', ' (no vectors yet)'))}</span>}
             </label>
+            {hasKind('fixed', kind == '陣列') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '陣列'} onChange={() => pickKind('陣列')} />array</label>
+            )}
+            {hasKind('stack', kind == '堆疊') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '堆疊'} onChange={() => pickKind('堆疊')} />stack</label>
+            )}
+            {hasKind('queue', kind == '佇列') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '佇列'} onChange={() => pickKind('佇列')} />queue</label>
+            )}
             {(allTypes.grid.length > 0 || kind == '二維清單') && (
               <label><input type="radio" name="rect_kind" checked={kind == '二維清單'} onChange={() => pickKind('二維清單')} />{t('二維清單', 'A 2D list')}</label>
             )}
@@ -563,6 +678,13 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
               <label><input type="radio" name="var_action" checked={f.varChange} onChange={() => set({ varChange: true, radio: '' })} />{t('改變（加多少）', 'Change by')}</label>
             </p>
           )}
+          {(kind == '堆疊' || kind == '佇列') && (
+            <p className="rect_action">
+              {t('怎麼改：', 'How: ')}
+              {actionRadio('放入', kind == '堆疊' ? t('push（放到最上面）', 'push (on top)') : t('push（排到最後面）', 'push (to the back)'))}
+              {actionRadio('取出', kind == '堆疊' ? t('pop（拿掉最上面的）', 'pop (remove the top)') : t('pop（拿掉最前面的）', 'pop (remove the front)'))}
+            </p>
+          )}
           {kind == '二維清單' && (
             <p className="rect_action">
               {t('怎麼改：', 'How: ')}
@@ -572,7 +694,8 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           )}
           {kind && kind != '回傳' && (
             <>
-              {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ') : t('清單：', 'List: ')}
+              {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ')
+                : kind == '陣列' ? 'array：' : kind == '堆疊' ? 'stack：' : kind == '佇列' ? 'queue：' : byTarget(t('清單：', 'List: '), 'vector：')}
               <VarPicker id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })} names={change ? varTypes.number : namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={change ? localT.number : namesFor(kind, localT)} />
             </>
           )}
@@ -592,12 +715,14 @@ function DialogBody({ request, onClose, varTypes, modules }: { request: DialogRe
           {verb && change && (
             <>
               <br /><br /> {t('改變', 'by')} {codeInput}
+              {helper('code', f.code, v => set({ code: v }))}
               <p className="dialog_note">{t('填 1 就是加 1，填 -1 就是減 1', '1 adds one, -1 takes one away')}</p>
             </>
           )}
           {verb && !change && (
             <>
               <br /><br /> {verb()} {codeInput}{' '}
+              {helper('code', f.code, v => set({ code: v }))}
               <br /><br />
               <p>{t('捨去進位？', 'Round?')}{' '}
                 {radio('', t('不需要', 'No'))}{' '}

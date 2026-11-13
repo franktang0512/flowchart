@@ -26,6 +26,7 @@ function rectangleText(vars: VarStore, f: DialogForm) {
     : f.rectAction == '替換' ? `${target}${cell} 設為 ${f.code}`
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
     : f.rectAction == '清空' ? `${target} 刪除所有項目`
+    : f.rectAction == '取出' ? `${target} 取出`
     : f.rectAction == '建立' ? `${target} 建立 ${f.rectIndex.trim()} 列 ${f.rectIndex2.trim()} 行`
     : f.rectAction == '回傳' ? ` 回傳 ${f.code}`
     : `${target} ${f.rectAction} ${f.code}`;
@@ -52,8 +53,8 @@ function changeForm(f: DialogForm): DialogForm {
   return { ...f, rectAction: '設為', radio: '', code: `${f.varSelect.trim()} + ${simple ? by : `(${by})`}` };
 }
 
-/** 刪除第幾項、刪除所有項目、建立二維清單不用填值 */
-const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立';
+/** 刪除第幾項、刪除所有項目、建立二維清單、pop 不用填值 */
+const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立' && f.rectAction != '取出';
 
 function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (!f.rectKind) {
@@ -100,6 +101,23 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     alert(t('請選一個二維清單。', 'Choose a 2D list.'));
     return false;
   }
+  // stack、queue：push 要填值（型別要跟裡面裝的一樣），pop 不用
+  if (f.rectKind == '堆疊' || f.rectKind == '佇列') {
+    const kind = f.rectKind == '堆疊' ? 'stack' : 'queue';
+    if (!vars.type_var_list[kind].includes(list)) {
+      alert(t(`請選一個 ${kind}。`, `Choose a ${kind}.`));
+      return false;
+    }
+    return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
+  }
+  // array：只能替換某一格（大小固定）
+  if (f.rectKind == '陣列') {
+    if (!vars.type_var_list.fixed.includes(list)) {
+      alert(t('請選一個 array。', 'Choose an array.'));
+      return false;
+    }
+    return checkVar(vars, f.rectIndex, true) && checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item');
+  }
   if (!vars.type_var_list.array.includes(list)) {
     alert(t(`「${list}」不是清單：只有型別是「清單」的變數才能添加、插入、替換或刪除。`, `"${list}" is not a list. Only list variables can add, insert, replace or delete.`));
     return false;
@@ -121,6 +139,9 @@ function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): stri
       return checkVar(vars, text, false) ? '輸入 ' + text : null;
     }
     if (!checkVar(vars, f.varSelect, false)) return null;
+    // array：存到某一格（大小固定，不能加到最後）
+    if (f.ioTarget == '陣列') return checkVar(vars, f.rectIndex, true) ? `輸入 ${f.varSelect}[${f.rectIndex.trim()}]` : null;
+    // stack、queue：push 進去
     if (f.ioTarget != '清單' || f.ioPlace == '加入') return '輸入 ' + f.varSelect;
     if (!checkVar(vars, f.rectIndex, true)) return null;
     const k = f.rectIndex.trim();
@@ -318,8 +339,10 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
-          // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳
-          rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' || (action == '替換' && index2) ? '二維清單' : '清單',
+          // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
+          rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' || (action == '替換' && index2) ? '二維清單'
+            : action == '放入' || action == '取出' ? (vars?.type_var_list.queue.includes(target) ? '佇列' : '堆疊')
+            : vars?.type_var_list.fixed.includes(target) ? '陣列' : '清單',
           rectIndex: index,
           rectIndex2: index2,
           varSelect: target,

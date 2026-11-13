@@ -11,13 +11,13 @@ import { QuestionPanel } from './components/QuestionPanel';
 import { RunArea, type RunPane } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
 import { connectorState, createConnectors } from './engine/connector';
-import { buildRun, createVarStore, FlowError, withParams, type RunResult } from './engine/decoder';
+import { buildRun, createVarStore, FlowError, typeLists, withParams, type RunResult } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
 import { callText, cppNameProblem, cppType, GLOBAL_PREFIX, isName, parseCall, renameInText, splitId, typeLabel, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
-import { EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
+import { allowedVarTypes, EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
 import { fitRowOnInput } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
 import { getLang, link, onLangChange, t, useLang } from './i18n';
@@ -381,10 +381,12 @@ export function App() {
    * 全域變數的名字跟模組一樣：流程圖上分不出是哪一個，回傳原因。
    * 跟模組的參數、區域變數同名可以：模組裡寫這個名字指的是模組自己的，主流程指的是全域變數
    */
-  const globalVarProblem = (name: string): string | null => {
+  const globalVarProblem = (name: string, id: number): string | null => {
     const cpp = cppNameProblem(name);
     if (cpp) return cpp;
     if (modulesRef.current.some(m => m.info.name == name)) return sameName(t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`));
+    // 變數表裡另一個變數（不管什麼型別）已經叫這個名字
+    if (varsRef.current.some(v => v.id != id && v.name.trim() == name)) return sameName(t(`已經有叫「${name}」的變數了`, `There is already a variable called "${name}"`));
     return null;
   };
   /** 區域變數的名字：不能跟模組、這個模組的參數、這個模組的其他區域變數一樣（跟全域變數一樣可以） */
@@ -401,9 +403,9 @@ export function App() {
   /** 變數表的輸入框確定時：名字不能用就改回原本的名字 */
   const commitVars = () => {
     // 只看這次改過名字的列（原本就撞名的舊作品，第四步執行時會說明）
-    const bad = varsRef.current.find(r => r.name.trim() && r.name.trim() != committedVarNames.current.get(r.id)?.trim() && globalVarProblem(r.name.trim()));
+    const bad = varsRef.current.find(r => r.name.trim() && r.name.trim() != committedVarNames.current.get(r.id)?.trim() && globalVarProblem(r.name.trim(), r.id));
     if (bad) {
-      alert(globalVarProblem(bad.name.trim())!);
+      alert(globalVarProblem(bad.name.trim(), bad.id)!);
       const old = committedVarNames.current.get(bad.id) ?? '';
       setVars(varsRef.current.map(v => (v.id == bad.id ? { ...v, name: old.trim() == bad.name.trim() ? '' : old } : v)));
     }
@@ -417,10 +419,8 @@ export function App() {
     const rows = varsRef.current.filter(r => r.name.trim() != '');
     varStore.var_list.name = rows.map(r => r.name);
     varStore.var_list.value = rows.map(r => r.init);
-    varStore.type_var_list.number = rows.filter(r => r.type == '數字').map(r => r.name);
-    varStore.type_var_list.text = rows.filter(r => r.type == '文字').map(r => r.name);
-    varStore.type_var_list.array = rows.filter(r => r.type == '清單').map(r => r.name);
-    varStore.type_var_list.grid = rows.filter(r => r.type == '二維清單').map(r => r.name);
+    varStore.type_var_list = typeLists(rows);
+    varStore.sizes = Object.fromEntries(rows.filter(r => r.type == '陣列').map(r => [r.name, r.size ?? '']));
     varStore.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
 
     rows.forEach(r => committedVarNames.current.set(r.id, r.name));
@@ -930,7 +930,7 @@ export function App() {
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
         open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
-        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float }))}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, size: v.size }))}
       />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>
@@ -948,6 +948,7 @@ export function App() {
             {page == 2 && (
               <VarTable
                 rows={vars}
+                allowed={allowedVarTypes(question)}
                 onChange={(id, patch) => setVars(varsRef.current.map(v => v.id == id ? { ...v, ...patch } : v))}
                 onCommit={commitVars}
                 onDelete={id => { setVars(varsRef.current.filter(v => v.id != id)); syncVarList(); }}
@@ -1082,6 +1083,7 @@ export function App() {
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
           varNames={varStore.var_list.name}
+          kinds={Object.fromEntries([...vars, ...modules.flatMap(m => m.info.locals ?? [])].filter(v => v.type == '堆疊' || v.type == '佇列' || v.type == '陣列').map(v => [v.name.trim(), v.type]))}
           sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
           moduleVars={modules.map((m, k) => ({
             sheet: k + 1,

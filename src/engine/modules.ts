@@ -7,6 +7,7 @@
 import { t } from '../i18n';
 import { getTarget } from '../target';
 import type { Diagram } from './diagram';
+import type { VarType } from './structure';
 
 export interface ParamInfo {
   name: string;
@@ -40,11 +41,13 @@ export interface ModuleInfo {
 export interface LocalVar {
   id: number;
   name: string;
-  type: '數字' | '文字' | '清單' | '二維清單';
+  type: VarType;
   init: string;
   desc: string;
   /** C++：數字是 float（小數）；沒有就是 int（整數） */
   float?: boolean;
+  /** C++ 的 array：大小 */
+  size?: string;
 }
 
 /**

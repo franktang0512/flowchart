@@ -14,7 +14,7 @@ const ROUNDING: [string, string][] = [
  * 計算積木做的事：「設為」一般的設定；清單才有的（名稱對應 Scratch 的清單積木）
  * 「加入」添加到最後、「插入」、「替換」第幾項、「刪除」第幾項、「清空」刪除所有項目
  */
-export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立' | '回傳';
+export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立' | '回傳' | '放入' | '取出';
 
 /**
  * 「名稱[a]」「名稱[a][b]」拆成名稱和中括號裡的東西（中括號裡還有中括號也沒關係，例如 表[a[1]][b]）；
@@ -47,6 +47,7 @@ export function splitTarget(s: string): { name: string; indexes: string[] } | nu
  * 計算積木的文字拆開，存起來的格式是：
  *   「 x 設為 運算式」「 清單[位置] 設為 運算式」（替換）「 清單 加入 運算式」
  *   「 清單 在第 位置 項插入 運算式」「 清單 刪除第 位置 項」「 清單 刪除所有項目」
+ *   堆疊、佇列（C++）：「 s 放入 運算式」（push）「 s 取出」（pop）
  *   二維清單（C++）：「 表 建立 r 列 c 行」（設定大小，每格都是 0 或空的文字）「 表[i][j] 設為 運算式」（替換一格，index2 是第二個位置）
  */
 export function splitRectangle(text: string): { target: string; action: RectAction; index: string; index2: string; expr: string } {
@@ -61,7 +62,10 @@ export function splitRectangle(text: string): { target: string; action: RectActi
   if (m) return { target: m[1].trim(), action: '刪除', index: m[2].trim(), index2: '', expr: '' };
   m = /^(.*?) 建立 (.*?) 列 (.*) 行$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '建立', index: m[2].trim(), index2: m[3].trim(), expr: '' };
-  m = /^(.*?) (設為|加入) (.*)$/s.exec(text);
+  // 堆疊、佇列（C++ 的 stack、queue）：「 s 放入 x」是 push，「 s 取出」是 pop
+  m = /^(.*?) 取出$/s.exec(text);
+  if (m) return { target: m[1].trim(), action: '取出', index: '', index2: '', expr: '' };
+  m = /^(.*?) (設為|加入|放入) (.*)$/s.exec(text);
   if (!m) return { target: text.trim(), action: '設為', index: '', index2: '', expr: '' };
   const target = m[1].trim();
   const item = m[2] == '設為' ? splitTarget(target) : null;
@@ -85,6 +89,9 @@ function rectangleLabel(text: string, en: boolean): string {
   if (action == '替換' && index2) return en ? `${target}[${index}][${index2}] = ${value}` : text;
   if (action == '建立') return en ? `make ${target} ${index} rows × ${index2} columns` : `${target} 建立 ${index} 列 × ${index2} 行`;
   if (action == '回傳') return en ? `return ${value}` : `回傳 ${value}`;
+  // stack、queue：照 C++ 的寫法
+  if (action == '放入') return `${target}.push(${value})`;
+  if (action == '取出') return `${target}.pop()`;
   switch (action) {
     case '加入': return en ? `add ${value} to ${target}` : `添加 ${value} 到 ${target}`;
     case '插入': return en ? `insert ${value} at ${itemWord(index)} of ${target}` : `插入 ${value} 到 ${target} 的${itemWord(index)}`;

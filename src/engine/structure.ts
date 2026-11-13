@@ -174,7 +174,7 @@ function rectStmt(text: string): Stmt {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,
     ...(index2 ? { index2: parseExpr(index2) } : {}),
-    value: action == '刪除' || action == '清空' || action == '建立' ? undefined : parseExpr(expr),
+    value: action == '刪除' || action == '清空' || action == '建立' || action == '取出' ? undefined : parseExpr(expr),
   };
 }
 
@@ -189,6 +189,8 @@ export type Expr =
   | { t: 'idx'; obj: Expr; index: Expr }
   /** 長度( )、項目編號( )、包含( ) */
   | { t: 'call'; fn: 'len' | 'find' | 'has'; args: Expr[] }
+  /** C++ 容器的函式：s.top()、q.front()、q.back()、v.size()、v.empty()（見 decoder 的 METHODS） */
+  | { t: 'method'; obj: Expr; name: string }
   /** 有回傳值的模組：找最大(x, y) */
   | { t: 'fcall'; name: string; args: Expr[] }
   /** + - * / % 、比較（== != < <= > >=）、and or */
@@ -286,8 +288,16 @@ class Parser {
   }
   private postfix(): Expr {
     let e = this.primary();
-    while (this.is('[')) {
-      this.take();
+    while (this.is('[', '.')) {
+      if (this.take().text == '.') {
+        // s.top()：點後面是函式名稱，再接空的括號
+        const name = this.take();
+        if (name.type != 'name') throw new Error('method');
+        this.expect('(');
+        this.expect(')');
+        e = { t: 'method', obj: e, name: name.text };
+        continue;
+      }
       const index = this.or();
       this.expect(']');
       e = { t: 'idx', obj: e, index };
@@ -324,14 +334,26 @@ class Parser {
 
 // ---------------- 變數表 ----------------
 
+/**
+ * 變數的型別。清單在 C++ 是 vector；二維清單、陣列（array）、堆疊（stack）、佇列（queue）只有學習目標是 C++ 時才有
+ */
+export type VarType = '數字' | '文字' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列';
+
+/** 容器：初始值欄是「裡面裝什麼」，不是一個值 */
+export const isContainerType = (type: VarType | undefined) => type == '清單' || type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列';
+
+/** 只有 C++ 有的型別（Scratch / Blockly 畫不出來） */
+export const isCppOnlyType = (type: VarType | undefined) => type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列';
+
 export interface VarInfo {
   name: string;
-  /** 二維清單只有學習目標是 C++ 時才有 */
-  type: '數字' | '文字' | '清單' | '二維清單';
-  /** 數字/文字的初始值；清單、二維清單是裡面裝「數字」、「小數」（C++ 的 float）還是「文字」 */
+  type: VarType;
+  /** 數字/文字的初始值；容器（清單、陣列…）是裡面裝「數字」、「小數」（C++ 的 float）還是「文字」 */
   init: string;
   /** C++：數字變數是 float（小數）；沒有就是 int（整數） */
   float?: boolean;
+  /** 陣列（array）的大小：宣告時就決定，之後不能改 */
+  size?: string;
 }
 
 /** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用） */
@@ -344,7 +366,13 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
     case 'str': return 'str';
     case 'var': {
       const v = vars.get(e.name);
-      return v?.type == '清單' || v?.type == '二維清單' ? 'list' : v?.type == '文字' ? 'str' : 'num';
+      return isContainerType(v?.type) ? 'list' : v?.type == '文字' ? 'str' : 'num';
+    }
+    case 'method': {
+      if (e.name == 'size') return 'num';
+      if (e.name == 'empty') return 'bool';
+      // top()、front()、back()：容器裡裝的東西
+      return e.obj.t == 'var' && vars.get(e.obj.name)?.init == '文字' ? 'str' : 'num';
     }
     case 'idx': {
       const o = exprType(e.obj, vars, modules);

@@ -30,6 +30,8 @@ interface Props {
   /** 學生在第二步填的測資：[輸入, 輸出, 測試重點] × 3 */
   cases: string[];
   varNames: string[];
+  /** C++ 的 array、stack、queue（名稱 → 型別）：畫的時候標出頂端、最前面、最後面 */
+  kinds?: Record<string, string>;
   /** 有模組時：畫布上現在是哪一張流程圖（主流程或某個模組） */
   sheetName: string;
   /** 每個模組（sheet 是第幾張流程圖）和它的參數、區域變數名稱：第四步每個模組分開列出來 */
@@ -44,7 +46,7 @@ interface Frame {
   vals: Record<string, unknown>;
 }
 
-export function RunArea({ visible, panes, run, error, partial, step, onStep, which, onWhich, cases, varNames, sheetName, moduleVars }: Props) {
+export function RunArea({ visible, panes, run, error, partial, step, onStep, which, onWhich, cases, varNames, kinds = {}, sheetName, moduleVars }: Props) {
   useLang();
   const split = useSplit(panes, visible);
   const total = run?.totalStep ?? 0;
@@ -73,7 +75,7 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
       <div key={name} className={'var_box' + (isList ? ' is_list' : '') + extra}>
         <span className="var_box_name">{name}</span>
         <span className={'var_box_value' + (isList ? ' is_list' : '')}>
-          {kind == 'idle' ? '—' : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} /> : isList ? <ListValue items={v} prev={before?.[name]} /> : String(v)}
+          {kind == 'idle' ? '—' : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} /> : isList ? <ListValue items={v} prev={before?.[name]} kind={kinds[name]} /> : String(v)}
         </span>
       </div>
     );
@@ -238,7 +240,7 @@ function GridValue({ rows, prev }: { rows: unknown[][]; prev: unknown }) {
 }
 
 /** 清單的值：一列排開，每一項標上位置（積木從 1、C++ 從 0 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */
-function ListValue({ items, prev }: { items: unknown[]; prev: unknown }) {
+function ListValue({ items, prev, kind }: { items: unknown[]; prev: unknown; kind?: string }) {
   const scrollerRef = useRef<HTMLSpanElement>(null);
   const changedRef = useRef<HTMLSpanElement>(null);
   const changed = changedIndex(items, prev);
@@ -255,14 +257,27 @@ function ListValue({ items, prev }: { items: unknown[]; prev: unknown }) {
     }
   });
 
-  if (!items.length) return <span className="muted">{t('（空清單）', '(empty list)')}</span>;
+  if (!items.length) return <span className="muted">{kind == '堆疊' ? t('（空的 stack）', '(empty stack)') : kind == '佇列' ? t('（空的 queue）', '(empty queue)') : t('（空清單）', '(empty list)')}</span>;
+  /**
+   * 每一格上面的小字：清單、array 是索引；stack 只看得到頂端（top），queue 只看得到最前面（front）和最後面（back）——
+   * C++ 的 stack、queue 不能用索引拿中間的東西
+   */
+  const tag = (k: number) => {
+    const last = k == items.length - 1;
+    if (kind == '堆疊') return last ? 'top' : '';
+    if (kind == '佇列') return [k == 0 ? 'front' : '', last ? 'back' : ''].filter(Boolean).join(' / ');
+    return String(k + indexBase());
+  };
   return (
-    <span className="list_value" ref={scrollerRef}>
+    <span className={'list_value' + (kind == '堆疊' ? ' is_stack' : kind == '佇列' ? ' is_queue' : '')} ref={scrollerRef}>
+      {/* queue 從左邊（front）出去、右邊（back）進來；stack 從右邊（top）進出 */}
+      {kind == '佇列' && <span className="list_end" aria-hidden="true">←</span>}
       {items.map((item, k) => (
-        <span key={k} ref={k == changed ? changedRef : undefined} className={'list_item' + (k == changed ? ' changed' : '')}>
-          <small>{k + indexBase()}</small>{String(item)}
+        <span key={k} ref={k == changed ? changedRef : undefined} className={'list_item' + (k == changed ? ' changed' : '') + (kind && kind != '陣列' && !tag(k) ? ' is_inner' : '')}>
+          {tag(k) && <small>{tag(k)}</small>}{String(item)}
         </span>
       ))}
+      {(kind == '堆疊' || kind == '佇列') && <span className="list_end" aria-hidden="true">{kind == '堆疊' ? '⇆' : '⇠'}</span>}
     </span>
   );
 }

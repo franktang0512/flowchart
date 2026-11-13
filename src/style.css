@@ -862,6 +862,34 @@ input, textarea, select, button {
     color: var(--muted);
     font-size: 0.75rem;
 }
+/* stack、queue 中間的東西：C++ 拿不到，顏色淡一點 */
+.list_item.is_inner {
+    color: var(--muted);
+    background: #f6f7f8;
+}
+.list_end {
+    align-self: center;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+/* 變數表：array 的大小 */
+.array_size {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+/* 很淡的綠色框：讓學生知道大小可以改（其他輸入框平常沒有框） */
+.array_size input {
+    width: 4em;
+    border-color: #cfe6cd;
+    background: #f5fbf4;
+}
+.array_size input:hover {
+    border-color: #a9d4a6;
+}
 
 /* ---------- 對話框（新增/修改積木） ---------- */
 #node_info {
@@ -927,6 +955,34 @@ input, textarea, select, button {
 #node_info input[type=radio] {
     margin: 0 4px 0 10px;
 }
+/* 算式欄位下面「點一下填入」：C++ 容器的函式 */
+#node_info .expr_helper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+}
+#node_info .expr_helper select {
+    min-width: 0;
+    width: auto;
+    margin: 0;
+}
+#node_info .snippet {
+    padding: 2px 8px;
+    border: 1px solid var(--card-line);
+    border-radius: 6px;
+    background: #fff;
+    font-family: Consolas, Menlo, monospace;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+#node_info .snippet:hover {
+    border-color: var(--green-dark);
+    background: var(--green);
+}
+
 #hint_yes,
 #hint_no {
     margin-top: 14px;
