@@ -258,6 +258,9 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
   const defined = (name: string) => Object.values(type_var_list).some(list => list.includes(name));
 
   if (!can_number) {
+    // ::a：全域的數字、文字變數
+    const scoped = scopedName(str);
+    if (scoped != null) return scopedOk(vars, scoped) && checkVar(vars.globalVars!, scoped, false);
     if (vars.paramsReadOnly && vars.params?.includes(str.trim())) {
       alert(t(`「${str.trim()}」是模組的參數：Scratch 的參數只能拿來算，不能改。要存結果請用變數表裡的變數。`, `"${str.trim()}" is a parameter. In Scratch you can use it, but you cannot change it. Use a variable from the variable table instead.`));
       return false;
@@ -293,6 +296,18 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
   }
   const tokens = tokenize(str);
   for (const [k, tk] of tokens.entries()) {
+    // ::a：全域的 a
+    if (tk.text == ':' && tk.type == 'op') {
+      if (tokens[k + 1]?.text == ':' && tokens[k + 2]?.type == 'name') {
+        if (!scopedOk(vars, tokens[k + 2].text)) return false;
+      }
+      else if (tokens[k - 1]?.text != ':') {
+        alert(t('「:」只能寫成 ::名稱（全域的那個變數），例如 ::a。', 'Use ":" only as ::name (the global variable), like ::a.'));
+        return false;
+      }
+      continue;
+    }
+    if (tokens[k - 1]?.text == ':' && tokens[k - 2]?.text == ':') continue;
     // s.top()：點後面的名稱是容器的函式；後面沒有括號的是 struct 的欄位（最後一起檢查）
     if (tk.text == '.' && tk.type == 'op') {
       if (tokens[k + 2]?.text == '(' && !methodOk(vars, tokens, k)) return false;
@@ -313,6 +328,20 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     return false;
   }
   return fieldsOk(vars, parseExpr(str));
+}
+
+/** ::a：只有 C++ 的全域數字、文字變數可以這樣寫；不行時跳出提示 */
+function scopedOk(vars: VarStore, name: string): boolean {
+  const gv = vars.globalVars;
+  if (getTarget() != 'cpp' || !gv || !gv.var_list.name.includes(name)) {
+    alert(t(`「::${name}」是全域的 ${name}，可是沒有叫「${name}」的全域變數。`, `"::${name}" means the global ${name}, but there is no global variable called "${name}".`));
+    return false;
+  }
+  if (!gv.type_var_list.number.includes(name) && !gv.type_var_list.text.includes(name)) {
+    alert(t(`「::${name}」目前只能用在全域的數字、文字變數。`, `"::${name}" works only for global number and text variables for now.`));
+    return false;
+  }
+  return true;
 }
 
 /** 寫成說明用：struct 有哪些欄位，例如 from、to、w */
@@ -500,6 +529,20 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   const floats = vars.floats ?? [];
   const what = { str: t('文字', 'text'), char: t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct') }[type];
   const v = value.trim();
+  // 存到 ::a：照全域 a 的型別
+  const scoped = where == 'var' ? scopedName(target) : null;
+  if (scoped != null && vars.globalVars) {
+    const g = vars.globalVars;
+    if (g.type_var_list.number.includes(scoped) && type != 'num') {
+      alert(t(`全域變數「${scoped}」是數字，但「${v}」是${what}，不能存進去。`, `The global "${scoped}" holds a number, but "${v}" is ${what}. It cannot go in.`));
+      return false;
+    }
+    if (g.type_var_list.text.includes(scoped) && (type == 'list' || type == 'bool' || type == 'struct')) {
+      alert(t(`全域變數「${scoped}」是文字，但「${v}」是${what}，不能存進去。`, `The global "${scoped}" holds text, but "${v}" is ${what}. It cannot go in.`));
+      return false;
+    }
+    return true;
+  }
   // 存到 struct 的欄位：照欄位的型別
   const field = where == 'var' ? splitField(target) : null;
   if (field) {
@@ -571,8 +614,13 @@ function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   add(vars.type_var_list.stack, '堆疊');
   add(vars.type_var_list.queue, '佇列');
   add(vars.type_var_list.record, '結構');
+  // ::a：全域的 a（照全域變數那一份的型別）
+  if (vars.globalVars) for (const [name, info] of varInfoMap(vars.globalVars)) map.set('::' + name, { ...info, name: '::' + name });
   return map;
 }
+
+/** 「::a」→ a；不是這種寫法回傳 null */
+export const scopedName = (s: string) => (/^\s*::\s*[^\s:]+\s*$/.test(s) ? s.trim().slice(2).trim() : null);
 
 /** 判斷式轉成 JavaScript：= 變 ==、and/or/not（且/或/非）變 && || !，字串裡的字不動 */
 function toCondition(str: string) {
@@ -1014,7 +1062,15 @@ class CodeGenerator {
         const f = fieldOf(e, varInfoMap(this.vars));
         return f?.type == '數字' && !f.float;
       }
-      case 'var': return this.isIntVar(e.name);
+      case 'var': {
+        // ::a：照全域 a 的型別
+        const scoped = scopedName(e.name);
+        if (scoped != null) {
+          const g = this.vars.globalVars;
+          return !!g && g.type_var_list.number.includes(scoped) && !(g.floats ?? []).includes(scoped);
+        }
+        return this.isIntVar(e.name);
+      }
       case 'idx':
         if (e.obj.t == 'var') return array.includes(e.obj.name) && holdsInt(e.obj.name);
         return e.obj.t == 'idx' && e.obj.obj.t == 'var' && grid.includes(e.obj.obj.name) && holdsInt(e.obj.obj.name);
@@ -1075,11 +1131,18 @@ class CodeGenerator {
     let prevWord = false;
     for (let k = 0; k < tokens.length; k++) {
       const t = tokens[k];
-      const word = t.type != 'op';
+      let word = t.type != 'op';
       let piece = t.text;
       /** s.top()、s.substr(1, 2) 這種寫法：「名稱 . 函式 (」變成 __method(名稱, …, 後面的引數和 ) 照原樣 */
       let skip = 0;
       const method = tokens[k + 2];
+      // ::a → 全域的 a（main 裡同名的 a 蓋住了它，要透過 __GL 拿）
+      if (t.text == ':' && tokens[k + 1]?.text == ':' && tokens[k + 2]?.type == 'name') {
+        piece = `__GL[${JSON.stringify(tokens[k + 2].text)}]`;
+        word = true;
+        skip = 2;
+      }
+      else
       if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '.' && method?.type == 'name' && tokens[k + 3]?.text == '(') {
         const ty = this.vars.type_var_list;
         const kind = ty.stack.includes(t.text) ? 'stack' : ty.queue.includes(t.text) ? 'queue' : ty.text.includes(t.text) ? 'string' : 'vector';
@@ -1148,6 +1211,14 @@ class CodeGenerator {
 
   /** 把 value 存進 target（變數或 清單[第幾項]），依型別檢查 */
   private assign(target: string, value: string, i: number) {
+    // ::a：全域的 a
+    const scoped = scopedName(target);
+    if (scoped != null) {
+      const g = this.vars.globalVars;
+      const conv = g?.type_var_list.text.includes(scoped) ? '__text'
+        : (g?.longs ?? []).includes(scoped) ? '__long' : (g?.floats ?? []).includes(scoped) ? '__num' : '__int';
+      return `__GL[${JSON.stringify(scoped)}] = ${conv}(${value}, ${i}, ${JSON.stringify(target.trim())});\n`;
+    }
     // struct 的欄位：e.from、edges[i].w（照欄位的型別檢查）
     const field = splitField(target);
     if (field) return `${this.expr(field.base, i)}.${field.field} = ${this.fieldValue(target, value, i)};\n`;
@@ -1246,8 +1317,17 @@ class CodeGenerator {
           const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
           const cell = splitTarget(v);
           const field = splitField(v);
+          const scoped = scopedName(v);
+          // 輸入 ::a：全域的 a
+          if (scoped != null) {
+            const g = this.vars.globalVars;
+            const conv = (g?.longs ?? []).includes(scoped) ? '__long' : (g?.floats ?? []).includes(scoped) ? '__num' : '__int';
+            code = g?.type_var_list.text.includes(scoped)
+              ? `__GL[${JSON.stringify(scoped)}] = __inText(input_list, ${i}, ${name});\n`
+              : `__GL[${JSON.stringify(scoped)}] = ${conv}(__inNum(input_list, ${i}, ${name}), ${i}, ${name});\n`;
+          }
           // 輸入 e.from、輸入 edges[i].w：照欄位的型別讀
-          if (field) {
+          else if (field) {
             const f = fieldOf(parseExpr(v) as Expr & { t: 'field' }, varInfoMap(this.vars));
             const read = f?.type == '文字' ? '__inText' : `${getTarget() == 'cpp' && f && !f.float ? 'Math.trunc' : ''}(__inNum`;
             code = `${expr(field.base)}.${field.field} = ${read}(input_list, ${i}, ${name})${f?.type == '文字' ? '' : ')'};\n`;
@@ -1604,6 +1684,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
     }).join(', ') + '};\n';
   }
   // 第四步要看的變數：最外層的（被 main 同名變數蓋住的全域變數叫「x（全域）」）＋ main 自己的
+  if (cpp) code += 'var __GL = {' + globalNames.map(n => `get ${JSON.stringify(n)}() { return ${n}; }, set ${JSON.stringify(n)}(v) { ${n} = v; }`).join(', ') + '};\n';
   code += 'var __mainSnap = null;\n';
   code += 'function __globals(){ var o = {' + topNames.map(n => JSON.stringify(shadowed.has(n) ? shadowLabel(n) : n) + ': ' + n).join(',') + '}; if (__mainSnap) { var m = __mainSnap(); for (var k in m) o[k] = m[k]; } return o; }\n';
   // 每一步都記下來給第四步看；步驟太多時（大的測資、排序）只記前 MAX_STEPS 步，之後只記住最後一步，執行完再補上，瀏覽器才不會卡住

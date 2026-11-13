@@ -193,6 +193,8 @@ interface Props {
   holds?: Record<string, string>;
   /** C++ 的全域變數：模組裡也列出來 */
   globals?: string[];
+  /** C++：被 main 同名變數蓋住的全域變數（主流程的選單不標「全域」） */
+  shadowed?: string[];
   /** C++：只有全域變數的那一份（可能跟 main 的變數同名、型別不一樣），模組裡用這一份 */
   globalTypes?: VarTypes;
   globalHolds?: Record<string, string>;
@@ -202,7 +204,9 @@ interface Props {
  * 選變數的下拉選單（像 Scratch 一樣用選的，不會打錯字），只列出一種類型的變數。
  * 舊作品裡填的值不在選項裡時，也放進選項，打開修改才不會被清掉。
  */
-function VarPicker({ id, value, onChange, names, params = [], locals = [] }: { id: string; value: string; onChange: (v: string) => void; names: string[]; params?: string[]; locals?: string[] }) {
+function VarPicker({ id, value, onChange, names, params = [], locals = [], marked }: { id: string; value: string; onChange: (v: string) => void; names: string[]; params?: string[]; locals?: string[]; marked?: Set<string> }) {
+  /** C++ 的全域變數標出來：「g（全域）」 */
+  const label = (name: string) => (marked?.has(name) ? name + t('（全域）', ' (global)') : name);
   // 參數：Blockly、C++ 可以改，Scratch 不行（列出來但不能選，學生才知道參數也是一種變數）
   const readOnly = getTarget() == 'scratch';
   const all = [...names, ...params, ...locals];
@@ -212,8 +216,8 @@ function VarPicker({ id, value, onChange, names, params = [], locals = [] }: { i
     <select className="var_select" id={id} value={value} onChange={e => onChange(e.target.value)}>
       <option value="" disabled>{all.length ? t('請選擇', 'Choose one') : t('請先到左邊的變數表新增', 'Add one in the variable table first')}</option>
       {value && !all.includes(value) && <option value={value}>{value}</option>}
-      {grouped && names.length > 0 && <option disabled>{t('── 主流程的變數 ──', '── Main-flow variables ──')}</option>}
-      {names.map(name => <option key={name} value={name}>{name}</option>)}
+      {grouped && names.length > 0 && <option disabled>{getTarget() == 'cpp' ? t('── 全域變數 ──', '── Global variables ──') : t('── 主流程的變數 ──', '── Main-flow variables ──')}</option>}
+      {names.map(name => <option key={name} value={name}>{label(name)}</option>)}
       {params.length > 0 && <option disabled>{readOnly ? t('── 參數（Scratch 的參數不能改）──', '── Parameters (cannot change in Scratch) ──') : t('── 這個模組的參數 ──', '── Parameters of this module ──')}</option>}
       {params.map(name => <option key={'p_' + name} value={name} disabled={readOnly}>{name}</option>)}
       {locals.length > 0 && <option disabled>{t('── 這個模組的區域變數 ──', '── Local variables of this module ──')}</option>}
@@ -348,7 +352,7 @@ const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string
   替換: (list, k) => t(`輸入的值會換掉清單「${list}」的${itemWord(k || '?')}`, `The value replaces ${itemWord(k || '?')} of "${list}".`),
 };
 
-export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, globals = [], globalTypes, globalHolds }: Props) {
+export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, globals = [], shadowed = [], globalTypes, globalHolds }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -367,12 +371,12 @@ export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, gl
         onClose();
       }}
     >
-      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={request.inModule && getTarget() == 'cpp' && globalTypes ? globalTypes : varTypes} modules={modules} holds={request.inModule && getTarget() == 'cpp' && globalHolds ? globalHolds : holds} globals={globals} />}
+      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={request.inModule && getTarget() == 'cpp' && globalTypes ? globalTypes : varTypes} modules={modules} holds={request.inModule && getTarget() == 'cpp' && globalHolds ? globalHolds : holds} globals={globals} shadowed={shadowed} globalTypes={globalTypes} />}
     </dialog>
   );
 }
 
-function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, globals }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[]; holds: Record<string, string>; globals: string[] }) {
+function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, globals, shadowed, globalTypes }: { request: DialogRequest; onClose: () => void; varTypes: VarTypes; modules: ModuleInfo[]; holds: Record<string, string>; globals: string[]; shadowed: string[]; globalTypes?: VarTypes }) {
   const { kind } = request;
   useLang();
   /** 在模組裡：區域變數照型別分好；allTypes 是全域加區域（判斷選到的是哪一種用） */
@@ -387,7 +391,17 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
     : target == 'cpp' ? list.filter(n => globals.includes(n) && !own.has(n))
     : list.flatMap(n => (!own.has(n) ? [n] : target == 'scratch' ? [GLOBAL_PREFIX + n] : [])));
   varTypes = mapTypes(varTypes, shown);
+  // C++ 的主流程：被 main 同名變數蓋住的全域數字、文字變數，用 ::a 選得到
+  if (target == 'cpp' && !request.inModule && globalTypes) {
+    const scoped = (list: string[]) => list.filter(n => shadowed.includes(n)).map(n => '::' + n);
+    varTypes = { ...varTypes, number: [...varTypes.number, ...scoped(globalTypes.number)], text: [...varTypes.text, ...scoped(globalTypes.text)] };
+  }
   const allTypes: VarTypes = joinTypes(varTypes, localT);
+  /**
+   * 選單裡標「（全域）」的變數（C++）：主流程裡是沒有被 main 同名變數蓋住的全域變數（被蓋住的話，選單裡那個名字是 main 自己的）；
+   * 模組裡列出來的主流程變數都是全域變數
+   */
+  const globalMarks = new Set(target != 'cpp' ? [] : request.inModule ? globals : [...globals.filter(n => !shadowed.includes(n)), ...shadowed.map(n => '::' + n)]);
   /** 每個變數裝什麼（區域變數蓋過全域的） */
   const holds: Record<string, string> = { ...globalHolds, ...Object.fromEntries((request.locals ?? []).map(v => [v.name.trim(), v.init])) };
   /** 這個變數（struct 變數或裝 struct 的容器）是哪一種 struct */
@@ -539,6 +553,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                 {f.ioTarget && (
                   <p>
                     <VarPicker
+                      marked={globalMarks}
                       id="var_select" value={f.varSelect} onChange={v => pickVar(v, f.ioTarget == '結構' || !!structOfVar(v))}
                       names={ioNames(varTypes)}
                       params={f.ioTarget == '變數' ? paramNames : []}
@@ -837,7 +852,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
             <>
               {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ')
                 : kind == '陣列' ? 'array：' : kind == '堆疊' ? 'stack：' : kind == '佇列' ? 'queue：' : kind == '結構' ? 'struct：' : byTarget(t('清單：', 'List: '), 'vector：')}
-              <VarPicker id="var_select" value={f.varSelect} onChange={v => pickVar(v, kind == '結構')} names={change ? varTypes.number : namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={change ? localT.number : namesFor(kind, localT)} />
+              <VarPicker marked={globalMarks} id="var_select" value={f.varSelect} onChange={v => pickVar(v, kind == '結構')} names={change ? varTypes.number : namesFor(kind, varTypes)} params={kind == '變數' || kind == '接收' ? paramNames : []} locals={change ? localT.number : namesFor(kind, localT)} />
             </>
           )}
           {indexLabel && (

@@ -1071,6 +1071,7 @@ export function App() {
         request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} modules={modules.map(m => m.info)}
         holds={Object.fromEntries(varStore.var_list.name.map((n, k) => [n, varStore.var_list.value[k]]))}
         globals={varStore.globals}
+        shadowed={varStore.shadowed}
         globalTypes={varStore.globalVars?.type_var_list}
         globalHolds={varStore.globalVars ? Object.fromEntries(varStore.globalVars.var_list.name.map((n, k) => [n, varStore.globalVars!.var_list.value[k]])) : undefined}
       />

@@ -1,7 +1,7 @@
 // 對話框按「確認」之後：新增或修改積木。檢查條件的順序與舊版相同（會影響跳出哪個提示）。
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
-import { checkCall, checkValueType, checkVar, getCodeVar, splitField, type VarStore } from './engine/decoder';
+import { checkCall, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
 import { parseSortKeys, sortKeysText, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { parseExpr } from './engine/structure';
@@ -103,7 +103,7 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (f.rectKind == '變數' && f.varChange) {
     const name = f.varSelect.trim();
     if (!checkVar(vars, f.varSelect, false)) return false;
-    if (!vars.type_var_list.number.includes(name)) {
+    if (!isNumberVar(vars, name)) {
       alert(t(`「${name}」不是數字變數：只有數字變數可以「改變」。`, `"${name}" is not a number variable. Only number variables can change by an amount.`));
       return false;
     }
@@ -243,6 +243,12 @@ function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): stri
     return f.radio + (f.varSelectOutput ? ' ' + f.varSelectOutput : '');
   }
   return null;
+}
+
+/** 數字變數（包括 ::a：全域的數字變數 a） */
+function isNumberVar(vars: VarStore, name: string) {
+  const scoped = scopedName(name);
+  return scoped != null ? !!vars.globalVars?.type_var_list.number.includes(scoped) : vars.type_var_list.number.includes(name);
 }
 
 /** 裝 struct 的 vector、array */
@@ -441,7 +447,7 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       const call = action == '設為' && !node.data && !expr.includes('(取') ? returningCall(expr, modules) : null;
       // 「x 設為 x + 多少」（數字變數、沒有捨去進位）→ 變數「改變」
       const by = action == '設為' && !node.data && !expr.includes('(取') ? changeAmount(target, expr) : null;
-      if (by != null && vars?.type_var_list.number.includes(target)) {
+      if (by != null && vars && isNumberVar(vars, target)) {
         return { kind: 'Rectangle', initial: { rectKind: '變數', rectAction: '設為', varChange: true, varSelect: target, code: by } };
       }
       if (call) {

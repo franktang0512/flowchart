@@ -326,6 +326,13 @@ class Parser {
   }
   private primary(): Expr {
     const tk = this.take();
+    // C++ 的 ::a：全域的 a（main 裡有同名的 a 蓋住它時用）
+    if (tk.text == ':' && this.is(':')) {
+      this.take();
+      const name = this.take();
+      if (name.type != 'name') throw new Error('scope');
+      return { t: 'var', name: '::' + name.text };
+    }
     if (tk.type == 'number') return { t: 'num', v: tk.text };
     if (tk.type == 'string') return { t: 'str', v: tk.text.slice(1, -1) };
     if (tk.text == '(') {
