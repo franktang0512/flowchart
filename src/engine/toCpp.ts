@@ -16,7 +16,9 @@ const CPP_OP: Record<string, string> = { or: '||', and: '&&' };
 const NEGATE: Record<string, string> = { '==': '!=', '!=': '==', '<': '>=', '<=': '>', '>': '<=', '>=': '<' };
 
 export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgram[] = []): string {
-  const globals = new Map(varList.map(v => [v.name, v]));
+  // main 看得到全域變數和自己的變數（同名時用自己的）；模組只看得到全域變數
+  const globalOnly = varList.filter(v => v.global);
+  const globals = new Map([...globalOnly, ...varList.filter(v => !v.global)].map(v => [v.name, v]));
   /** 模組的區域變數（寫在函式裡面） */
   const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, fieldInit: v.fieldInit }));
   /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數和區域變數 */
@@ -25,7 +27,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   let current: ModuleProgram | null = null;
   const enter = (m: ModuleProgram | null) => {
     current = m;
-    vars = m ? new Map([...globals, ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '', float: p.float, long: p.long } as VarInfo] as const), ...localsOf(m).map(v => [v.name, v] as const)]) : globals;
+    vars = m ? new Map([...globalOnly.map(v => [v.name, v] as const), ...m.params.map(p => [p.name, { name: p.name, type: p.type, init: '', float: p.float, long: p.long } as VarInfo] as const), ...localsOf(m).map(v => [v.name, v] as const)]) : globals;
   };
   /** 全部的變數（全域＋各模組的區域變數；名字不會重複，執行時會擋） */
   const allVars = [...varList, ...modules.flatMap(localsOf)];

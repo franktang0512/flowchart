@@ -193,6 +193,9 @@ interface Props {
   holds?: Record<string, string>;
   /** C++ 的全域變數：模組裡也列出來 */
   globals?: string[];
+  /** C++：只有全域變數的那一份（可能跟 main 的變數同名、型別不一樣），模組裡用這一份 */
+  globalTypes?: VarTypes;
+  globalHolds?: Record<string, string>;
 }
 
 /**
@@ -345,7 +348,7 @@ const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string
   替換: (list, k) => t(`輸入的值會換掉清單「${list}」的${itemWord(k || '?')}`, `The value replaces ${itemWord(k || '?')} of "${list}".`),
 };
 
-export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, globals = [] }: Props) {
+export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, globals = [], globalTypes, globalHolds }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -364,7 +367,7 @@ export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, gl
         onClose();
       }}
     >
-      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={varTypes} modules={modules} holds={holds} globals={globals} />}
+      {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={request.inModule && getTarget() == 'cpp' && globalTypes ? globalTypes : varTypes} modules={modules} holds={request.inModule && getTarget() == 'cpp' && globalHolds ? globalHolds : holds} globals={globals} />}
     </dialog>
   );
 }
@@ -380,7 +383,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
   const own = new Set([...(request.params ?? []).map(p => p.name), ...Object.values(localT).flat()]);
   const target = getTarget();
   const shown = (list: string[]) => (!request.inModule ? list
-    // C++：只有勾了「全域」的主流程變數，模組裡才用得到
+    // C++：模組裡用的是只有全域變數的那一份（見 NodeDialog 傳進來的 varTypes）
     : target == 'cpp' ? list.filter(n => globals.includes(n) && !own.has(n))
     : list.flatMap(n => (!own.has(n) ? [n] : target == 'scratch' ? [GLOBAL_PREFIX + n] : [])));
   varTypes = mapTypes(varTypes, shown);

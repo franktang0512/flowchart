@@ -52,6 +52,13 @@ export interface VarStore {
   longs?: string[];
   /** C++：全域變數（宣告在 main 外面，模組也用得到） */
   globals?: string[];
+  /**
+   * C++：只有全域變數的那一份（模組裡用的就是這一份）。全域變數可以跟 main 的變數同名（不同的作用域）：
+   * 這時 main 用自己的，模組用全域的，這一份的名字指的就是全域的
+   */
+  globalVars?: VarStore;
+  /** C++：被 main 的同名變數蓋住的全域變數（main 裡看不到，模組看得到） */
+  shadowed?: string[];
 }
 
 /** 區域變數照型別分好（給下拉選單、型別檢查用） */
@@ -126,32 +133,33 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
   const target = getTarget();
   const lt = localTypes(named);
   const own = new Set([...params.map(p => p.name), ...named.map(v => v.name.trim())]);
-  // C++ 的模組只看得到全域變數（主流程其他的變數寫在 main 裡面）
-  const visible = (n: string) => (target != 'cpp' || (vars.globals ?? []).includes(n)) && !own.has(n);
+  // C++ 的模組只看得到全域變數（主流程其他的變數寫在 main 裡面）：用只有全域變數的那一份
+  const base = target == 'cpp' ? vars.globalVars ?? createVarStore() : vars;
+  const visible = (n: string) => !own.has(n);
   // Scratch：被蓋住的主流程變數改叫「主流程的a」
   const renamed = (n: string) => (target == 'scratch' && own.has(n) ? [GLOBAL_PREFIX + n] : []);
   const g = (list: string[]) => list.flatMap(n => (visible(n) ? [n] : renamed(n)));
-  const globalNames = g(vars.var_list.name);
-  const valueOf = (n: string) => vars.var_list.value[vars.var_list.name.indexOf(n.startsWith(GLOBAL_PREFIX) ? n.slice(GLOBAL_PREFIX.length) : n)];
+  const globalNames = g(base.var_list.name);
+  const valueOf = (n: string) => base.var_list.value[base.var_list.name.indexOf(n.startsWith(GLOBAL_PREFIX) ? n.slice(GLOBAL_PREFIX.length) : n)];
   return {
     var_list: {
       name: [...globalNames, ...named.map(v => v.name.trim())],
       value: [...globalNames.map(valueOf), ...named.map(v => v.init)],
     },
-    type_var_list: joinTypes(mapTypes(vars.type_var_list, g), {
+    type_var_list: joinTypes(mapTypes(base.type_var_list, g), {
       ...lt,
       number: [...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
       text: [...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
     }),
-    sizes: { ...vars.sizes, ...Object.fromEntries(named.filter(v => v.type == '陣列').map(v => [v.name.trim(), v.size ?? ''])) },
-    structInits: { ...vars.structInits, ...Object.fromEntries(named.filter(v => v.type == '結構' && v.fieldInit).map(v => [v.name.trim(), v.fieldInit!])) },
+    sizes: { ...base.sizes, ...Object.fromEntries(named.filter(v => v.type == '陣列').map(v => [v.name.trim(), v.size ?? ''])) },
+    structInits: { ...base.structInits, ...Object.fromEntries(named.filter(v => v.type == '結構' && v.fieldInit).map(v => [v.name.trim(), v.fieldInit!])) },
     globals: vars.globals,
     params: params.map(p => p.name),
     paramsReadOnly: getTarget() == 'scratch',
     locals: named.map(v => v.name.trim()),
     calls: vars.calls,
-    floats: [...g(vars.floats ?? []), ...params.filter(p => p.type == '數字' && p.float).map(p => p.name), ...named.filter(v => v.type == '數字' && v.float).map(v => v.name.trim())],
-    longs: [...g(vars.longs ?? []), ...params.filter(p => p.type == '數字' && p.long).map(p => p.name), ...named.filter(v => v.type == '數字' && v.long).map(v => v.name.trim())],
+    floats: [...g(base.floats ?? []), ...params.filter(p => p.type == '數字' && p.float).map(p => p.name), ...named.filter(v => v.type == '數字' && v.float).map(v => v.name.trim())],
+    longs: [...g(base.longs ?? []), ...params.filter(p => p.type == '數字' && p.long).map(p => p.name), ...named.filter(v => v.type == '數字' && v.long).map(v => v.name.trim())],
   };
 }
 
@@ -165,6 +173,9 @@ export function structNameOf(vars: VarStore, name: string): string | undefined {
   const holds = vars.var_list.value[vars.var_list.name.indexOf(name)];
   return findStruct(holds) ? holds : undefined;
 }
+
+/** 第四步顯示被 main 同名變數蓋住的全域變數：「x（全域）」 */
+export const shadowLabel = (name: string) => t(`${name}（全域）`, `${name} (global)`);
 
 /** 欄位當存值的地方：「e.from」「edges[i].w」→ 前面那段和欄位名稱；不是這種寫法回傳 null */
 export function splitField(str: string): { base: string; field: string } | null {
@@ -878,6 +889,8 @@ class CodeGenerator {
   private readonly locals: LocalVar[];
   /** Scratch 的模組：可以用「主流程的a」（見 withParams） */
   private readonly globalRefs: boolean;
+  /** 主程式：「開始」後面先宣告 main 自己的變數（C++，見 buildRun） */
+  mainPrelude = '';
 
   constructor(diagram: Diagram, vars: VarStore, sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = [], locals: LocalVar[] = []) {
     this.diagram = diagram;
@@ -1202,7 +1215,7 @@ class CodeGenerator {
           return { code: 'total_step ++;\n' + update + check + '__depth--;\n__frames.pop();\nreturn __ret;\n' + (this.globalRefs ? '}\n' : '') + '}\n', next: undefined };
         }
         if (node.text == '開始') {
-          return { code: 'function flowchart_code(){\n' + update, next: this.nextOf(node) };
+          return { code: 'function flowchart_code(){\n' + this.mainPrelude + update, next: this.nextOf(node) };
         }
         return { code: 'total_step ++;\n' + update + '}\n', next: undefined };
       case 'Function': {
@@ -1507,12 +1520,19 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
 
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');
-  // 兩個變數同名（舊作品，或匯入的作品）：流程圖上分不出是哪一個
-  const twice = names.find((n, k) => names.indexOf(n) != k);
+  // C++：全域變數一份、main 的一份（可以同名：不同的作用域）
+  const cpp = getTarget() == 'cpp';
+  const gv = cpp ? vars.globalVars ?? createVarStore() : null;
+  const globalNames = gv ? gv.var_list.name.filter(n => n.trim() != '') : [];
+  const shadowed = new Set(vars.shadowed ?? []);
+  /** main 自己的變數（C++ 宣告在 main 裡面）；不是 C++ 時全部都放在最外層 */
+  const mainNames = cpp ? names.filter(n => !globalNames.includes(n) || shadowed.has(n)) : names;
+  // 同一個作用域裡有兩個變數同名（舊作品，或匯入的作品）：流程圖上分不出是哪一個
+  const twice = [names, globalNames].map(list => list.find((n, k) => list.indexOf(n) != k)).find(Boolean);
   if (twice) throw new FlowError(t(`變數表裡有兩個變數都叫「${twice}」：流程圖上分不出是哪一個，請到第三步把其中一個改名。`, `Two variables are both called "${twice}". You cannot tell them apart in the flowchart. Rename one of them in step 3.`));
   // C++：名稱只能用英文（舊作品、從別的語言換過來的還留著中文名稱時，在這裡說明）
   const cppNames: [string, string][] = [
-    ...names.map(n => [t('變數', 'Variable'), n] as [string, string]),
+    ...[...names, ...globalNames.filter(n => !names.includes(n))].map(n => [t('變數', 'Variable'), n] as [string, string]),
     ...modules.flatMap(m => [
       [t('模組', 'Module'), m.info.name] as [string, string],
       ...m.info.params.map(p => [t(`模組「${m.info.name}」的參數`, `Parameter of "${m.info.name}"`), p.name] as [string, string]),
@@ -1557,30 +1577,42 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
   let code = `var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = ${MAX_LOOPS};\nvar __depth = 0;\nvar __stack = [];\nvar __frames = [];\n`;
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
-  const fixedNames = [...vars.type_var_list.fixed, ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列').map(v => v.name.trim()))];
+  const fixedNames = [...vars.type_var_list.fixed, ...(gv?.type_var_list.fixed ?? []), ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列').map(v => v.name.trim()))];
   code += 'var __FIXED = ' + JSON.stringify(Object.fromEntries(fixedNames.map(n => [n, true]))) + ';\n';
   for (const s of getStructs()) {
     if (!s.fields.length) throw new FlowError(t(`struct ${s.name} 還沒有欄位：請到第三步替它加上欄位，或把它刪掉。`, `The struct ${s.name} has no fields yet. Add fields in step 3, or delete it.`));
   }
   code += 'var __STRUCTS = ' + JSON.stringify(Object.fromEntries(getStructs().map(s => [s.name, Object.fromEntries(s.fields.map(f => [f.name, fieldInit(f)]))]))) + ';\n';
   code += runtime();
-  for (const name of names) {
-    const decl = 'var ' + name + ' = ' + initialValue(vars, name, vars.var_list.value[vars.var_list.name.indexOf(name)]) + '\n';
+  const declare = (store: VarStore, name: string) => {
+    const decl = 'var ' + name + ' = ' + initialValue(store, name, store.var_list.value[store.var_list.name.indexOf(name)]) + ';\n';
     if (!syntaxOk(decl)) throw new FlowError(t(`變數名稱「${name}」不能用：名稱裡不能有空白或符號，也不能用數字開頭。`, `"${name}" cannot be a variable name. Do not use spaces or symbols, and do not start with a number.`));
-    code += decl;
-  }
+    return decl;
+  };
+  /** 寫在最外層的變數（模組看得到）：C++ 是全域變數；其他語言是全部的變數 */
+  const topNames = cpp ? globalNames : names;
+  for (const name of topNames) code += declare(gv ?? vars, name);
+  // C++ 的 main 自己的變數：宣告在 flowchart_code 裡面（模組看不到；跟全域變數同名時蓋住全域的）
+  const mainPrelude = cpp
+    ? mainNames.map(n => declare(vars, n)).join('') + 'var __mainNow = function(){ return {' + mainNames.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; };\n__mainSnap = __mainNow;\n'
+    : '';
   // 「主流程的a」：模組裡讀寫主流程的 a（Scratch；見 withParams）
-  code += 'var __G = {' + names.map(n => {
-    const key = JSON.stringify(GLOBAL_PREFIX + n);
-    return `get ${key}() { return ${n}; }, set ${key}(v) { ${n} = v; }`;
-  }).join(', ') + '};\n';
-  // 全域變數的值（寫在最外層：模組裡就算有同名的參數，這裡拿到的還是全域的）
-  code += 'function __globals(){ return {' + names.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; }\n';
+  if (!cpp) {
+    code += 'var __G = {' + names.map(n => {
+      const key = JSON.stringify(GLOBAL_PREFIX + n);
+      return `get ${key}() { return ${n}; }, set ${key}(v) { ${n} = v; }`;
+    }).join(', ') + '};\n';
+  }
+  // 第四步要看的變數：最外層的（被 main 同名變數蓋住的全域變數叫「x（全域）」）＋ main 自己的
+  code += 'var __mainSnap = null;\n';
+  code += 'function __globals(){ var o = {' + topNames.map(n => JSON.stringify(shadowed.has(n) ? shadowLabel(n) : n) + ': ' + n).join(',') + '}; if (__mainSnap) { var m = __mainSnap(); for (var k in m) o[k] = m[k]; } return o; }\n';
   // 每一步都記下來給第四步看；步驟太多時（大的測資、排序）只記前 MAX_STEPS 步，之後只記住最後一步，執行完再補上，瀏覽器才不會卡住
   code += 'function __record(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nif (b && typeof b == "object" && __frames.length) b.__frames = __frames.slice(-20).map(function (f, k, all) { return { sheet: f.sheet, depth: __frames.length - all.length + k + 1, vals: f.get() }; });\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
   code += `var __skipped = 0;\nvar __last = null;\nfunction Update_output(a,b){\nif (step_list.step.length < ${MAX_STEPS}) { __record(a, b); return; }\n__skipped++;\n__last = [a, b];\n}\n`;
   const infos = modules.map(m => m.info);
-  code += new CodeGenerator(diagram, vars, 0, infos).program();
+  const mainGen = new CodeGenerator(diagram, vars, 0, infos);
+  mainGen.mainPrelude = mainPrelude;
+  code += mainGen.program();
   // 模組：每個模組一個函式（__mod1、__mod2…）
   modules.forEach((m, k) => {
     code += new CodeGenerator(m.diagram, vars, k + 1, infos, m.info.params, m.info.locals).program();

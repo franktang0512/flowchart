@@ -14,7 +14,7 @@ import { StructTable, type StructRename } from './components/StructTable';
 import { setStructs as setStructRegistry, type StructDef } from './engine/structs';
 import { isContainerType, type VarType } from './engine/structure';
 import { connectorState, createConnectors } from './engine/connector';
-import { buildRun, createVarStore, FlowError, typeLists, withParams, type RunResult } from './engine/decoder';
+import { buildRun, createVarStore, FlowError, shadowLabel, typeLists, withParams, type RunResult, type VarStore } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
 import { callText, cppNameProblem, cppType, GLOBAL_PREFIX, isName, parseCall, renameFieldInText, renameInText, splitId, typeLabel, usesField, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
@@ -386,6 +386,8 @@ export function App() {
 
   /** 變數表每一列上次確定的名字（名字不能用時改回去） */
   const committedVarNames = useRef(new Map<number, string>());
+  /** 上次確定時有沒有勾「全域」（勾了可能就跟另一個同名的撞在同一個作用域） */
+  const committedGlobals = useRef(new Map<number, boolean>());
   /**
    * 全域變數的名字跟模組一樣：流程圖上分不出是哪一個，回傳原因。
    * 跟模組的參數、區域變數同名可以：模組裡寫這個名字指的是模組自己的，主流程指的是全域變數
@@ -395,8 +397,19 @@ export function App() {
     if (cpp) return cpp;
     if (modulesRef.current.some(m => m.info.name == name)) return sameName(t(`「${name}」已經是模組的名字了`, `"${name}" is already a module`));
     if (structsRef.current.some(s => s.name.trim() == name)) return sameName(t(`「${name}」已經是 struct 的名字了`, `"${name}" is already a struct`));
-    // 變數表裡另一個變數（不管什麼型別）已經叫這個名字
-    if (varsRef.current.some(v => v.id != id && v.name.trim() == name)) return sameName(t(`已經有叫「${name}」的變數了`, `There is already a variable called "${name}"`));
+    // 同一個作用域裡已經有這個名字：C++ 的全域變數和 main 的變數是不同的作用域，可以同名
+    // （main 裡用 main 自己的，模組用全域的）；其他語言沒有全域、main 之分，一律不能同名
+    const cppScope = getTarget() == 'cpp';
+    const me = varsRef.current.find(v => v.id == id);
+    const other = varsRef.current.find(v => v.id != id && v.name.trim() == name && (!cppScope || !!v.global == !!me?.global));
+    if (other) {
+      if (!cppScope) return sameName(t(`已經有叫「${name}」的變數了`, `There is already a variable called "${name}"`));
+      const which = other.global ? t('全域變數', 'global variable') : t('main 的變數', 'main variable');
+      return t(
+        `已經有一個${which}叫「${name}」了：同一個地方的變數不能同名，請換一個名字。（全域變數和 main 的變數可以同名：main 裡用 main 自己的，模組用全域的。）`,
+        `There is already a ${which} called "${name}". Variables in the same place cannot share a name. (A global and a main variable may share a name: main uses its own, modules use the global one.)`,
+      );
+    }
     return null;
   };
   /** 區域變數的名字：不能跟模組、這個模組的參數、這個模組的其他區域變數一樣（跟全域變數一樣可以） */
@@ -490,29 +503,50 @@ export function App() {
   const sameName = (why: string) => why + t('：名字一樣的話，流程圖上分不出是哪一個，請換一個名字。', '. With the same name you cannot tell them apart in the flowchart. Choose another name.');
   /** 變數表的輸入框確定時：名字不能用就改回原本的名字 */
   const commitVars = () => {
-    // 只看這次改過名字的列（原本就撞名的舊作品，第四步執行時會說明）
-    const bad = varsRef.current.find(r => r.name.trim() && r.name.trim() != committedVarNames.current.get(r.id)?.trim() && globalVarProblem(r.name.trim(), r.id));
+    // 只看這次改過名字、或勾 / 取消「全域」的列（原本就撞名的舊作品，第四步執行時會說明）
+    const renamed = (r: VarRow) => r.name.trim() != committedVarNames.current.get(r.id)?.trim();
+    const regloballed = (r: VarRow) => !!r.global != !!committedGlobals.current.get(r.id);
+    const bad = varsRef.current.find(r => r.name.trim() && (renamed(r) || regloballed(r)) && globalVarProblem(r.name.trim(), r.id));
     if (bad) {
       alert(globalVarProblem(bad.name.trim(), bad.id)!);
       const old = committedVarNames.current.get(bad.id) ?? '';
-      setVars(varsRef.current.map(v => (v.id == bad.id ? { ...v, name: old.trim() == bad.name.trim() ? '' : old } : v)));
+      // 改名字撞名就改回原本的名字；勾全域撞名就改回原本有沒有勾
+      setVars(varsRef.current.map(v => (v.id != bad.id ? v
+        : renamed(v) ? { ...v, name: old.trim() == bad.name.trim() ? '' : old }
+        : { ...v, global: committedGlobals.current.get(v.id) || undefined })));
     }
     syncVarList();
   };
+
+  /** 變數表的列 → 變數清單（名稱、初始值、型別…） */
+  const fillStore = (store: VarStore, rows: VarRow[]) => {
+    store.var_list.name = rows.map(r => r.name);
+    store.var_list.value = rows.map(r => r.init);
+    store.type_var_list = typeLists(rows);
+    store.sizes = Object.fromEntries(rows.filter(r => r.type == '陣列').map(r => [r.name, r.size ?? '']));
+    store.structInits = Object.fromEntries(rows.filter(r => r.type == '結構' && r.fieldInit).map(r => [r.name, r.fieldInit!]));
+    store.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
+    store.longs = rows.filter(r => r.type == '數字' && r.long).map(r => r.name);
+    return store;
+  };
+  /** C++：這個全域變數被 main 的同名變數蓋住了嗎 */
+  const shadows = (r: VarRow, rows: VarRow[]) => getTarget() == 'cpp' && !!r.global && rows.some(o => o.id != r.id && !o.global && o.name.trim() == r.name.trim());
+  /** 第四步顯示的名字：被蓋住的全域變數叫「x（全域）」 */
+  const runName = (r: VarRow) => (shadows(r, vars) ? shadowLabel(r.name.trim()) : r.name.trim());
 
   /** 依變數表格重建變數清單；如果有變數改名，流程圖裡用到的地方也跟著改 */
   const syncVarList = () => {
     const oldNames = [...varStore.var_list.name];
     // 沒填名稱的列先不算（還在打字，或忘了刪）
     const rows = varsRef.current.filter(r => r.name.trim() != '');
-    varStore.var_list.name = rows.map(r => r.name);
-    varStore.var_list.value = rows.map(r => r.init);
-    varStore.type_var_list = typeLists(rows);
-    varStore.sizes = Object.fromEntries(rows.filter(r => r.type == '陣列').map(r => [r.name, r.size ?? '']));
-    varStore.structInits = Object.fromEntries(rows.filter(r => r.type == '結構' && r.fieldInit).map(r => [r.name, r.fieldInit!]));
-    varStore.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
-    varStore.longs = rows.filter(r => r.type == '數字' && r.long).map(r => r.name);
-    varStore.globals = getTarget() == 'cpp' ? rows.filter(r => r.global).map(r => r.name) : [];
+    // C++：被 main 同名變數蓋住的全域變數，main 裡看不到（模組看得到，放在 globalVars）
+    const cpp = getTarget() == 'cpp';
+    const mainRows = rows.filter(r => !shadows(r, rows));
+    fillStore(varStore, mainRows);
+    varStore.globals = cpp ? rows.filter(r => r.global).map(r => r.name) : [];
+    varStore.shadowed = rows.filter(r => shadows(r, rows)).map(r => r.name);
+    varStore.globalVars = cpp ? fillStore(createVarStore(), rows.filter(r => r.global)) : undefined;
+    rows.forEach(r => committedGlobals.current.set(r.id, !!r.global));
 
     rows.forEach(r => committedVarNames.current.set(r.id, r.name));
     const replaced = oldNames.filter(n => !varStore.var_list.name.includes(n));
@@ -1037,6 +1071,8 @@ export function App() {
         request={dialog} onClose={() => setDialog(null)} varTypes={varStore.type_var_list} modules={modules.map(m => m.info)}
         holds={Object.fromEntries(varStore.var_list.name.map((n, k) => [n, varStore.var_list.value[k]]))}
         globals={varStore.globals}
+        globalTypes={varStore.globalVars?.type_var_list}
+        globalHolds={varStore.globalVars ? Object.fromEntries(varStore.globalVars.var_list.name.map((n, k) => [n, varStore.globalVars!.var_list.value[k]])) : undefined}
       />
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
@@ -1194,8 +1230,8 @@ export function App() {
           which={which}
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
-          varNames={varStore.var_list.name}
-          kinds={Object.fromEntries([...vars, ...modules.flatMap(m => m.info.locals ?? [])].filter(v => v.type == '堆疊' || v.type == '佇列' || v.type == '陣列').map(v => [v.name.trim(), v.type]))}
+          varNames={vars.filter(v => v.name.trim()).map(runName)}
+          kinds={Object.fromEntries([...vars.map(v => ({ ...v, name: runName(v) })), ...modules.flatMap(m => m.info.locals ?? [])].filter(v => v.type == '堆疊' || v.type == '佇列' || v.type == '陣列').map(v => [v.name.trim(), v.type]))}
           sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
           moduleVars={modules.map((m, k) => ({
             sheet: k + 1,
