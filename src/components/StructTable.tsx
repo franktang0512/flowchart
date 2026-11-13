@@ -22,20 +22,21 @@ interface Props {
 
 let structSeq = 2_000_000;
 
+/** 欄位名稱的灰色範例：一條邊 Edge 有 from、to、w */
+const FIELD_EXAMPLES = ['from', 'to', 'w'];
+
 export function StructTable({ structs, onChange, structProblem, fieldProblem, deleteProblem, fieldInUse }: Props) {
   useLang();
   const update = (s: StructDef, patch: Partial<StructDef>, rename?: StructRename) => onChange(structs.map(x => (x.id == s.id ? { ...x, ...patch } : x)), rename);
   return (
+    // 不放說明文字（還沒教到 struct 的學生看了會混淆），只用灰色的範例提示怎麼寫
     <div className="struct_area">
-      <p className="section_label var_section">
-        {t('struct（結構）：把幾個欄位綁成一筆資料，例如一條邊 Edge 有 from、to、w', 'struct: put several fields together as one record, like an Edge with from, to, w')}
-      </p>
       {structs.map(s => (
         <div key={s.id} className="struct_card">
           <div className="struct_head">
             <span className="struct_kw">struct</span>
             <NameInput
-              value={s.name} placeholder={t('名稱，例如 Edge', 'Name, like Edge')} className="struct_name"
+              value={s.name} placeholder="Edge" className="struct_name"
               onCommit={name => {
                 const why = name && structProblem(name, s.id);
                 if (why) {
@@ -64,7 +65,7 @@ export function StructTable({ structs, onChange, structProblem, fieldProblem, de
                   <tr key={k}>
                     <td>
                       <NameInput
-                        value={f.name} placeholder={t('例如 from', 'like from')}
+                        value={f.name} placeholder={FIELD_EXAMPLES[k] ?? ''}
                         onCommit={name => {
                           const why = name && fieldProblem(name, s.fields.filter((_, j) => j != k).map(x => x.name.trim()));
                           if (why) {
