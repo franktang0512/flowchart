@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜陣列：存進去、讀出來、改一格",
+  "question": "陣列（積木叫清單）把很多個資料排成一排，每一格用位置來找。\n請輸入 5 個整數存進陣列。再輸入一個位置 k（1 到 5，第 1 個是最左邊），先輸出第 k 個數字；再把第 k 個改成 0，最後輸出整個陣列。\n提示：第 k 個在陣列的哪一格？想一想陣列是從 0 還是從 1 開始算的。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3 8 6 1 9\n2",
+      "output": "8\n3 0 6 1 9",
+      "note": "第 2 個是 8"
+    },
+    {
+      "input": "10 20 30 40 50\n1",
+      "output": "10\n0 20 30 40 50",
+      "note": "改第一個"
+    },
+    {
+      "input": "7 7 7 7 5\n5",
+      "output": "5\n7 7 7 7 0",
+      "note": "改最後一個"
+    }
+  ],
+  "en": {
+    "title": "Basics | array: store, read, change one item",
+    "question": "An array (a list in blocks) keeps many values in a row. You find each one by its place.\nInput 5 whole numbers into an array. Then input a place k (1 to 5; 1 is the leftmost). Output the k-th number, then change the k-th number to 0, and output the whole array.\nTip: the k-th number is in which slot? Think about whether the array starts at 0 or 1.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3 8 6 1 9\n2",
+        "output": "8\n3 0 6 1 9",
+        "note": "The 2nd one is 8"
+      },
+      {
+        "input": "10 20 30 40 50\n1",
+        "output": "10\n0 20 30 40 50",
+        "note": "Change the first"
+      },
+      {
+        "input": "7 7 7 7 5\n5",
+        "output": "5\n7 7 7 7 0",
+        "note": "Change the last"
+      }
+    ]
+  }
+}

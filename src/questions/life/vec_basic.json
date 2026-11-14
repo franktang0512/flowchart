@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜vector（清單）：一直加到最後面",
+  "question": "不知道會有幾個資料時，用 vector（積木叫清單）：拿到一個就加到最後面（C++ 是 push_back）。\n請一直輸入貼紙編號，輸入 0 代表結束（0 不算貼紙）。先輸出一共拿到幾張（vector 的大小），再把所有編號照拿到的順序輸出在同一行（輸出整個 vector）。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 12 7 0",
+      "output": "3\n5 12 7",
+      "note": ""
+    },
+    {
+      "input": "8 8 3 9 1 0",
+      "output": "5\n8 8 3 9 1",
+      "note": "一樣的貼紙也算"
+    },
+    {
+      "input": "42 0",
+      "output": "1\n42",
+      "note": "只拿到一張"
+    }
+  ],
+  "en": {
+    "title": "Basics | vector (list): add to the end",
+    "question": "When you do not know how many items there will be, use a vector (a list in blocks): add each new item to the end (push_back in C++).\nKeep inputting sticker numbers. 0 means stop (0 is not a sticker). Output how many stickers you got (the size of the vector), then all the numbers in order on one line (output the whole vector).",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 12 7 0",
+        "output": "3\n5 12 7",
+        "note": ""
+      },
+      {
+        "input": "8 8 3 9 1 0",
+        "output": "5\n8 8 3 9 1",
+        "note": "Same stickers count too"
+      },
+      {
+        "input": "42 0",
+        "output": "1\n42",
+        "note": "Only one sticker"
+      }
+    ]
+  }
+}
