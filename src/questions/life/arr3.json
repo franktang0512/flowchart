@@ -1,0 +1,44 @@
+{
+  "title": "一週步數統計",
+  "question": "請輸入七天的步數（星期一到星期日）存進清單，用迴圈算出一週總共走了幾步，再找出走最多的是星期幾（1 到 7）。\n先輸出總步數，再輸出星期幾；如果有兩天一樣多，輸出比較前面的那一天。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5000 7200 8300 9100 7800 6400 10000",
+      "output": "53800\n7",
+      "note": "星期日走最多"
+    },
+    {
+      "input": "8000 6000 8000 5000 4000 3000 2000",
+      "output": "36000\n1",
+      "note": "星期一和星期三一樣多，輸出比較前面的 1"
+    },
+    {
+      "input": "3000 9000 4000 9500 2000 1000 500",
+      "output": "29000\n4",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Weekly Steps",
+    "question": "Input the steps for 7 days (Monday to Sunday) into a list. Use a loop to find the total steps, and the day with the most steps (1 to 7).\nOutput the total first, then the day. If two days are the same, output the earlier day.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5000 7200 8300 9100 7800 6400 10000",
+        "output": "53800\n7",
+        "note": "Sunday has the most"
+      },
+      {
+        "input": "8000 6000 8000 5000 4000 3000 2000",
+        "output": "36000\n1",
+        "note": "Monday and Wednesday are the same: output 1"
+      },
+      {
+        "input": "3000 9000 4000 9500 2000 1000 500",
+        "output": "29000\n4",
+        "note": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "title": "每天氣溫變化",
+  "question": "請輸入一週七天的最高氣溫（整數）存進清單，從第二天開始，每天輸出「今天比昨天多幾度」，一行一個（變冷就是負的，一樣就是 0），一共輸出 6 行。\n提示：今天是清單裡的某一格，昨天就是它的前一格。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "20 22 21 21 25 19 18",
+      "output": "2\n-1\n0\n4\n-6\n-1",
+      "note": ""
+    },
+    {
+      "input": "30 30 30 30 30 30 30",
+      "output": "0\n0\n0\n0\n0\n0",
+      "note": "每天都一樣"
+    },
+    {
+      "input": "15 18 23 27 24 16 12",
+      "output": "3\n5\n4\n-3\n-8\n-4",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Temperature Change",
+    "question": "Input the high temperature (whole numbers) for 7 days into a list. From day 2, output how much warmer today is than yesterday, one on each line (colder is negative, the same is 0). Output 6 lines.\nTip: Today is one item in the list. Yesterday is the item before it.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "20 22 21 21 25 19 18",
+        "output": "2\n-1\n0\n4\n-6\n-1",
+        "note": ""
+      },
+      {
+        "input": "30 30 30 30 30 30 30",
+        "output": "0\n0\n0\n0\n0\n0",
+        "note": "The same every day"
+      },
+      {
+        "input": "15 18 23 27 24 16 12",
+        "output": "3\n5\n4\n-3\n-8\n-4",
+        "note": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "title": "基礎佇列操作",
+  "question": "佇列（queue）是「先進先出」：就像排隊買飲料，先排的人先買到。\n請用 queue 存整數，支援三種指令：\n1 x：x 排到最後面（push）\n2：最前面的離開（pop）；如果是空的，輸出 Empty!\n3：輸出最前面的數字（front）；如果是空的，輸出 Empty!\n第一行輸入 N，接下來輸入 N 個指令。每個要輸出的結果各輸出一行。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "8\n1 10\n1 20\n3\n2\n3\n2\n2\n3",
+      "output": "10\n20\nEmpty!\nEmpty!",
+      "note": "先排的 10 先離開，所以第二次 front 是 20"
+    },
+    {
+      "input": "6\n1 5\n1 -3\n1 8\n3\n2\n3",
+      "output": "5\n-3",
+      "note": ""
+    },
+    {
+      "input": "5\n3\n2\n1 7\n3\n2",
+      "output": "Empty!\nEmpty!\n7",
+      "note": "一開始就是空的"
+    }
+  ],
+  "en": {
+    "title": "Basic Queue Operations",
+    "question": "A queue is \"first in, first out\", like a line for drinks: the first person in line buys first.\nUse a queue of whole numbers with three commands:\n1 x: x joins the back of the line (push)\n2: the front one leaves (pop). If it is empty, output Empty!\n3: output the front number (front). If it is empty, output Empty!\nFirst input N, then N commands. Output each result on its own line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "8\n1 10\n1 20\n3\n2\n3\n2\n2\n3",
+        "output": "10\n20\nEmpty!\nEmpty!",
+        "note": "10 came first and leaves first, so the second front is 20"
+      },
+      {
+        "input": "6\n1 5\n1 -3\n1 8\n3\n2\n3",
+        "output": "5\n-3",
+        "note": ""
+      },
+      {
+        "input": "5\n3\n2\n1 7\n3\n2",
+        "output": "Empty!\nEmpty!\n7",
+        "note": "Empty at the start"
+      }
+    ]
+  }
+}

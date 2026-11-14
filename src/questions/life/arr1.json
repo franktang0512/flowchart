@@ -1,0 +1,44 @@
+{
+  "title": "查詢步數紀錄",
+  "question": "你有一支智慧手環，會記錄一週每天走的步數。\n請先輸入七天的步數（星期一到星期日）存進清單，再輸入一個整數 n（1 到 7），代表要查星期幾，輸出那一天的步數。\n提示：星期 n 是清單的第幾個位置？想一想清單是從哪裡開始算的。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5000 7200 8300 9100 7800 6400 10000\n4",
+      "output": "9100",
+      "note": "星期四是第 4 天"
+    },
+    {
+      "input": "3000 4500 6000 5200 8800 12000 9500\n1",
+      "output": "3000",
+      "note": "查第一天"
+    },
+    {
+      "input": "6600 7100 5900 8000 7300 15000 11200\n7",
+      "output": "11200",
+      "note": "查最後一天"
+    }
+  ],
+  "en": {
+    "title": "Step Record",
+    "question": "Your smart band records your steps every day for a week.\nInput the steps for 7 days (Monday to Sunday) into a list. Then input a number n (1 to 7) for the day you want. Output the steps of that day.\nTip: Day n is at which place in the list? Think about where the list starts.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5000 7200 8300 9100 7800 6400 10000\n4",
+        "output": "9100",
+        "note": "Thursday is day 4"
+      },
+      {
+        "input": "3000 4500 6000 5200 8800 12000 9500\n1",
+        "output": "3000",
+        "note": "The first day"
+      },
+      {
+        "input": "6600 7100 5900 8000 7300 15000 11200\n7",
+        "output": "11200",
+        "note": "The last day"
+      }
+    ]
+  }
+}

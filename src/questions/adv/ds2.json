@@ -1,0 +1,44 @@
+{
+  "title": "基礎堆疊操作",
+  "question": "堆疊（stack）是「後進先出」：就像疊盤子，最後放上去的盤子要最先拿下來。\n請用 stack 存整數，支援三種指令：\n1 x：把 x 放到頂端（push）\n2：拿掉頂端的數字（pop）；如果是空的，輸出 Empty!\n3：輸出頂端的數字（top）；如果是空的，輸出 Empty!\n第一行輸入 N，接下來輸入 N 個指令。每個要輸出的結果各輸出一行。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "8\n1 10\n1 20\n3\n2\n3\n2\n2\n3",
+      "output": "20\n10\nEmpty!\nEmpty!",
+      "note": "拿掉 20 之後頂端是 10；10 也拿掉之後，pop 和 top 都是空的"
+    },
+    {
+      "input": "6\n1 5\n1 -3\n1 8\n3\n2\n3",
+      "output": "8\n-3",
+      "note": ""
+    },
+    {
+      "input": "5\n3\n2\n1 7\n3\n2",
+      "output": "Empty!\nEmpty!\n7",
+      "note": "一開始就是空的"
+    }
+  ],
+  "en": {
+    "title": "Basic Stack Operations",
+    "question": "A stack is \"last in, first out\", like a pile of plates: the last plate on top comes off first.\nUse a stack of whole numbers with three commands:\n1 x: put x on the top (push)\n2: remove the top number (pop). If it is empty, output Empty!\n3: output the top number (top). If it is empty, output Empty!\nFirst input N, then N commands. Output each result on its own line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "8\n1 10\n1 20\n3\n2\n3\n2\n2\n3",
+        "output": "20\n10\nEmpty!\nEmpty!",
+        "note": "After popping 20 the top is 10. After popping 10, pop and top find it empty"
+      },
+      {
+        "input": "6\n1 5\n1 -3\n1 8\n3\n2\n3",
+        "output": "8\n-3",
+        "note": ""
+      },
+      {
+        "input": "5\n3\n2\n1 7\n3\n2",
+        "output": "Empty!\nEmpty!\n7",
+        "note": "Empty at the start"
+      }
+    ]
+  }
+}

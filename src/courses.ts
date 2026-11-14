@@ -36,6 +36,8 @@ export const COURSES: Course[] = [
       { name: '次數迴圈', nameEn: 'Repeat n times', questions: ['life/f1', 'life/f2', 'life/f3'] },
       { name: '條件迴圈', nameEn: 'Repeat until', questions: ['life/w1', 'life/w2', 'life/w3'] },
       { name: '巢狀迴圈', nameEn: 'Loop inside a loop', questions: ['life/n1', 'life/n2'] },
+      { name: '陣列（清單）基本操作', nameEn: 'Arrays (lists): the basics', questions: ['life/arr1', 'life/arr2'] },
+      { name: '陣列搭配迴圈', nameEn: 'Arrays with loops', questions: ['life/arr3', 'life/arr4', 'life/arr5'] },
       { name: '排序：泡泡排序', nameEn: 'Sorting: bubble sort', questions: ['life/sort1'] },
       { name: '搜尋：一個一個找、二分搜尋', nameEn: 'Searching: one by one, binary search', questions: ['life/find1', 'life/find2'] },
       { name: '挑戰：怎麼買最划算（背包問題）', nameEn: 'Challenge: the best plan (knapsack)', questions: ['life/bag1'] },
@@ -47,6 +49,8 @@ export const COURSES: Course[] = [
     name: '生活中的演算法', nameEn: 'Algorithms in Everyday Life',
     target: 'cpp',
     units: [
+      { name: '資料結構基本操作', nameEn: 'Data structures: the basics', questions: ['adv/ds1', 'adv/ds2', 'adv/ds3'] },
+      { name: '不用函式庫：用陣列做 stack', nameEn: 'No library: a stack made from an array', questions: ['adv/ds4'] },
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q1', 'adv/q2'] },
       { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },

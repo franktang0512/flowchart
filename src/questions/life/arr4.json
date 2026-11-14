@@ -1,0 +1,44 @@
+{
+  "title": "倒著播放歌單",
+  "question": "請輸入 5 首歌的編號存進清單，然後從最後一首倒著播回第一首：用迴圈把編號倒過來輸出，一行一個。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "3 8 1 6 2",
+      "output": "2\n6\n1\n8\n3",
+      "note": ""
+    },
+    {
+      "input": "10 20 30 40 50",
+      "output": "50\n40\n30\n20\n10",
+      "note": ""
+    },
+    {
+      "input": "7 7 2 9 7",
+      "output": "7\n9\n2\n7\n7",
+      "note": "一樣的編號也照順序倒過來"
+    }
+  ],
+  "en": {
+    "title": "Play the Songs Backward",
+    "question": "Input the numbers of 5 songs into a list. Then play them from the last one back to the first: use a loop to output the numbers backward, one on each line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "3 8 1 6 2",
+        "output": "2\n6\n1\n8\n3",
+        "note": ""
+      },
+      {
+        "input": "10 20 30 40 50",
+        "output": "50\n40\n30\n20\n10",
+        "note": ""
+      },
+      {
+        "input": "7 7 2 9 7",
+        "output": "7\n9\n2\n7\n7",
+        "note": "Same numbers: still reverse the order"
+      }
+    ]
+  }
+}

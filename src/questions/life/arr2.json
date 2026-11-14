@@ -1,0 +1,44 @@
+{
+  "title": "交換座位",
+  "question": "一排有 5 個座位。請先輸入 5 位同學的名字（從左到右）存進清單，再輸入兩個位置 a、b（1 到 5），把這兩個位置的同學換座位，最後輸出整排的名字。\n提示：直接把 a 設成 b 的話，a 原本的名字就不見了，要先找個變數暫時存起來。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "小明 小華 小美 小強 小芳\n2 4",
+      "output": "小明 小強 小美 小華 小芳",
+      "note": "第 2 個和第 4 個換"
+    },
+    {
+      "input": "Amy Ben Cathy Dan Eva\n1 5",
+      "output": "Eva Ben Cathy Dan Amy",
+      "note": "頭尾交換"
+    },
+    {
+      "input": "小明 小華 小美 小強 小芳\n3 3",
+      "output": "小明 小華 小美 小強 小芳",
+      "note": "同一個位置，換了也一樣"
+    }
+  ],
+  "en": {
+    "title": "Swap Seats",
+    "question": "A row has 5 seats. Input 5 names (left to right) into a list. Then input two places a and b (1 to 5). Swap the two students, and output the whole row.\nTip: If you set a to b first, the name at a is lost. Keep it in another variable first.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "小明 小華 小美 小強 小芳\n2 4",
+        "output": "小明 小強 小美 小華 小芳",
+        "note": "Swap place 2 and place 4"
+      },
+      {
+        "input": "Amy Ben Cathy Dan Eva\n1 5",
+        "output": "Eva Ben Cathy Dan Amy",
+        "note": "Swap the first and the last"
+      },
+      {
+        "input": "小明 小華 小美 小強 小芳\n3 3",
+        "output": "小明 小華 小美 小強 小芳",
+        "note": "The same place: nothing changes"
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "title": "收集貼紙",
+  "question": "你在收集貼紙，每拿到一張就記下它的編號，但不知道最後會拿到幾張，所以要用 vector：拿到一張就 push_back 一張。\n請一直輸入貼紙編號，輸入 0 代表結束（0 不算貼紙）。先輸出一共拿到幾張，再把所有編號照拿到的順序輸出在同一行。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 12 7 0",
+      "output": "3\n5 12 7",
+      "note": ""
+    },
+    {
+      "input": "8 8 3 9 1 0",
+      "output": "5\n8 8 3 9 1",
+      "note": "一樣的貼紙也算"
+    },
+    {
+      "input": "42 0",
+      "output": "1\n42",
+      "note": "只拿到一張"
+    }
+  ],
+  "en": {
+    "title": "Sticker Collection",
+    "question": "You collect stickers and write down each number. You do not know how many you will get, so use a vector: push_back each new sticker.\nKeep inputting sticker numbers. 0 means stop (0 is not a sticker). Output how many stickers you got, then all the numbers in order on one line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 12 7 0",
+        "output": "3\n5 12 7",
+        "note": ""
+      },
+      {
+        "input": "8 8 3 9 1 0",
+        "output": "5\n8 8 3 9 1",
+        "note": "Same stickers count too"
+      },
+      {
+        "input": "42 0",
+        "output": "1\n42",
+        "note": "Only one sticker"
+      }
+    ]
+  }
+}
