@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MAX_STEPS, type RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
 import { indexBase } from '../target';
+import type { RunView } from '../engine/diagram';
 
 /** 第四步的一張流程圖：主流程、一層一層執行進來的模組，最後一張是正在執行的 */
 export interface RunPane {
@@ -10,8 +11,8 @@ export interface RunPane {
   title: string;
   /** 正在執行的那一張（其他張標出「執行模組」的積木） */
   running: boolean;
-  /** 畫到這張畫布上（只是畫，不能改） */
-  draw: (canvas: HTMLCanvasElement) => void;
+  /** 畫到這張畫布上（只是畫，不能改）；回傳畫的比例 */
+  draw: (canvas: HTMLCanvasElement, view: RunView) => number;
 }
 
 interface Props {
@@ -138,7 +139,17 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
               <div className={'run_pane' + (p.running ? '' : ' run_caller')}>
                 {panes.length > 1 && <span className="run_pane_title">{p.title}</span>}
                 <div className="canvas_wrap">
-                  <canvas ref={el => { split.canvases.current[k] = el; }}></canvas>
+                  <canvas
+                    ref={el => { split.canvases.current[k] = el; }}
+                    onPointerDown={e => split.startPan(e, k)}
+                    title={t('拖曳可以移動流程圖', 'Drag to move the flowchart')}
+                  ></canvas>
+                  {/* 放大縮小：一開始整張流程圖放進畫面；點比例回到整張 */}
+                  <div className="zoom_controls">
+                    <button title={t('縮小', 'Zoom out')} aria-label={t('縮小', 'Zoom out')} onClick={() => split.zoomBy(k, 1 / 1.25)}>－</button>
+                    <button className="zoom_value" title={t('整張流程圖放進畫面', 'Fit the whole flowchart')} ref={el => { split.labels.current[k] = el; }} onClick={() => split.fit(k)}></button>
+                    <button title={t('放大', 'Zoom in')} aria-label={t('放大', 'Zoom in')} onClick={() => split.zoomBy(k, 1.25)}>＋</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -352,10 +363,65 @@ function useSplit(panes: RunPane[], visible: boolean) {
   const weight = (k: number) => weights[k] ?? 1;
   const latest = useRef(panes);
   latest.current = panes;
-  const redraw = () => latest.current.forEach((p, k) => {
-    const c = canvases.current[k];
-    if (c && c.clientWidth > 0) p.draw(c);
-  });
+  /** 每張畫布的縮放、捲動位置（記在第幾張） */
+  const views = useRef<RunView[]>([]);
+  const view = (k: number) => (views.current[k] ??= { zoom: null, x: 0, y: 0 });
+  /** 每張畫布實際畫的比例（縮放按鈕從這裡開始算） */
+  const scales = useRef<number[]>([]);
+  const labels = useRef<(HTMLButtonElement | null)[]>([]);
+  const redrawOne = (k: number) => {
+    const c = canvases.current[k], p = latest.current[k];
+    if (!c || !p || c.clientWidth <= 0) return;
+    const v = view(k);
+    scales.current[k] = p.draw(c, v);
+    c.style.cursor = 'grab';
+    const label = labels.current[k];
+    if (label) label.textContent = `${Math.round(scales.current[k] * 100)}%`;
+  };
+  const redraw = () => latest.current.forEach((_, k) => redrawOne(k));
+  /** 放大縮小（30% 到 200%），畫面中間的位置不變 */
+  const zoomBy = (k: number, f: number) => {
+    const v = view(k), c = canvases.current[k];
+    const old = scales.current[k] ?? 1;
+    const z = Math.min(2, Math.max(0.3, Math.round(old * f * 100) / 100));
+    if (c) {
+      v.x = ((v.x + c.width / 2) * z) / old - c.width / 2;
+      v.y = ((v.y + c.height / 2) * z) / old - c.height / 2;
+    }
+    v.zoom = z;
+    redrawOne(k);
+  };
+  const fit = (k: number) => {
+    views.current[k] = { zoom: null, x: 0, y: 0 };
+    redrawOne(k);
+  };
+  /** 放大後拖曳畫布移動 */
+  const startPan = (e: React.PointerEvent<HTMLCanvasElement>, k: number) => {
+    const v = view(k);
+    // 整張放進畫面時也可以拖：照現在的大小固定下來再移動
+    v.zoom ??= scales.current[k] ?? 1;
+    const c = e.currentTarget;
+    c.setPointerCapture(e.pointerId);
+    c.style.cursor = 'grabbing';
+    // 畫布的像素和畫面上的 px 可能不一樣
+    const ratio = c.clientWidth ? c.width / c.clientWidth : 1;
+    let last = { x: e.clientX, y: e.clientY };
+    const move = (ev: PointerEvent) => {
+      v.x -= (ev.clientX - last.x) * ratio;
+      v.y -= (ev.clientY - last.y) * ratio;
+      last = { x: ev.clientX, y: ev.clientY };
+      redrawOne(k);
+    };
+    const up = () => {
+      c.removeEventListener('pointermove', move);
+      c.removeEventListener('pointerup', up);
+      c.removeEventListener('pointercancel', up);
+      c.style.cursor = 'grab';
+    };
+    c.addEventListener('pointermove', move);
+    c.addEventListener('pointerup', up);
+    c.addEventListener('pointercancel', up);
+  };
   // 每次畫面更新（換步驟、換測資、拖曳寬度）都重畫
   useLayoutEffect(redraw);
   // 視窗或分隔線改變大小時重畫
@@ -397,5 +463,5 @@ function useSplit(panes: RunPane[], visible: boolean) {
     handle.addEventListener('pointerup', up);
     handle.addEventListener('pointercancel', up);
   };
-  return { box, canvases, weight, startDrag };
+  return { box, canvases, labels, weight, startDrag, zoomBy, fit, startPan };
 }

@@ -16,6 +16,8 @@ export interface DiagramHooks {
   editNode(diagram: Diagram, index: number): void;
   /** 目前在工具列選的工具，用來決定新箭頭是直線(straight)還是直角(square) */
   selectedTool(): string;
+  /** 縮放比例改了（Ctrl + 滾輪也會改），畫面上的比例跟著更新 */
+  zoomChanged?(zoom: number): void;
 }
 
 /** 滑鼠在畫布上的座標（扣掉邊框，並換算成畫布內部的像素座標） */
@@ -65,6 +67,15 @@ interface NodeToMove {
   elemDragOrigin: Point;
 }
 
+/** 第四步一張畫布的縮放（null 是整張放進畫面）和捲動位置（畫面左上角在放大後的流程圖上的哪裡） */
+export interface RunView {
+  zoom: number | null;
+  x: number;
+  y: number;
+  /** 上次畫面跟著移過去的積木（同一步不再自動移，學生拖開了就不會被拉回來） */
+  followed?: number | null;
+}
+
 export class Diagram {
   ctx!: CanvasRenderingContext2D;
   myCanvas!: HTMLCanvasElement;
@@ -87,6 +98,15 @@ export class Diagram {
   editText = false;
   /** 正在操作（拖曳、開著對話框）時為 true，此時點畫布不會新增積木 */
   pause = false;
+  /** 第三步畫布的縮放比例（1 是原本的大小）；積木的位置不變，只是畫大或畫小 */
+  zoom = 1;
+
+  /** 設定縮放比例（30% 到 200%） */
+  setZoom(z: number) {
+    this.zoom = Math.min(2, Math.max(0.3, Math.round(z * 100) / 100));
+    this.hooks.zoomChanged?.(this.zoom);
+    this.draw();
+  }
   /** 有好幾張流程圖（主程式、模組）時，只有畫面上這一張處理鍵盤（Delete、複製貼上） */
   active = true;
   private nodesToMove: NodeToMove[] = [];
@@ -185,6 +205,8 @@ export class Diagram {
   draw() {
     if (!this.ctx) return;
     this.clean();
+    this.ctx.save();
+    this.ctx.scale(this.zoom, this.zoom);
     for (const node of this.nodes) {
       if (node) node.draw(this.ctx);
     }
@@ -195,8 +217,12 @@ export class Diagram {
       this.nodes[this.selNode]!.highlight(this.ctx);
     }
     const selLink = this.selLink != null ? this.links[this.selLink] : null;
+    if (selLink) selLink.highlight(this.ctx);
+    if (this.stepHighlight != null) {
+      this.nodes[this.stepHighlight]?.stepHighlight(this.ctx);
+    }
+    this.ctx.restore();
     if (selLink) {
-      selLink.highlight(this.ctx);
       // 告訴學生選到箭頭之後可以怎麼調整
       this.ctx.save();
       this.ctx.fillStyle = '#666';
@@ -205,9 +231,6 @@ export class Diagram {
       this.ctx.textBaseline = 'top';
       this.ctx.fillText(t('拖曳線上的點可以改變線的形狀；雙擊圓點可以刪掉它', 'Drag the dots to change the line. Double-click a round dot to remove it.'), 10, 10);
       this.ctx.restore();
-    }
-    if (this.stepHighlight != null) {
-      this.nodes[this.stepHighlight]?.stepHighlight(this.ctx);
     }
   }
 
@@ -221,6 +244,7 @@ export class Diagram {
       canvas.addEventListener('mousemove', this.move);
       canvas.addEventListener('mouseup', this.up);
       canvas.addEventListener('dblclick', this.dblclick);
+      canvas.addEventListener('wheel', this.wheel, { passive: false });
       canvas.ondragstart = () => false;
       this.resizeObserver.observe(canvas);
     }
@@ -250,9 +274,11 @@ export class Diagram {
   /**
    * 把流程圖畫到另一個畫布上（只是畫，不能拖、不能改），標出 highlight 這個積木。
    * 第四步用：一張畫布一張流程圖（遞迴時好幾張是同一張流程圖，所以不能用 init 換畫布）。
-   * fit：整張流程圖縮小到放得進畫布（不放大），畫布窄的時候也看得到全部
+   * view：第四步的縮放和捲動位置。zoom 是 null 時整張流程圖縮小到放得進畫布（不放大），
+   * 畫布窄的時候也看得到全部；有 zoom 時照那個比例畫，正在執行的積木跑出畫面就把畫面移過去。
+   * 回傳這次畫的比例（畫面上顯示幾 %）
    */
-  drawOn(canvas: HTMLCanvasElement, highlight: number | null, fit = false) {
+  drawOn(canvas: HTMLCanvasElement, highlight: number | null, view?: RunView): number {
     const saved = { ctx: this.ctx, canvas: this.myCanvas, step: this.stepHighlight, node: this.selNode, link: this.selLink };
     this.myCanvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -263,14 +289,31 @@ export class Diagram {
     this.stepHighlight = highlight;
     this.selNode = null;
     this.selLink = null;
-    const box = fit ? this.bounds() : null;
-    if (box && canvas.width > 0 && canvas.height > 0) {
+    const box = view ? this.bounds() : null;
+    let scale = 1;
+    if (view && box && canvas.width > 0 && canvas.height > 0) {
       const pad = 12;
       // 從左上角 (0, 0) 算起，跟第三步看到的位置一樣；太大才縮小
       const w = box.maxX + pad, h = box.maxY + pad;
-      const scale = Math.min(1, canvas.width / w, canvas.height / h);
+      scale = view.zoom ?? Math.min(1, canvas.width / w, canvas.height / h);
+      if (view.zoom == null) view.x = view.y = 0;
+      else {
+        // 換到新的一步：正在執行的積木不在畫面裡，就把它移到畫面中間
+        const n = highlight != null ? this.nodes[highlight] : null;
+        if (n && highlight != view.followed) {
+          const left = n.x * scale - view.x, top = n.y * scale - view.y;
+          if (left < 0 || left + n.w * scale > canvas.width) view.x = (n.x + n.w / 2) * scale - canvas.width / 2;
+          if (top < 0 || top + n.h * scale > canvas.height) view.y = (n.y + n.h / 2) * scale - canvas.height / 2;
+        }
+        view.followed = highlight;
+        // 可以拖到任何位置，但至少留一小塊在畫面裡，不會整張拖不見
+        const keep = 60;
+        view.x = Math.max(keep - canvas.width, Math.min(view.x, w * scale - keep));
+        view.y = Math.max(keep - canvas.height, Math.min(view.y, h * scale - keep));
+      }
       this.clean();
       this.ctx.save();
+      this.ctx.translate(-view.x, -view.y);
       this.ctx.scale(scale, scale);
       for (const node of this.nodes) if (node) node.draw(this.ctx);
       for (const link of this.links) if (link) link.draw(this.ctx);
@@ -283,6 +326,7 @@ export class Diagram {
     this.stepHighlight = saved.step;
     this.selNode = saved.node;
     this.selLink = saved.link;
+    return scale;
   }
 
   /** 積木和箭頭佔的範圍；沒有積木是 null */
@@ -410,7 +454,8 @@ export class Diagram {
   }
 
   private mouseCoords(ev: MouseEvent): Point {
-    return canvasPoint(this.myCanvas, ev);
+    const p = canvasPoint(this.myCanvas, ev);
+    return { x: p.x / this.zoom, y: p.y / this.zoom };
   }
 
   /** 畫布座標 → 螢幕座標（反向換算，給浮在畫布上的文字框定位用） */
@@ -418,10 +463,17 @@ export class Diagram {
     const c = this.myCanvas;
     const rect = c.getBoundingClientRect();
     return {
-      x: rect.left + c.clientLeft + p.x * (c.width ? c.clientWidth / c.width : 1),
-      y: rect.top + c.clientTop + p.y * (c.height ? c.clientHeight / c.height : 1),
+      x: rect.left + c.clientLeft + p.x * this.zoom * (c.width ? c.clientWidth / c.width : 1),
+      y: rect.top + c.clientTop + p.y * this.zoom * (c.height ? c.clientHeight / c.height : 1),
     };
   }
+
+  /** Ctrl + 滾輪：放大縮小（不按 Ctrl 就照常捲動頁面） */
+  private wheel = (ev: WheelEvent) => {
+    if (!this.mine(ev) || !ev.ctrlKey) return;
+    ev.preventDefault();
+    this.setZoom(this.zoom * (ev.deltaY < 0 ? 1.1 : 1 / 1.1));
+  };
 
   /** 這個滑鼠事件是不是給這張流程圖的（同一個畫布可能輪流放主程式和模組） */
   private mine(ev: MouseEvent) {
@@ -575,11 +627,14 @@ export class Diagram {
       }
       case 'newlink': {
         this.draw();
+        this.ctx.save();
+        this.ctx.scale(this.zoom, this.zoom);
         this.ctx.beginPath();
         const aC = this.nodes[this.selConnectorNode!]!.connectorCoords(this.selConnector!);
         this.ctx.moveTo(aC.x, aC.y);
         this.ctx.lineTo(mouseC.x, mouseC.y);
         this.ctx.stroke();
+        this.ctx.restore();
 
         this.linkDestNode = null;
         // 找終點的連接點

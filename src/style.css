@@ -661,6 +661,36 @@ input, textarea, select, button {
     height: 100%;
 }
 
+/* 第三步畫布右下角：放大縮小 */
+.zoom_controls {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    border: 1px solid var(--card-line);
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.zoom_controls button {
+    border: none;
+    background: #fff;
+    padding: 4px 10px;
+    font-size: 1rem;
+    line-height: 1.2;
+    cursor: pointer;
+}
+.zoom_controls button:hover {
+    background: var(--green);
+}
+.zoom_controls .zoom_value {
+    min-width: 4em;
+    font-size: 0.85rem;
+    border-left: 1px solid var(--card-line);
+    border-right: 1px solid var(--card-line);
+}
+
 /* 工具列 */
 #toolbox {
     display: flex;

@@ -61,6 +61,9 @@ const ARROW_TOOLS = [
   { id: 'straight', icon: 'arrow', name: () => t('直線箭頭', 'Arrow') },
   { id: 'square', icon: 'turn_arrow', name: () => t('折線箭頭', 'Bent arrow') },
 ];
+/** 畫布上的位置 → 流程圖上的位置（畫布縮小、放大時要除以縮放比例） */
+const diagramPoint = (d: Diagram, p: { x: number; y: number }) => ({ x: p.x / d.zoom, y: p.y / d.zoom });
+
 /** 從工具列拖積木進畫布時，dataTransfer 用的資料類型（避免接受拖進來的文字、檔案） */
 const DRAG_TYPE = 'application/x-flowchart-block';
 /** 箭頭工具：選了才顯示積木上的連接點 */
@@ -110,6 +113,8 @@ export function App() {
   const [printing, setPrinting] = useState(false);
   /** 正在產生 PDF（列印畫面畫在畫面外面，產生完就收起來） */
   const [pdfBusy, setPdfBusy] = useState(false);
+  /** 第三步畫布現在的縮放比例（每張流程圖各自的） */
+  const [zoom, setZoomState] = useState(1);
   const [printData, setPrintData] = useState<PrintData | null>(null);
   const [printImg, setPrintImg] = useState<{ src: string; cuts: number[] }>();
   const [printModules, setPrintModules] = useState<{ title: string; src: string; cuts: number[] }[]>([]);
@@ -162,6 +167,7 @@ export function App() {
     })),
     editNode: (d, i) => editNodeRef.current(d, i),
     selectedTool: () => toolRef.current,
+    zoomChanged: z => setZoomState(z),
   }));
   const [main] = useState(() => new Diagram(hooks));
   // 開發模式下給自動化測試讀積木位置
@@ -201,6 +207,8 @@ export function App() {
     sheetRef.current = moduleOf2(id) ? id : 0;
     setSheetState(sheetRef.current);
     const d = currentDiagram();
+    // 每張流程圖的縮放比例各自記著
+    setZoomState(d.zoom);
     d.active = true;
     d.pause = false;
     d.init(myCanvasRef.current!);
@@ -623,7 +631,7 @@ export function App() {
       const inside = rect.left < event.clientX && event.clientX < rect.right
         && rect.top < event.clientY && event.clientY < rect.bottom;
       const d = currentDiagram();
-      if (!d.pause && inside) myMouse.current = canvasPoint(canvas, event);
+      if (!d.pause && inside) myMouse.current = diagramPoint(d, canvasPoint(canvas, event));
       if (!inside) d.copyNode = null;
     };
     window.addEventListener('mousemove', onMouseMove);
@@ -704,13 +712,13 @@ export function App() {
       key: 'p' + k,
       title: (k == 1 && skipped ? t(`（中間還有 ${skipped} 層）`, `(${skipped} more levels) `) : '') + sheetLabel(c.sheet) + t('（從這裡執行進去）', ' (calls from here)'),
       running: false,
-      draw: cv => at(c.sheet).drawOn(cv, c.node, true),
+      draw: (cv, view) => at(c.sheet).drawOn(cv, c.node, view),
     }));
     panes.push({
       key: 'p' + shown.length,
       title: t('正在執行：', 'Running: ') + sheetLabel(nowAt.sheet) + (callers.length > 1 ? t(`（第 ${callers.length} 層）`, ` (level ${callers.length})`) : ''),
       running: true,
-      draw: cv => at(nowAt.sheet).drawOn(cv, nowAt.node, true),
+      draw: (cv, view) => at(nowAt.sheet).drawOn(cv, nowAt.node, view),
     });
     return panes;
   })();
@@ -748,7 +756,7 @@ export function App() {
   const dropOnCanvas = (e: DragEvent<HTMLCanvasElement>) => {
     if (!isBlockDrag(e)) return;
     e.preventDefault();
-    const p = canvasPoint(e.currentTarget, e.nativeEvent);
+    const p = diagramPoint(currentDiagram(), canvasPoint(e.currentTarget, e.nativeEvent));
     myMouse.current = p;
     addBlockAt(e.dataTransfer.getData(DRAG_TYPE), p.x, p.y);
   };
@@ -1256,6 +1264,12 @@ export function App() {
               </div>
               <div className="canvas_wrap">
                 <canvas id="my_canvas" ref={myCanvasRef} onClick={clickCanvas} onDragOver={dragOverCanvas} onDrop={dropOnCanvas}></canvas>
+                {/* 放大縮小：流程圖太大時縮小看全部（Ctrl + 滾輪也可以）；點比例回到 100% */}
+                <div className="zoom_controls">
+                  <button title={t('縮小', 'Zoom out')} aria-label={t('縮小', 'Zoom out')} onClick={() => currentDiagram().setZoom(currentDiagram().zoom / 1.25)}>－</button>
+                  <button className="zoom_value" title={t('回到原本的大小', 'Back to 100%')} onClick={() => currentDiagram().setZoom(1)}>{Math.round(zoom * 100)}%</button>
+                  <button title={t('放大', 'Zoom in')} aria-label={t('放大', 'Zoom in')} onClick={() => currentDiagram().setZoom(currentDiagram().zoom * 1.25)}>＋</button>
+                </div>
               </div>
             </div>
           </div>
