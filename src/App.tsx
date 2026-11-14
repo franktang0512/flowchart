@@ -12,6 +12,7 @@ import { RunArea, type RunPane } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
 import { StructTable, type StructRename } from './components/StructTable';
 import { setStructs as setStructRegistry, type StructDef } from './engine/structs';
+import { setCppKinds } from './engine/labels';
 import { forLoopVars, isContainerType, type VarType } from './engine/structure';
 import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, shadowLabel, typeLists, withParams, type RunResult, type VarStore } from './engine/decoder';
@@ -76,7 +77,7 @@ const questionPath = `${urlParams.get('w')}/${urlParams.get('h')}`;
 
 let dialogSeq = 0;
 /** 存檔裡認得的變數型別 */
-const VAR_TYPES: VarType[] = ['數字', '文字', '清單', '二維清單', '陣列', '堆疊', '佇列', '結構'];
+const VAR_TYPES: VarType[] = ['數字', '文字', '清單', '二維清單', '陣列', '堆疊', '佇列', '結構', '集合', '對應表', '優先佇列', '優先佇列小'];
 let varSeq = 0;
 
 /** 第一步、第二步的卡片：不是目前步驟時蓋上半透明灰色，點一下切過去 */
@@ -701,6 +702,10 @@ export function App() {
    * 第四步並排的流程圖：主流程 → 一層一層執行進來的模組（標出執行模組的積木）→ 正在執行的。
    * 太多層（遞迴）時只放主流程和最後兩層
    */
+  // 積木上 map、set 的操作照 C++ 的寫法（見 labels.ts）
+  setCppKinds(getTarget() != 'cpp' ? {} : Object.fromEntries([...vars, ...modules.flatMap(m => m.info.locals ?? [])]
+    .filter(v => v.type == '對應表' || v.type == '集合' || v.type == '文字')
+    .map(v => [v.name.trim(), v.type == '對應表' ? 'map' as const : v.type == '集合' ? 'set' as const : 'string' as const])));
   const runPanes: RunPane[] = (() => {
     if (page != 3) return [];
     const diagrams = allDiagrams();
@@ -1287,7 +1292,7 @@ export function App() {
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
           varNames={[...vars.filter(v => v.name.trim()).map(runName), ...forLoopVars(main.nodes)]}
-          kinds={Object.fromEntries([...vars.map(v => ({ ...v, name: runName(v) })), ...modules.flatMap(m => m.info.locals ?? [])].filter(v => v.type == '堆疊' || v.type == '佇列' || v.type == '陣列').map(v => [v.name.trim(), v.type]))}
+          kinds={Object.fromEntries([...vars.map(v => ({ ...v, name: runName(v) })), ...modules.flatMap(m => m.info.locals ?? [])].filter(v => ['堆疊', '佇列', '陣列', '集合', '對應表', '優先佇列', '優先佇列小'].includes(v.type)).map(v => [v.name.trim(), v.type]))}
           sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
           moduleVars={modules.map((m, k) => ({
             sheet: k + 1,

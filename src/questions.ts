@@ -25,7 +25,7 @@ export interface Question extends QuestionText {
   var_types?: string[];
 }
 
-const VAR_TYPE_KEYS: Record<string, VarType> = { vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列', struct: '結構' };
+const VAR_TYPE_KEYS: Record<string, VarType> = { vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列', struct: '結構', set: '集合', map: '對應表', priority_queue: '優先佇列', priority_queue_min: '優先佇列小' };
 
 /** 這一題變數表可以選的容器；undefined 是都可以 */
 export function allowedVarTypes(q: Question): VarType[] | undefined {

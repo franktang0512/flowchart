@@ -1,7 +1,7 @@
 // 對話框按「確認」之後：新增或修改積木。檢查條件的順序與舊版相同（會影響跳出哪個提示）。
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
-import { checkCall, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
+import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
 import { parseSortKeys, sortKeysText, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { forInit, forUpdate, parseExpr, splitFor } from './engine/structure';
@@ -29,6 +29,8 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   const rowPush = f.rectKind == '二維清單' && f.rectAction == '加入';
   let text = f.rectAction == '跳出' ? ' break' : f.rectAction == '下一輪' ? ' continue'
     : field ? ` ${field} 設為 ${f.code}`
+    // C++ 的 string 只改其中一個字：「 s[i] 設為 'a'」
+    : letterTarget(vars, f) ? ` ${letterTarget(vars, f)} 設為 ${f.code}`
     : rowPush ? `${target}[${f.rectIndex.trim()}] 加入 ${f.code}`
     // 排序：「 a 排序 前 n 個 依 w 由小到大」（前幾個、依欄位都可以沒有）
     : f.rectAction == '排序' ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''}${sortKeysOf(vars, f).length ? ` 依 ${sortKeysText(sortKeysOf(vars, f))}` : ` ${f.sortDesc ? '由大到小' : '由小到大'}`}`
@@ -46,6 +48,13 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   // 刪除沒有值，不用捨去進位
   if (hasValue(f)) text += ROUNDING_TEXT[f.radio] ?? '';
   return { text, nodeVar };
+}
+
+/** C++ 的 string 只改其中一個字：s[i]；不是的話 null */
+function letterTarget(vars: VarStore, f: DialogForm): string | null {
+  const name = f.varSelect.trim();
+  if (f.rectKind != '變數' || f.varChange || !f.rectIndex.trim() || !vars.type_var_list.text.includes(name)) return null;
+  return `${name}[${f.rectIndex.trim()}]`;
 }
 
 /** 計算積木改的是 struct 的欄位：e.from 或 edges[i].w；不是的話 null */
@@ -130,6 +139,8 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     }
     return checkVar(vars, field, false) && checkVar(vars, f.code, true) && checkValueType(vars, modules, field, f.code, 'var');
   }
+  const letter = letterTarget(vars, f);
+  if (letter) return checkVar(vars, letter, false) && checkVar(vars, f.code, true) && checkValueType(vars, modules, letter, f.code, 'var');
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
   if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
   const list = f.varSelect.trim();
@@ -176,6 +187,21 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     }
     return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
   }
+  // set：insert、erase、clear；priority_queue：push、pop；map：m[鍵] = 值、erase、clear
+  if (f.rectKind == '集合' || f.rectKind == '優先佇列' || f.rectKind == '對應表') {
+    const kind = f.rectKind == '集合' ? 'set' : f.rectKind == '優先佇列' ? 'pq' : 'map';
+    if (!vars.type_var_list[kind].includes(list)) {
+      alert(t(`請選一個 ${kind == 'pq' ? 'priority_queue' : kind}。`, `Choose a ${kind == 'pq' ? 'priority_queue' : kind}.`));
+      return false;
+    }
+    if (f.rectAction == '清空' || f.rectAction == '取出') return true;
+    if (kind == 'map') {
+      if (!checkVar(vars, f.rectIndex, true) || !checkMapKey(vars, modules, list, f.rectIndex)) return false;
+      return f.rectAction == '刪除' || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
+    }
+    const value = f.rectAction == '刪除' ? f.rectIndex : f.code;
+    return checkVar(vars, value, true) && checkValueType(vars, modules, list, value, 'item');
+  }
   // array：只能替換某一格（大小固定）
   if (f.rectKind == '陣列') {
     if (!vars.type_var_list.fixed.includes(list)) {
@@ -217,8 +243,14 @@ function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): stri
       const text = `${f.varSelect.trim()}[${f.rectIndex.trim()}][${f.rectIndex2.trim()}]${findStruct(holds) ? `.${f.rectField}` : ''}`;
       return checkVar(vars, text, false) ? '輸入 ' + text : null;
     }
+    // map 的一格：輸入 m[鍵]
+    if (f.ioTarget == '對應表') {
+      const name = f.varSelect.trim();
+      if (!checkVar(vars, f.varSelect, false)) return null;
+      return checkVar(vars, f.rectIndex, true) && checkMapKey(vars, modules, name, f.rectIndex) ? `輸入 ${name}[${f.rectIndex.trim()}]` : null;
+    }
     // 裝 struct 的 stack、queue：不能一次輸入一整筆
-    if ((f.ioTarget == '堆疊' || f.ioTarget == '佇列') && findStruct(vars.var_list.value[vars.var_list.name.indexOf(f.varSelect.trim())])) {
+    if ((f.ioTarget == '堆疊' || f.ioTarget == '佇列' || f.ioTarget == '集合' || f.ioTarget == '優先佇列') && findStruct(vars.var_list.value[vars.var_list.name.indexOf(f.varSelect.trim())])) {
       alert(t('裡面裝的是 struct，不能一次輸入一整筆：請先輸入到 struct 變數的欄位，再用計算積木 push 進去。', 'It holds structs, so you cannot input a whole one. Input into a struct variable\'s fields first, then push it with a Math block.'));
       return null;
     }
@@ -513,6 +545,10 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       if (call) {
         return { kind: 'Rectangle', initial: { rectKind: '接收', rectAction: '設為', varSelect: target, moduleName: call.name, moduleArgs: call.args } };
       }
+      // C++ 的 string 只改其中一個字：「 s[i] 設為 'a'」
+      if (action == '替換' && !index2 && vars?.type_var_list.text.includes(target)) {
+        return { kind: 'Rectangle', initial: { ...(node.data != null ? { radio: node.data } : {}), rectKind: '變數', rectAction: '設為', varSelect: target, rectIndex: index, code: expr.split('(取')[0] } };
+      }
       return {
         kind: 'Rectangle',
         initial: {
@@ -521,7 +557,8 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           rectAction: action,
           ...(action == '排序' ? { sortKeys: index2 ? parseSortKeys(index2) : [], sortDesc: expr == '由大到小' } : {}),
           // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
-          rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' && !index2 ? '陣列' : action == '建立' || (action == '替換' && index2) ? '二維清單'
+          rectKind: vars?.type_var_list.map.includes(target) ? '對應表' : vars?.type_var_list.set.includes(target) ? '集合' : vars?.type_var_list.pq.includes(target) ? '優先佇列'
+            : action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' && !index2 ? '陣列' : action == '建立' || (action == '替換' && index2) ? '二維清單'
             : action == '放入' || action == '取出' ? (vars?.type_var_list.queue.includes(target) ? '佇列' : '堆疊')
             // 二維 vector 某一列 push_back：「 g[u] 加入 v」
             : action == '加入' && splitTarget(target) ? '二維清單'

@@ -81,6 +81,11 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
         <span className="var_box_name">{name}</span>
         <span className={'var_box_value' + (wide ? ' is_list' : '')}>
           {kind == 'idle' ? '—'
+            // map：一列一個鍵和值；set：由小到大（裝 pair 的畫成表格）
+            : isRecord(v) && Array.isArray(v.__map) ? <MapValue pairs={v.__map as [unknown, unknown][]} prev={before?.[name]} />
+            : isRecord(v) && Array.isArray(v.__set) ? (v.__set.length && isRecord(v.__set[0])
+              ? <RecordTable rows={v.__set as Record<string, unknown>[]} prev={null} indexed kind="集合" />
+              : <ListValue items={v.__set} prev={isRecord(before?.[name]) ? (before![name] as { __set?: unknown }).__set : undefined} kind="集合" />)
             : isRecord(v) ? <RecordTable rows={[v]} prev={isRecord(before?.[name]) ? [before![name]] : null} />
             : isRecords ? <RecordTable rows={v as Record<string, unknown>[]} prev={Array.isArray(before?.[name]) ? before![name] as unknown[] : null} indexed kind={kinds[name]} />
             : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} />
@@ -212,7 +217,8 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
           {/* 主流程的變數、每個模組的參數和區域變數分開列（模組沒有在執行時只列名字） */}
           <p className="section_label" style={{ marginTop: 0 }}>{moduleVars.length ? t('主流程的變數', 'Main-flow variables') : t('變數', 'Variables')}</p>
           <div id="variableTable" className="var_boxes">
-            {values && varNames.map(name => varBox(name, values, prevValues))}
+            {/* for 迴圈的計數變數只在迴圈裡面有：不在迴圈裡時不列出來 */}
+            {values && varNames.filter(name => values[name] !== undefined).map(name => varBox(name, values, prevValues))}
             {values && varNames.length == 0 && <span className="muted">{t('（沒有變數）', '(none)')}</span>}
           </div>
           {values && moduleVars.map(moduleSection)}
@@ -280,8 +286,9 @@ function RecordTable({ rows, prev, indexed = false, kind }: { rows: Record<strin
   /** 左邊那一欄：索引；stack 只標 top，queue 標 front、back（中間的拿不到） */
   const tag = (r: number) => {
     const last = r == rows.length - 1;
-    if (kind == '堆疊') return last ? 'top' : '';
+    if (kind == '堆疊' || kind == '優先佇列' || kind == '優先佇列小') return last ? 'top' : '';
     if (kind == '佇列') return [r == 0 ? 'front' : '', last ? 'back' : ''].filter(Boolean).join(' / ');
+    if (kind == '集合') return '';
     return String(r);
   };
   const fields = Object.keys(rows[0] ?? {});
@@ -308,6 +315,30 @@ function RecordTable({ rows, prev, indexed = false, kind }: { rows: Record<strin
   );
 }
 
+/** map 的值：一列一個鍵和值（由小到大）；這一步改到的值標出來 */
+function MapValue({ pairs, prev }: { pairs: [unknown, unknown][]; prev: unknown }) {
+  if (!pairs.length) return <span className="muted">{t('（空的 map）', '(empty map)')}</span>;
+  const old = prev && typeof prev == 'object' && Array.isArray((prev as { __map?: unknown }).__map) ? (prev as { __map: [unknown, unknown][] }).__map : null;
+  const before = new Map((old ?? []).map(([k, v]) => [JSON.stringify(k), JSON.stringify(v)]));
+  return (
+    <span className="grid_value map_value">
+      <table>
+        <thead>
+          <tr><th>{t('鍵', 'key')}</th><th>{t('值', 'value')}</th></tr>
+        </thead>
+        <tbody>
+          {pairs.map(([k, v]) => (
+            <tr key={JSON.stringify(k)}>
+              <th>{cellText(k)}</th>
+              <td className={old && before.get(JSON.stringify(k)) !== JSON.stringify(v) ? 'changed' : ''}>{cellText(v)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </span>
+  );
+}
+
 /** 清單的值：一列排開，每一項標上位置（積木從 1、C++ 從 0 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */
 function ListValue({ items, prev, kind }: { items: unknown[]; prev: unknown; kind?: string }) {
   const scrollerRef = useRef<HTMLSpanElement>(null);
@@ -326,15 +357,18 @@ function ListValue({ items, prev, kind }: { items: unknown[]; prev: unknown; kin
     }
   });
 
-  if (!items.length) return <span className="muted">{kind == '堆疊' ? t('（空的 stack）', '(empty stack)') : kind == '佇列' ? t('（空的 queue）', '(empty queue)') : t('（空清單）', '(empty list)')}</span>;
+  if (!items.length) return <span className="muted">{kind == '堆疊' ? t('（空的 stack）', '(empty stack)') : kind == '佇列' ? t('（空的 queue）', '(empty queue)')
+    : kind == '集合' ? t('（空的 set）', '(empty set)') : kind == '優先佇列' || kind == '優先佇列小' ? t('（空的 priority_queue）', '(empty priority_queue)') : t('（空清單）', '(empty list)')}</span>;
   /**
    * 每一格上面的小字：清單、array 是索引；stack 只看得到頂端（top），queue 只看得到最前面（front）和最後面（back）——
    * C++ 的 stack、queue 不能用索引拿中間的東西
    */
   const tag = (k: number) => {
     const last = k == items.length - 1;
-    if (kind == '堆疊') return last ? 'top' : '';
+    // priority_queue 只看得到 top；set 沒有索引
+    if (kind == '堆疊' || kind == '優先佇列' || kind == '優先佇列小') return last ? 'top' : '';
     if (kind == '佇列') return [k == 0 ? 'front' : '', last ? 'back' : ''].filter(Boolean).join(' / ');
+    if (kind == '集合') return '';
     return String(k + indexBase());
   };
   return (

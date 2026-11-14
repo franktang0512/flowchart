@@ -661,6 +661,18 @@ input, textarea, select, button {
     height: 100%;
 }
 
+/* 變數表的 map：鍵 → 值 排成一行 */
+.map_types {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 4px;
+}
+.cpp_types .map_types select.var_input {
+    min-width: 0;
+    width: auto;
+}
+
 /* 第三步畫布右下角：放大縮小 */
 .zoom_controls {
     position: absolute;

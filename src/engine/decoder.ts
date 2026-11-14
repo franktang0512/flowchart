@@ -21,10 +21,10 @@ import { t } from '../i18n';
 import { getTarget, indexBase } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, parseSortKeys, splitRectangle, splitTarget } from './labels';
-import { cppNameProblem, elemCppType, GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
+import { cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
-import { exprType, fieldOf, forInit, forLoopVars, forUpdate, parseExpr, splitFor, structOf, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
-import { fieldCppType, fieldInit, findStruct, getStructs } from './structs';
+import { exprType, fieldOf, forInit, forLoopVars, forUpdate, parseExpr, parseExprSpans, splitFor, structOf, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
+import { allStructs, fieldCppType, fieldInit, findStruct, getStructs } from './structs';
 
 /** 第三步「變數」表格整理出來的變數清單 */
 export interface VarStore {
@@ -33,7 +33,11 @@ export interface VarStore {
    * array：清單（C++ 的 vector）和陣列（C++ 的 array，也在 fixed 裡）——都可以用 [索引]。
    * 只有學習目標是 C++ 時才有：grid 二維清單、fixed 陣列（大小固定，不能加入或刪除）、stack 堆疊、queue 佇列
    */
-  type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[]; fixed: string[]; stack: string[]; queue: string[]; record: string[] };
+  type_var_list: {
+    number: string[]; text: string[]; array: string[]; grid: string[]; fixed: string[]; stack: string[]; queue: string[]; record: string[];
+    /** C++ 的 map、set、priority_queue（pqMin 是小的先出來的，也在 pq 裡） */
+    map: string[]; set: string[]; pq: string[]; pqMin: string[];
+  };
   /** 陣列的大小（變數表填的） */
   sizes?: Record<string, string>;
   /** 大小在流程圖中建立的 array（一開始還沒有，建立之後每格都還沒放值） */
@@ -69,13 +73,15 @@ export interface VarStore {
 export function localTypes(locals: LocalVar[] = []): VarStore['type_var_list'] {
   const named = locals.filter(v => v.name.trim() != '');
   const of = (type: VarType) => named.filter(v => v.type == type).map(v => v.name.trim());
-  return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列'), record: of('結構') };
+  return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列'), record: of('結構'),
+    map: of('對應表'), set: of('集合'), pq: [...of('優先佇列'), ...of('優先佇列小')], pqMin: of('優先佇列小') };
 }
 
 /** 變數表的每一列（名稱、型別）→ 依型別分好的名稱 */
 export function typeLists(rows: { name: string; type: VarType }[]): VarStore['type_var_list'] {
   const of = (type: VarType) => rows.filter(r => r.type == type).map(r => r.name);
-  return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列'), record: of('結構') };
+  return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列'), record: of('結構'),
+    map: of('對應表'), set: of('集合'), pq: [...of('優先佇列'), ...of('優先佇列小')], pqMin: of('優先佇列小') };
 }
 
 /** 兩組依型別分好的名稱接起來 */
@@ -83,12 +89,14 @@ export function joinTypes(a: VarStore['type_var_list'], b: VarStore['type_var_li
   return {
     number: [...a.number, ...b.number], text: [...a.text, ...b.text], array: [...a.array, ...b.array], grid: [...a.grid, ...b.grid],
     fixed: [...a.fixed, ...b.fixed], stack: [...a.stack, ...b.stack], queue: [...a.queue, ...b.queue], record: [...a.record, ...b.record],
+    map: [...a.map, ...b.map], set: [...a.set, ...b.set], pq: [...a.pq, ...b.pq], pqMin: [...a.pqMin, ...b.pqMin],
   };
 }
 
 /** 每一種依型別分好的名稱都套用 f（例如把模組裡看不到的拿掉） */
 export function mapTypes(a: VarStore['type_var_list'], f: (list: string[]) => string[]): VarStore['type_var_list'] {
-  return { number: f(a.number), text: f(a.text), array: f(a.array), grid: f(a.grid), fixed: f(a.fixed), stack: f(a.stack), queue: f(a.queue), record: f(a.record) };
+  return { number: f(a.number), text: f(a.text), array: f(a.array), grid: f(a.grid), fixed: f(a.fixed), stack: f(a.stack), queue: f(a.queue), record: f(a.record),
+    map: f(a.map), set: f(a.set), pq: f(a.pq), pqMin: f(a.pqMin) };
 }
 
 /**
@@ -102,16 +110,21 @@ export const METHODS = {
   vector: ['size', 'empty'],
   // string：s.length()、s.size()、s.substr(從哪個索引, 幾個字)
   string: ['length', 'size', 'substr'],
+  // map：m.count(鍵) 有沒有這個鍵（0 或 1）；set：s.count(x) 有沒有 x；priority_queue：top() 最大（或最小）的
+  map: ['count', 'size', 'empty'],
+  set: ['count', 'size', 'empty'],
+  pq: ['top', 'size', 'empty'],
 } as const;
 
 /** 要填引數的函式：幾個到幾個 */
-const METHOD_ARGS: Record<string, [number, number]> = { substr: [1, 2] };
+const METHOD_ARGS: Record<string, [number, number]> = { substr: [1, 2], count: [1, 1] };
 
 /** 這個名稱是哪一種容器（用來決定可以用哪些函式）；不是容器回傳 null */
-export function containerKind(vars: VarStore, name: string): 'stack' | 'queue' | 'vector' | 'array' | 'grid' | null {
+export function containerKind(vars: VarStore, name: string): 'stack' | 'queue' | 'vector' | 'array' | 'grid' | 'map' | 'set' | 'pq' | null {
   const ty = vars.type_var_list;
   return ty.stack.includes(name) ? 'stack' : ty.queue.includes(name) ? 'queue' : ty.fixed.includes(name) ? 'array'
-    : ty.array.includes(name) ? 'vector' : ty.grid.includes(name) ? 'grid' : null;
+    : ty.array.includes(name) ? 'vector' : ty.grid.includes(name) ? 'grid'
+    : ty.map.includes(name) ? 'map' : ty.set.includes(name) ? 'set' : ty.pq.includes(name) ? 'pq' : null;
 }
 
 /** C++ 型別的名稱（給學生看的說明用），例如 stack<int> */
@@ -121,6 +134,8 @@ export function cppContainerName(vars: VarStore, name: string): string {
   const kind = containerKind(vars, name);
   if (kind == 'array') return `${elem} ${name}[${vars.sizes?.[name] ?? ''}]`;
   if (kind == 'grid') return `vector<vector<${elem}>>`;
+  if (kind == 'map') return `map<${mapKeyCppType(holds)}, ${elem}>`;
+  if (kind == 'pq') return vars.type_var_list.pqMin.includes(name) ? `priority_queue<${elem}, vector<${elem}>, greater<${elem}>>` : `priority_queue<${elem}>`;
   return `${kind ?? 'vector'}<${elem}>`;
 }
 
@@ -170,7 +185,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
 
 export const createVarStore = (): VarStore => ({
   var_list: { name: [], value: [] },
-  type_var_list: { number: [], text: [], array: [], grid: [], fixed: [], stack: [], queue: [], record: [] },
+  type_var_list: { number: [], text: [], array: [], grid: [], fixed: [], stack: [], queue: [], record: [], map: [], set: [], pq: [], pqMin: [] },
 });
 
 /** 變數（或容器）裡裝的 struct 名稱：struct 變數、裝 struct 的 array / vector；不是的話 undefined */
@@ -199,7 +214,11 @@ const FUNCTIONS: Record<string, string> = {
   // C++：文字變整數、數字變文字
   stoi: '__stoi', to_string: '__tostr',
   max: '__max', min: '__min',
+  // C++ 的字元
+  char: '__chr', toupper: '__toupper', tolower: '__tolower', isdigit: '__isdigit', isalpha: '__isalpha', isupper: '__isupper', islower: '__islower',
 };
+/** 只有 C++ 才有的字元函式 */
+const CHAR_FUNCS = ['char', 'toupper', 'tolower', 'isdigit', 'isalpha', 'isupper', 'islower'];
 const isFunc = (name: string) => Object.prototype.hasOwnProperty.call(FUNCTIONS, name);
 /** 第 i 個積木的程式有沒有用到上面的函式 */
 const FUNC_CALL = (i: number) => new RegExp(`__(len|find|has|stoi|tostr|max|min)_${i}\\(`);
@@ -284,10 +303,12 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     if (field) return fieldTargetOk(vars, field.base, field.field);
     const item = listItemTarget(str);
     if (item) {
+      if (type_var_list.text.includes(item.list) && getTarget() == 'cpp') return checkVar(vars, item.index, true);
       if (type_var_list.text.includes(item.list)) {
         alert(t(`「${item.list}」是文字，不能只改其中一個字：可以用 + 把字接起來，存成新的文字。`, `"${item.list}" is text. You cannot change one letter. Use + to join letters into new text.`));
         return false;
       }
+      if (type_var_list.map.includes(item.list)) return checkVar(vars, item.index, true);
       if (!type_var_list.array.includes(item.list)) {
         alert(t(`「${item.list}」不是清單：只有型別是「清單」的變數才能用 [第幾項]。`, `"${item.list}" is not a list. Only list variables can use [ ].`));
         return false;
@@ -325,6 +346,10 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     }
     if ((tk.text == 'max' || tk.text == 'min') && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
       alert(t(`${tk.text}( ) 是 C++ 的寫法：積木請用判斷或迴圈找最大、最小的值。`, `${tk.text}( ) is C++ only. In blocks, use a decision or a loop to find the largest or smallest value.`));
+      return false;
+    }
+    if (CHAR_FUNCS.includes(tk.text) && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
+      alert(t(`${tk.text}( ) 是 C++ 處理字元的寫法，積木裡沒有。`, `${tk.text}( ) is C++ only.`));
       return false;
     }
     if (tokens[k - 1]?.text == '.' && tokens[k - 1].type == 'op') continue;
@@ -451,7 +476,7 @@ function methodOk(vars: VarStore, tokens: Token[], k: number): boolean {
   const obj = tokens[k - 1];
   const kind = obj?.type != 'name' ? null : vars.type_var_list.text.includes(obj.text) ? 'string' : containerKind(vars, obj.text);
   if (!obj || obj.type != 'name' || !kind || kind == 'grid') {
-    alert(t(`「.」前面要是 vector、stack、queue 或 string，例如 s.top()、name.length()。`, `Put a vector, stack, queue or string before ".", like s.top() or name.length().`));
+    alert(t(`「.」前面要是 vector、stack、queue、set、map、priority_queue 或 string，例如 s.top()、name.length()、m.count(k)。`, `Put a container or a string before ".", like s.top(), name.length() or m.count(k).`));
     return false;
   }
   if (kind == 'array') {
@@ -459,7 +484,7 @@ function methodOk(vars: VarStore, tokens: Token[], k: number): boolean {
     return false;
   }
   const allowed: readonly string[] = METHODS[kind];
-  const kindName = kind == 'vector' ? 'vector' : kind;
+  const kindName = kind == 'pq' ? 'priority_queue' : kind;
   if (method?.type != 'name' || !allowed.includes(method.text)) {
     alert(t(`「${obj.text}」是 ${kindName}，可以用：${methodList(obj.text, kind)}。`, `"${obj.text}" is a ${kindName}. You can use: ${methodList(obj.text, kind)}.`));
     return false;
@@ -473,6 +498,8 @@ function methodOk(vars: VarStore, tokens: Token[], k: number): boolean {
   if (n < min || n > max) {
     alert(method.text == 'substr'
       ? t(`${obj.text}.substr( ) 的括號裡要寫「從哪個索引開始, 取幾個字」，例如 ${obj.text}.substr(0, 3)。`, `Write ${obj.text}.substr(start, count), like ${obj.text}.substr(0, 3).`)
+      : method.text == 'count'
+      ? t(`${obj.text}.count( ) 的括號裡要寫一個要找的值，例如 ${obj.text}.count(x)。`, `Write one value in ${obj.text}.count( ), like ${obj.text}.count(x).`)
       : t(`${obj.text}.${method.text}() 的括號裡不用填東西。`, `${obj.text}.${method.text}() takes nothing in ( ).`));
     return false;
   }
@@ -532,7 +559,7 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   }
   const cpp = getTarget() == 'cpp';
   const floats = vars.floats ?? [];
-  const what = { str: t('文字', 'text'), char: t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct') }[type];
+  const what = { str: t('文字', 'text'), char: cpp ? t('一個字（char）', 'one letter (char)') : t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct') }[type];
   const v = value.trim();
   // 存到 ::a：照全域 a 的型別
   const scoped = where == 'var' ? scopedName(target) : null;
@@ -563,9 +590,20 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
     return true;
   }
   if (where == 'var') {
+    // C++ 的 s[i]：一個字（char），放一個字或數字（字的編號）
+    const letter = cpp ? listItemTarget(target) : null;
+    if (letter && vars.type_var_list.text.includes(letter.list)) {
+      if (type != 'char' && type != 'num') {
+        alert(t(`「${target.trim()}」是一個字（char），只能放一個字，例如 'a'（單引號），但「${v}」是${what}。`, `"${target.trim()}" is one letter (char). Put one letter like 'a' (single quotes), but "${v}" is ${what}.`));
+        return false;
+      }
+      return true;
+    }
     if (vars.type_var_list.number.includes(target) && type != 'num') {
       const kind = cpp ? (floats.includes(target) ? ' float（小數）' : ' int（整數）') : t('數字', 'a number');
-      alert(t(`變數「${target}」是${kind}，但「${v}」是${what}，不能存進去。`, `"${target}" holds ${kind}, but "${v}" is ${what}. It cannot go in.`));
+      // 一個字存進數字變數：多半是想把 '7' 變成 7
+      const fix = type == 'char' ? t(`要把數字的字變成數字，請寫成「${v} - '0'」。`, ` To turn a digit letter into a number, write "${v} - '0'".`) : '';
+      alert(t(`變數「${target}」是${kind}，但「${v}」是${what}，不能存進去。`, `"${target}" holds ${kind}, but "${v}" is ${what}. It cannot go in.`) + fix);
       return false;
     }
     if (vars.type_var_list.text.includes(target) && (type == 'list' || type == 'bool' || type == 'struct')) {
@@ -575,15 +613,20 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
     return true;
   }
   if (!cpp) return true;
-  const holds = vars.var_list.value[vars.var_list.name.indexOf(target)];
+  // map 的一格：看值的型別
+  let holds = vars.var_list.value[vars.var_list.name.indexOf(target)];
+  if (vars.type_var_list.map.includes(target)) holds = mapParts(holds).value;
   // 二維 vector 的某一列 g[u]：看 g 裡裝什麼
   const row = listItemTarget(target);
   if (row && vars.type_var_list.grid.includes(row.list)) return checkValueType(vars, modules, row.list, value, where);
   // 裝 struct 的容器：要放同一種 struct 的一整筆資料（例如 edges.push_back(e)）
   if (findStruct(holds)) {
     let sname: string | null = null;
+    const parsed = parseExpr(value);
+    // {a, b}：欄位要一樣多（照順序放）
+    if (parsed.t == 'brace') return braceOk(holds, parsed.items.length, v);
     try {
-      sname = structOf(parseExpr(value), varInfoMap(vars));
+      sname = structOf(parsed, varInfoMap(vars));
     }
     catch {
       sname = null;
@@ -607,6 +650,34 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   return true;
 }
 
+/** map 的鍵型別要對：鍵是 string 的要放文字，鍵是數字的要放數字；不行時跳出提示 */
+export function checkMapKey(vars: VarStore, modules: ModuleInfo[], map: string, key: string): boolean {
+  const kt = mapParts(vars.var_list.value[vars.var_list.name.indexOf(map)]).key;
+  let type: ExprType;
+  try {
+    type = exprType(parseExpr(key), varInfoMap(vars), modules);
+  }
+  catch {
+    return true;
+  }
+  const ok = kt == '文字' ? type == 'str' : type == 'num';
+  if (!ok) {
+    const want = kt == '文字' ? t('文字（string，要加引號，例如 "amy"）', 'text (a string in quotes, like "amy")') : t('數字', 'a number');
+    alert(t(`map「${map}」的鍵要是${want}，「${key.trim()}」不是。`, `The keys of the map "${map}" must be ${want}. "${key.trim()}" is not.`));
+  }
+  return ok;
+}
+
+/** {a, b} 放進 pair / struct：個數要跟欄位一樣；不行時跳出提示 */
+export function braceOk(sname: string, n: number, v: string): boolean {
+  const s = findStruct(sname);
+  if (s && s.fields.length != n) {
+    alert(t(`「${v}」有 ${n} 個值，可是 ${sname} 有 ${s.fields.length} 個欄位（${s.fields.map(f => f.name).join('、')}）：照順序每個欄位放一個。`, `"${v}" has ${n} values, but ${sname} has ${s.fields.length} fields (${s.fields.map(f => f.name).join(', ')}). Put one value for each field, in order.`));
+    return false;
+  }
+  return true;
+}
+
 /** 變數清單 → 名稱對到型別（判斷算式是數字還是文字用） */
 function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   const map = new Map<string, VarInfo>();
@@ -619,6 +690,10 @@ function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   add(vars.type_var_list.stack, '堆疊');
   add(vars.type_var_list.queue, '佇列');
   add(vars.type_var_list.record, '結構');
+  add(vars.type_var_list.map, '對應表');
+  add(vars.type_var_list.set, '集合');
+  add(vars.type_var_list.pq.filter(n => !vars.type_var_list.pqMin.includes(n)), '優先佇列');
+  add(vars.type_var_list.pqMin, '優先佇列小');
   // ::a：全域的 a（照全域變數那一份的型別）
   if (vars.globalVars) for (const [name, info] of varInfoMap(vars.globalVars)) map.set('::' + name, { ...info, name: '::' + name });
   return map;
@@ -725,6 +800,11 @@ const runtimeMessages = () => ({
   maxArgs: t('max( )、min( ) 的括號裡要放兩個以上的值（例如 max(a, b)），或一個 vector / array（例如 max(v)）。', 'Put two or more values in max( ) / min( ) (like max(a, b)), or one vector / array (like max(v)).'),
   maxEmpty: t('max( )、min( ) 裡的「{name}」是空的，沒有最大、最小的值。', 'The list in max( ) / min( ) is empty, so there is no largest or smallest value.'),
   maxStruct: t('max( )、min( ) 不能比 struct：請比某個欄位，或自己用迴圈找。', 'max( ) / min( ) cannot compare structs. Compare one field, or use a loop.'),
+  setChar: t('{name} 的一格只能放一個字（char），例如 \'a\'；「{v}」不是一個字。', 'One item of {name} holds one letter (char), like \'a\'. "{v}" is not one letter.'),
+  braceCount: t('「{name}」：{ } 裡有 {got} 個值，可是要 {n} 個（每個欄位一個，照順序）。', '"{name}": there are {got} values in { }, but it needs {n} (one for each field, in order).'),
+  mapKeyText: t('map「{name}」的鍵是 string，{v} 是數字：要放文字（加引號）。', 'The keys of the map "{name}" are strings, but {v} is a number. Use text (in quotes).'),
+  mapKeyNum: t('map「{name}」的鍵是數字，「{v}」是文字：要放數字。', 'The keys of the map "{name}" are numbers, but "{v}" is text. Use a number.'),
+  pqEmpty: t('priority_queue「{name}」是空的，不能用 {m}()：裡面要先有東西（push），可以先用 {name}.empty() 檢查是不是空的。', 'The priority_queue "{name}" is empty, so you cannot use {m}(). Push something first, or check with {name}.empty().'),
   stoiBad: t('stoi( ) 要把文字變成整數，可是「{v}」開頭不是數字。', 'stoi( ) turns text into a whole number, but "{v}" does not start with a number.'),
   showStruct: t('struct 不能整筆一起輸出（C++ 的 cout 不會印 struct），請一個欄位一個欄位輸出，例如 e.from。', 'A whole struct cannot be printed (cout cannot print a struct). Print one field at a time, like e.from.'),
   fixedRange: t('array「{name}」有 {len} 格，索引只能是 0 到 {max}，沒有索引 {k}（array 的大小是固定的，不會自己變大）。', 'The array "{name}" has {len} items. The index must be 0 to {max}. There is no index {k}. (An array has a fixed size.)'),
@@ -846,6 +926,7 @@ function __find(list, v, i) {
 }
 function __has(list, v, i) { return __find(list, v, i) >= __BASE; }
 function __clear(list, name, i) {
+  if (list && (list.__map || list.__set)) { (list.__map || list.__set).length = 0; return; }
   if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
   list.length = 0;
 }
@@ -873,7 +954,75 @@ function __grid(name, i, r, c, fill, sname) {
 // C++ 的 struct：__STRUCTS 是每種 struct 一開始的樣子（數字欄位 0、文字欄位 ""）
 function __new(sname) { return JSON.parse(JSON.stringify(__STRUCTS[sname])); }
 // 放進容器或存到另一個 struct 變數時複製一份（C++ 的 struct 是整筆複製，改原本的不會影響放進去的）
-function __rec(v, i, name, sname) { return JSON.parse(JSON.stringify(v)); }
+// {a, b}：照欄位的順序變成一筆（__FTYPES 是每個欄位的 C++ 型別）
+function __rec(v, i, name, sname) {
+  if (v && v.__brace) {
+    var types = __FTYPES[sname] || {};
+    var keys = Object.keys(types);
+    if (v.__brace.length != keys.length) __err('braceCount', i, { name: name, n: keys.length, got: v.__brace.length });
+    var o = {};
+    for (var k = 0; k < keys.length; k++) {
+      var x = v.__brace[k], ty = types[keys[k]];
+      o[keys[k]] = ty == 'string' ? __text(x, i, name) : ty == 'int' ? __int(x, i, name) : ty == 'long long' ? __long(x, i, name) : __num(x, i, name);
+    }
+    return o;
+  }
+  if (v && typeof v == 'object' && !Array.isArray(v) && !Object.keys(v).length) return v;
+  return JSON.parse(JSON.stringify(v));
+}
+// 比大小（set、map 的鍵、priority_queue）：pair / struct 先比第一個欄位，一樣再比下一個
+function __cmp(a, b) {
+  if (a && typeof a == 'object') {
+    for (var k in a) { var c = __cmp(a[k], b[k]); if (c) return c; }
+    return 0;
+  }
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+// 排好的陣列裡找 x：找到回傳 [true, 位置]；找不到回傳 [false, 該插入的位置]（key 是 map 的 [鍵, 值]）
+function __bs(list, x, isMap) {
+  var lo = 0, hi = list.length;
+  while (lo < hi) {
+    var mid = (lo + hi) >> 1, c = __cmp(isMap ? list[mid][0] : list[mid], x);
+    if (c == 0) return [true, mid];
+    if (c < 0) lo = mid + 1; else hi = mid;
+  }
+  return [false, lo];
+}
+// map 的鍵：int 去掉小數；鍵是 string 的不能放數字，鍵是數字的不能放文字
+function __key(k, i, name, d) {
+  if (d.k == 'string') { if (typeof k != 'string') __err('mapKeyText', i, { name: name, v: k }); return k; }
+  if (typeof k == 'string') __err('mapKeyNum', i, { name: name, v: k });
+  return d.k == 'int' ? __int(k, i, name) : __long(k, i, name);
+}
+// m[k]：跟 C++ 一樣，沒有這個鍵時先放一個 0（string 是空的）再拿出來
+function __mget(m, name, i, d, k) {
+  k = __key(k, i, name, d);
+  var r = __bs(m.__map, k, true);
+  if (!r[0]) m.__map.splice(r[1], 0, [k, d.d]);
+  return m.__map[r[1]][1];
+}
+function __mset(m, name, i, d, k, v) {
+  k = __key(k, i, name, d);
+  var r = __bs(m.__map, k, true);
+  if (r[0]) m.__map[r[1]][1] = v; else m.__map.splice(r[1], 0, [k, v]);
+}
+// set 放入：已經有了就不放（不重複），沒有就放在排好的位置
+function __sins(s, name, i, v) {
+  var r = __bs(s.__set, v, false);
+  if (!r[0]) s.__set.splice(r[1], 0, v);
+}
+// map、set 的 erase(鍵)：沒有這個鍵就什麼都不做
+function __erase(c, name, i, d, k) {
+  if (c.__map) k = __key(k, i, name, d);
+  var list = c.__map || c.__set, r = __bs(list, k, !!c.__map);
+  if (r[0]) list.splice(r[1], 1);
+}
+// priority_queue 放入：排好放（最後一個是 top：大的先出來的由小排到大，小的先出來的由大排到小）
+function __pqpush(q, name, i, v, min) {
+  var k = q.length;
+  while (k > 0 && (min ? __cmp(q[k - 1], v) < 0 : __cmp(q[k - 1], v) > 0)) k--;
+  q.splice(k, 0, v);
+}
 // C++ 的 stack、queue（都用陣列存：stack 最後一個是頂端；queue 第一個是最前面）
 function __method(c, name, i, m, kind, a, b) {
   // string：s.substr(從哪個索引, 幾個字)；開始的位置超過長度時 C++ 會出錯，取的字太多只會取到最後
@@ -881,9 +1030,12 @@ function __method(c, name, i, m, kind, a, b) {
     if (!(Number.isInteger(a) && a >= 0 && a <= c.length)) __err('substrRange', i, { name: name, len: c.length, k: a });
     return b === undefined ? c.substr(a) : c.substr(a, Math.max(0, b));
   }
-  if (m == 'size' || m == 'length') return c.length;
-  if (m == 'empty') return c.length == 0;
-  if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : 'queueEmpty', i, { name: name, m: m });
+  // map、set 存在 __map、__set 裡（排好的）
+  var items = kind == 'map' ? c.__map : kind == 'set' ? c.__set : c;
+  if (m == 'size' || m == 'length') return items.length;
+  if (m == 'empty') return items.length == 0;
+  if (m == 'count') return __bs(items, kind == 'map' ? __key(a, i, name, b) : a, kind == 'map')[0] ? 1 : 0;
+  if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : kind == 'pq' ? 'pqEmpty' : 'queueEmpty', i, { name: name, m: m });
   return m == 'front' ? c[0] : c[c.length - 1];
 }
 // C++ 的 sort：只排前 n 個（沒給就是全部）；desc 由大到小
@@ -922,15 +1074,36 @@ function __stoi(v, i) {
   return parseInt(m[0], 10) | 0;
 }
 // to_string：整數照原樣；有小數的跟 C++ 一樣寫到小數點後 6 位
+// C++ 的字元（char）：執行時是一個字的文字，要算的時候變成編號（'a' 是 97）
+function __ord(v) { return typeof v == 'string' ? (v.length ? v.charCodeAt(0) : 0) : v; }
+function __chr(v) { return typeof v == 'string' ? v.charAt(0) : String.fromCharCode(((Math.trunc(v) % 256) + 256) % 256); }
+function __isdigit(c) { c = __ord(c); return c >= 48 && c <= 57; }
+function __isupper(c) { c = __ord(c); return c >= 65 && c <= 90; }
+function __islower(c) { c = __ord(c); return c >= 97 && c <= 122; }
+function __isalpha(c) { return __isupper(c) || __islower(c); }
+function __toupper(c) { return __islower(c) ? __chr(__ord(c) - 32) : __chr(c); }
+function __tolower(c) { return __isupper(c) ? __chr(__ord(c) + 32) : __chr(c); }
+// s[k] = c：換掉文字裡的一個字（回傳新的文字）
+function __setch(s, name, i, k, v) {
+  if (typeof v == 'string' && v.length != 1) __err('setChar', i, { name: name, v: v });
+  var at = __index(s, name, i, k);
+  return s.slice(0, at) + __chr(v) + s.slice(at + 1);
+}
 function __tostr(v) { return typeof v == 'number' && !Number.isInteger(v) ? v.toFixed(6) : String(v); }
 function __pop(c, name, i, kind) {
-  if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : 'queueEmpty', i, { name: name, m: 'pop' });
-  if (kind == 'stack') c.pop(); else c.shift();
+  if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : kind == 'pq' ? 'pqEmpty' : 'queueEmpty', i, { name: name, m: 'pop' });
+  if (kind == 'stack' || kind == 'pq') c.pop(); else c.shift();
 }
 // 輸出清單：一項一項用空白隔開；二維清單一列一行
 function __show(v) {
   // C++ 的 cout 印 true / false 是 1 / 0（例如 s.empty()）
   if (typeof v == 'boolean' && __BASE == 0) return v ? 1 : 0;
+  // map：一行一個「鍵 值」；set：由小到大用空白隔開
+  if (v && v.__map) {
+    if (v.__map.some(function (p) { return p[1] && typeof p[1] == 'object'; })) __err('showStruct', -1, {});
+    return v.__map.map(function (p) { return p[0] + ' ' + p[1]; }).join('\\n');
+  }
+  if (v && v.__set) v = v.__set;
   if (v && typeof v == 'object' && !Array.isArray(v)) __err('showStruct', -1, {});
   if (!Array.isArray(v)) return v;
   if (v.some(function (x) { return x === undefined; })) __err('unsetShow', -1, {});
@@ -1045,9 +1218,23 @@ class CodeGenerator {
     return this.vars.type_var_list.fixed.includes(name);
   }
 
-  /** C++ 的 stack、queue：只能從一端放入、取出 */
-  private containerKind(name: string): 'stack' | 'queue' | null {
-    return this.vars.type_var_list.stack.includes(name) ? 'stack' : this.vars.type_var_list.queue.includes(name) ? 'queue' : null;
+  /** C++ 的 stack、queue、priority_queue（放入、取出）、set（放入、刪除） */
+  private containerKind(name: string): 'stack' | 'queue' | 'pq' | 'set' | null {
+    const ty = this.vars.type_var_list;
+    return ty.stack.includes(name) ? 'stack' : ty.queue.includes(name) ? 'queue' : ty.pq.includes(name) ? 'pq' : ty.set.includes(name) ? 'set' : null;
+  }
+
+  /** C++ 的 map */
+  private isMap(name: string) {
+    return this.vars.type_var_list.map.includes(name);
+  }
+
+  /** map 的鍵是什麼型別、沒有這個鍵時的值（m[k] 用；見 __mget） */
+  private mapDesc(name: string) {
+    const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(name)];
+    const { value } = mapParts(holds);
+    const def = findStruct(value) ? JSON.stringify(Object.fromEntries(findStruct(value)!.fields.map(f => [f.name, fieldInit(f)]))) : value == '文字' ? '""' : '0';
+    return `{k: ${JSON.stringify(mapKeyCppType(holds))}, d: ${def}}`;
   }
 
   /** 變數後面接 [ ] 一律交給 __at/__set 檢查：清單是第幾項、文字是第幾個字，數字會提示不能用 */
@@ -1084,8 +1271,10 @@ class CodeGenerator {
    * Scratch、Blockly 的清單什麼都能放，照原樣
    */
   private item(list: string, value: string, i: number) {
-    if (getTarget() != 'cpp' || !(this.isList(list) || this.isGrid(list) || this.containerKind(list))) return value;
-    const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
+    if (getTarget() != 'cpp' || !(this.isList(list) || this.isGrid(list) || this.containerKind(list) || this.isMap(list))) return value;
+    let holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
+    // map：放的是值
+    if (this.isMap(list)) holds = mapParts(holds).value;
     // 裝 struct：複製一份放進去
     if (findStruct(holds)) return `__rec(${value}, ${i}, ${JSON.stringify(list)}, ${JSON.stringify(holds)})`;
     const elem = elemCppType(holds);
@@ -1112,6 +1301,8 @@ class CodeGenerator {
   /** 學生寫的運算式 → JavaScript：清單或文字[第幾項]、二維清單[列][行]、長度(清單或文字)、判斷式的 and/or/= */
   /** C++：運算式是不是整數（int）——整數 / 整數 要照 C++ 去掉小數 */
   private isIntExpr(e: Expr): boolean {
+    // C++ 的字元算的時候是整數（'7' - '0' 是 7）
+    if (exprType(e, varInfoMap(this.vars), this.modules) == 'char') return true;
     const { array, grid, stack, queue } = this.vars.type_var_list;
     const holdsInt = (name: string) => (array.includes(name) || grid.includes(name) || stack.includes(name) || queue.includes(name)) && ['數字', '長整數'].includes(this.vars.var_list.value[this.vars.var_list.name.indexOf(name)]);
     switch (e.t) {
@@ -1148,41 +1339,70 @@ class CodeGenerator {
   }
 
   /**
-   * C++：哪些「整數 / 整數」要改成 __idiv(a, b)（去掉小數，跟 C++ 一樣）。
-   * 回傳每個 token 前面要加幾個「__idiv(」、哪些 / 換成逗號、後面要加幾個「)」
+   * C++ 要包起來的地方：「整數 / 整數」改成 __idiv(a, b)（去掉小數，跟 C++ 一樣）；
+   * 字元（char）拿來算或跟數字比的時候改成 __ord(c)（'a' 變成 97）。
+   * 回傳每個 token 前面要加的字、後面要加的字（外層的先開、後關）、哪些 / 換成逗號
    */
-  private intDivisions(text: string) {
-    const open = new Map<number, number>();
-    const close = new Map<number, number>();
+  private rewrites(text: string, i: number) {
+    const pre = new Map<number, { len: number; s: string }[]>();
+    const post = new Map<number, { len: number; s: string }[]>();
     const ops = new Set<number>();
-    if (getTarget() != 'cpp') return { open, close, ops };
+    if (getTarget() != 'cpp') return { pre, post, ops };
+    const { e: root, spans } = parseExprSpans(text);
+    const map = varInfoMap(this.vars);
+    const add = (m: typeof pre, k: number, x: { len: number; s: string }) => { if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); };
+    /** 第 from 到 to - 1 個 token 包起來 */
+    const wrap = (from: number, to: number, open: string, close: string) => {
+      add(pre, from, { len: to - from, s: open });
+      add(post, to - 1, { len: to - from, s: close });
+    };
+    const type = (x: Expr) => exprType(x, map, this.modules);
+    const ord = (x: Expr) => {
+      const sp = spans.get(x);
+      if (sp && type(x) == 'char') wrap(sp[0], sp[1], '__ord(', ')');
+    };
     const visit = (e: Expr) => {
       switch (e.t) {
-        case 'bin':
+        case 'bin': {
           visit(e.a);
           visit(e.b);
           if (e.op == '/' && e.span && this.isIntExpr(e.a) && this.isIntExpr(e.b)) {
             const [from, at, to] = e.span;
-            open.set(from, (open.get(from) ?? 0) + 1);
+            wrap(from, to, '__idiv(', `, ${i})`);
             ops.add(at);
-            close.set(to - 1, (close.get(to - 1) ?? 0) + 1);
+          }
+          const ta = type(e.a), tb = type(e.b);
+          // 字拿來算：'a' + 1、s[i] - '0'（文字接起來的 + 不算）
+          if (['+', '-', '*', '/', '%'].includes(e.op) && !(e.op == '+' && (ta == 'str' || tb == 'str'))) {
+            ord(e.a);
+            ord(e.b);
+          }
+          // 字跟數字比：c >= 65（字跟字比照原樣就可以）
+          if (['==', '!=', '<', '<=', '>', '>='].includes(e.op)) {
+            if (ta == 'char' && tb == 'num') ord(e.a);
+            if (tb == 'char' && ta == 'num') ord(e.b);
           }
           break;
+        }
         case 'idx': visit(e.obj); visit(e.index); break;
         case 'method': visit(e.obj); e.args.forEach(visit); break;
         case 'field': visit(e.obj); break;
         case 'call': case 'fcall': e.args.forEach(visit); break;
-        case 'neg': case 'not': visit(e.a); break;
+        case 'neg': visit(e.a); ord(e.a); break;
+        case 'not': visit(e.a); break;
+        case 'brace': e.items.forEach(visit); break;
       }
     };
-    visit(parseExpr(text));
-    return { open, close, ops };
+    visit(root);
+    return { pre, post, ops };
   }
 
   private expr(text: string, i: number, condition = false): string {
     text = rowMethods(text);
     const tokens = tokenize(text);
-    const div = this.intDivisions(text);
+    /** m.count(k) 的 )：要補上鍵的型別 */
+    const mapCountClose = new Map<number, string>();
+    const div = this.rewrites(text, i);
     // 每個 [ 是哪一種：清單的一項、二維清單的第一個／第二個 [ 、一般的中括號
     const stack: ('item' | 'cell1' | 'cell2' | 'raw')[] = [];
     let secondBracket = false;
@@ -1204,9 +1424,33 @@ class CodeGenerator {
       else
       if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '.' && method?.type == 'name' && tokens[k + 3]?.text == '(') {
         const ty = this.vars.type_var_list;
-        const kind = ty.stack.includes(t.text) ? 'stack' : ty.queue.includes(t.text) ? 'queue' : ty.text.includes(t.text) ? 'string' : 'vector';
-        piece = `__method(${t.text}, ${JSON.stringify(t.text)}, ${i}, ${JSON.stringify(method.text)}, ${JSON.stringify(kind)}${tokens[k + 4]?.text == ')' ? '' : ', '}`;
+        const kind = ty.stack.includes(t.text) ? 'stack' : ty.queue.includes(t.text) ? 'queue' : ty.text.includes(t.text) ? 'string'
+          : ty.map.includes(t.text) ? 'map' : ty.set.includes(t.text) ? 'set' : ty.pq.includes(t.text) ? 'pq' : 'vector';
+        // m.count(k)：要知道鍵的型別（放在第二個引數後面）
+        if (kind == 'map' && method.text == 'count') {
+          piece = `__method(${t.text}, ${JSON.stringify(t.text)}, ${i}, "count", "map", `;
+          // 引數照原樣，最後補上鍵的型別：找配對的 )
+          let depth = 0;
+          for (let j = k + 3; j < tokens.length; j++) {
+            if (tokens[j].text == '(') depth++;
+            else if (tokens[j].text == ')' && --depth == 0) { mapCountClose.set(j, t.text); break; }
+          }
+        }
+        else piece = `__method(${t.text}, ${JSON.stringify(t.text)}, ${i}, ${JSON.stringify(method.text)}, ${JSON.stringify(kind)}${tokens[k + 4]?.text == ')' ? '' : ', '}`;
         skip = 3;
+      }
+      else if (mapCountClose.has(k)) {
+        piece = `, ${this.mapDesc(mapCountClose.get(k)!)})`;
+      }
+      else if (t.type == 'name' && this.isMap(t.text) && tokens[k + 1]?.text == '[') {
+        piece = `__mget(${t.text}, ${JSON.stringify(t.text)}, ${i}, ${this.mapDesc(t.text)}, `;
+      }
+      // {a, b}：一整筆 pair / struct（放進去的時候照欄位變成一筆，見 __rec）
+      else if (t.text == '{') {
+        piece = '{__brace: [';
+      }
+      else if (t.text == '}') {
+        piece = ']}';
       }
       else if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '[') {
         piece = this.isCell(tokens, k + 1)
@@ -1243,12 +1487,13 @@ class CodeGenerator {
       }
       // C++ 的整數除法：a / b → __idiv(a, b, 積木編號)
       if (div.ops.has(k)) piece = ', ';
-      // 用掉的 token 上如果有整數除法的結尾，也要補上
-      let closes = 0;
-      for (let j = k; j <= k + skip; j++) closes += div.close.get(j) ?? 0;
-      piece = '__idiv('.repeat(div.open.get(k) ?? 0) + piece + `, ${i})`.repeat(closes);
+      // 包起來的開頭（外層的先寫）；用掉的 token 上如果有結尾，也要補上（裡層的先寫）
+      const opens = (div.pre.get(k) ?? []).sort((a, b) => b.len - a.len).map(x => x.s).join('');
+      let closes = '';
+      for (let j = k; j <= k + skip; j++) closes += (div.post.get(j) ?? []).sort((a, b) => a.len - b.len).map(x => x.s).join('');
+      piece = opens + piece + closes;
       out += (word && prevWord ? ' ' : '') + piece;
-      prevWord = word && closes == 0;
+      prevWord = word && closes == '';
       k += skip;
     }
     // 長度( )、項目編號( )、包含( ) 要把積木編號傳進去，錯誤時才能標出積木
@@ -1287,6 +1532,14 @@ class CodeGenerator {
       return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${this.item(cell.name, value, i)});\n`;
     }
     const item = listItemTarget(target);
+    // C++ 的 s[i] = 'x'：換掉文字裡的一個字
+    if (item && getTarget() == 'cpp' && this.vars.type_var_list.text.includes(item.list)) {
+      return `${item.list} = __setch(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${value});\n`;
+    }
+    // map 的一格：m[k] = v（沒有這個鍵就新增）
+    if (item && this.isMap(item.list)) {
+      return `__mset(${item.list}, ${JSON.stringify(item.list)}, ${i}, ${this.mapDesc(item.list)}, (${this.expr(item.index, i)}), ${this.item(item.list, value, i)});\n`;
+    }
     // 文字、數字變數接 [ ] 也交給 __set，執行時會說明為什麼不行
     if (item && this.isVar(item.list)) {
       return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${this.item(item.list, value, i)});\n`;
@@ -1296,7 +1549,7 @@ class CodeGenerator {
     if (number.includes(target)) return `${target} = ${this.numConv(target)}(${value}, ${i}, ${name});\n`;
     if (text.includes(target)) return `${target} = __text(${value}, ${i}, ${name});\n`;
     if (this.isList(target)) return `${target} = __list(${value}, ${i}, ${name});\n`;
-    if (this.vars.type_var_list.record.includes(target)) return `${target} = __rec(${value}, ${i}, ${name});\n`;
+    if (this.vars.type_var_list.record.includes(target)) return `${target} = __rec(${value}, ${i}, ${name}, ${JSON.stringify(this.vars.var_list.value[this.vars.var_list.name.indexOf(target)])});\n`;
     return `${target} = ${value};\n`;
   }
 
@@ -1405,6 +1658,12 @@ class CodeGenerator {
             const listName = JSON.stringify(list);
             code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), ${this.item(list, `${this.listReader(list)}(input_list, ${i}, ${listName})`, i)});\n`;
           }
+          // 輸入 m[k]：map 的一格（照值的型別讀）
+          else if (item && this.isMap(item.list)) {
+            const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(item.list)];
+            const read = mapParts(holds).value == '文字' ? '__inText' : '__inNum';
+            code = this.assign(v, `${read}(input_list, ${i}, ${name})`, i);
+          }
           // 輸入 成績[k]：替換第 k 項，跟計算積木一樣從第 1 項開始，超出範圍會提示
           else if (item && this.isVar(item.list)) {
             const list = JSON.stringify(item.list);
@@ -1413,6 +1672,9 @@ class CodeGenerator {
           else if (this.isFixed(v)) {
             this.fail(t(`${label(node)}：「${v}」是 array，大小是固定的，不能把值加到最後面。請雙擊積木，選要存到第幾格（索引）。`, `${label(node)}: "${v}" is an array with a fixed size. You cannot add to the end. Double-click the block and choose an index.`), node);
           }
+          // set：放進去（不重複）；priority_queue：放到排好的位置
+          else if (this.containerKind(v) == 'set') code = `__sins(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
+          else if (this.containerKind(v) == 'pq') code = `__pqpush(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)}, ${this.vars.type_var_list.pqMin.includes(v)});\n`;
           // stack、queue：輸入的值 push 進去
           else if (this.isList(v) || this.containerKind(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
           else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
@@ -1422,7 +1684,7 @@ class CodeGenerator {
         else {
           const what = parts.slice(1).join(' ').trim();
           // 輸出整個 stack：跟 C++ 一樣從頂端（最後放進去的）開始一個一個拿出來
-          const shown = this.containerKind(what) == 'stack' ? `${what}.slice().reverse()` : expr(what);
+          const shown = this.containerKind(what) == 'stack' || this.containerKind(what) == 'pq' ? `${what}.slice().reverse()` : expr(what);
           code = 'output_result += (__show(' + shown + ') + "\\n");\n';
         }
         this.checkSyntax(node, code);
@@ -1506,8 +1768,13 @@ class CodeGenerator {
         if (this.isFixed(target) && ['加入', '插入', '刪除', '清空'].includes(action)) {
           this.fail(t(`${label(node)}：「${target}」是 array，大小是固定的，不能加入、插入或刪除，只能替換某一格。`, `${label(node)}: "${target}" is an array with a fixed size. You cannot add, insert or delete. You can only change one item.`), node);
         }
-        if (kind && action != '放入' && action != '取出') {
-          this.fail(t(`${label(node)}：「${target}」是 ${kind}，只能用 push（放入）和 pop（取出）。請雙擊積木重新選。`, `${label(node)}: "${target}" is a ${kind}. You can only push and pop. Double-click the block to choose again.`), node);
+        // set：insert（放入）、erase（刪除）、clear；map：m[k] = v（替換）、erase、clear
+        const okActions: Record<string, string[]> = { stack: ['放入', '取出'], queue: ['放入', '取出'], pq: ['放入', '取出'], set: ['放入', '刪除', '清空'] };
+        if (kind && !okActions[kind].includes(action)) {
+          this.fail(t(`${label(node)}：「${target}」是 ${kind == 'pq' ? 'priority_queue' : kind}，不能這樣改。請雙擊積木重新選。`, `${label(node)}: "${target}" is a ${kind == 'pq' ? 'priority_queue' : kind}. It cannot change this way. Double-click the block to choose again.`), node);
+        }
+        if (this.isMap(target) && !['替換', '刪除', '清空'].includes(action)) {
+          this.fail(t(`${label(node)}：「${target}」是 map，只能設定某個鍵的值、刪除某個鍵、全部清空。請雙擊積木重新選。`, `${label(node)}: "${target}" is a map. You can set the value of a key, erase a key, or clear it. Double-click the block to choose again.`), node);
         }
         if (!kind && (action == '放入' || action == '取出')) {
           this.fail(t(`${label(node)}：「${target}」不是 stack 或 queue，不能 push、pop。請雙擊積木重新選。`, `${label(node)}: "${target}" is not a stack or queue, so it cannot push or pop. Double-click the block to choose again.`), node);
@@ -1519,7 +1786,11 @@ class CodeGenerator {
           this.checkSyntax(node, code);
           return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
         }
-        const code = action == '排序' ? `__sort(${target}, ${name}, ${i}, ${index ? `(${expr(index)})` : 'null'}, ${index2 ? JSON.stringify(parseSortKeys(index2).map(k => [k.field, k.desc])) : 'null'}, ${rest == '由大到小'});\n`
+        const pqMin = this.vars.type_var_list.pqMin.includes(target);
+        const code = kind == 'set' && action == '放入' ? `__sins(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
+          : kind == 'pq' && action == '放入' ? `__pqpush(${target}, ${name}, ${i}, ${this.item(target, value, i)}, ${pqMin});\n`
+          : (kind == 'set' || this.isMap(target)) && action == '刪除' ? `__erase(${target}, ${name}, ${i}, ${this.isMap(target) ? this.mapDesc(target) : 'null'}, (${expr(index)}));\n`
+          : action == '排序' ? `__sort(${target}, ${name}, ${i}, ${index ? `(${expr(index)})` : 'null'}, ${index2 ? JSON.stringify(parseSortKeys(index2).map(k => [k.field, k.desc])) : 'null'}, ${rest == '由大到小'});\n`
           : action == '放入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
           : action == '取出' ? `__pop(${target}, ${name}, ${i}, ${JSON.stringify(kind)});\n`
           : action == '加入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
@@ -1716,7 +1987,9 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
     if (findStruct(raw)) return `Array.from({ length: ${Number(size)} }, function () { return __new(${JSON.stringify(raw)}); })`;
     return `Array(${Number(size)}).fill(${raw == '文字' ? '""' : '0'})`;
   }
-  if (vars.type_var_list.array.includes(name) || vars.type_var_list.grid.includes(name) || vars.type_var_list.stack.includes(name) || vars.type_var_list.queue.includes(name)) return '[]';
+  if (vars.type_var_list.map.includes(name)) return '{__map: []}';
+  if (vars.type_var_list.set.includes(name)) return '{__set: []}';
+  if (vars.type_var_list.array.includes(name) || vars.type_var_list.grid.includes(name) || vars.type_var_list.stack.includes(name) || vars.type_var_list.queue.includes(name) || vars.type_var_list.pq.includes(name)) return '[]';
   const value = (raw ?? '').trim();
   if (vars.type_var_list.text.includes(name)) {
     return /^(".*"|'.*')$/.test(value) ? value : JSON.stringify(value);
@@ -1804,7 +2077,9 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   for (const s of getStructs()) {
     if (!s.fields.length) throw new FlowError(t(`struct ${s.name} 還沒有欄位：請到第三步替它加上欄位，或把它刪掉。`, `The struct ${s.name} has no fields yet. Add fields in step 3, or delete it.`));
   }
-  code += 'var __STRUCTS = ' + JSON.stringify(Object.fromEntries(getStructs().map(s => [s.name, Object.fromEntries(s.fields.map(f => [f.name, fieldInit(f)]))]))) + ';\n';
+  code += 'var __STRUCTS = ' + JSON.stringify(Object.fromEntries(allStructs().map(s => [s.name, Object.fromEntries(s.fields.map(f => [f.name, fieldInit(f)]))]))) + ';\n';
+  // 每種 struct（和 pair）每個欄位的 C++ 型別：{a, b} 變成一筆時照這個轉
+  code += 'var __FTYPES = ' + JSON.stringify(Object.fromEntries(allStructs().map(s => [s.name, Object.fromEntries(s.fields.map(f => [f.name, fieldCppType(f)]))]))) + ';\n';
   code += runtime();
   const declare = (store: VarStore, name: string) => {
     const decl = 'var ' + name + ' = ' + initialValue(store, name, store.var_list.value[store.var_list.name.indexOf(name)]) + ';\n';

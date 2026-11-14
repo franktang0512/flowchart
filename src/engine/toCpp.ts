@@ -1,9 +1,9 @@
 // 「看程式」：流程圖的結構 → C++（學習目標是 C++ 時，清單的索引從 0 開始，所以位置直接照抄）。
 // 給學生看「流程圖怎麼變成程式」，以好讀為主：型別照第三步學生選的 int / float / string，清單用 vector。
 import { t } from '../i18n';
-import { cppType, elemCppType } from './modules';
-import { exprType, fieldOf, isContainerType, parseExpr, type Expr, type ExprType, type ModuleProgram, type Stmt, type VarInfo } from './structure';
-import { fieldCppType, findStruct, getStructs } from './structs';
+import { cppType, elemCppType, mapKeyCppType, mapParts } from './modules';
+import { CHAR_TESTS, exprType, fieldOf, isContainerType, parseExpr, type Expr, type ExprType, type ModuleProgram, type Stmt, type VarInfo } from './structure';
+import { fieldCppType, findStruct, getStructs, isPair } from './structs';
 
 const INDENT = '    ';
 
@@ -41,7 +41,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     return p?.type == '文字' && typeOf(a) != 'str' ? strPart(a, false) : expr(a);
   };
   // 用到哪些東西：最後只 #include 有用到的
-  const uses = { indexOf: false, indexOfArray: false, inputNumber: false, inputLong: false, inputFloat: false, inputText: false, cmath: false, string: false, sort: false, greater: false };
+  const uses = { cctype: false, indexOf: false, indexOfArray: false, inputNumber: false, inputLong: false, inputFloat: false, inputText: false, cmath: false, string: false, sort: false, greater: false };
   /** 排序 struct 用的比較函式：名稱 → 程式 */
   const comparators = new Map<string, string[]>();
   const typeOfVar = (name: string) => (vars.get(name) ?? allVars.find(v => v.name == name))?.type;
@@ -55,6 +55,8 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   const paramOf = (name: string) => (current as ModuleProgram | null)?.params.find(p => p.name == name);
   /** 運算式是不是整數（決定 / 要不要先轉成小數） */
   const isInt = (e: Expr): boolean => {
+    // 字元（char）算的時候是整數
+    if (typeOf(e) == 'char') return true;
     switch (e.t) {
       case 'num': return !e.v.includes('.');
       case 'var': {
@@ -64,13 +66,15 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         return v?.type == '數字' && !v.float;
       }
       case 'idx':
+        // map 的一格：值是整數嗎
+        if (e.obj.t == 'var' && vars.get(e.obj.name)?.type == '對應表') return isIntType(elemType(e.obj.name));
         // 清單的一項、二維清單的一格（只取一個 [ ] 的二維清單是一整列，不是數字）
         if (e.obj.t == 'var') return (vars.get(e.obj.name)?.type == '清單' || vars.get(e.obj.name)?.type == '陣列') && isIntType(elemType(e.obj.name));
         return e.obj.t == 'idx' && e.obj.obj.t == 'var' && vars.get(e.obj.obj.name)?.type == '二維清單' && isIntType(elemType(e.obj.obj.name));
       case 'call':
         if (e.fn == 'max' || e.fn == 'min') return e.args.length == 1 ? e.args[0].t == 'var' && isIntType(elemType(e.args[0].name)) : e.args.every(isInt);
         return e.fn == 'len' || e.fn == 'find' || e.fn == 'stoi';
-      case 'method': return e.name == 'size' || e.name == 'length' || (e.name != 'empty' && e.name != 'substr' && e.obj.t == 'var' && isIntType(elemType(e.obj.name)));
+      case 'method': return e.name == 'size' || e.name == 'length' || e.name == 'count' || (e.name != 'empty' && e.name != 'substr' && e.obj.t == 'var' && isIntType(elemType(e.obj.name)));
       case 'field': {
         const f = fieldOf(e, vars);
         return f?.type == '數字' && !f.float;
@@ -100,8 +104,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   const expr = (e: Expr, parent = 0): string => {
     switch (e.t) {
       case 'num': return e.v;
-      case 'str': return JSON.stringify(e.v);
+      case 'str': return e.ch ? charLit(e.v) : JSON.stringify(e.v);
       case 'var': return e.name;
+      case 'brace': return `{${e.items.map(a => expr(a)).join(', ')}}`;
       case 'raw': return `/* ${e.text} */`;
       case 'idx': return `${expr(e.obj, 9)}[${expr(e.index)}]`;
       case 'method': return `${expr(e.obj, 9)}.${e.name}(${e.args.map(a => expr(a)).join(', ')})`;
@@ -122,6 +127,16 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
           }
           const args = e.args.map(x => expr(x)).join(', ');
           return e.args.length == 2 ? `${e.fn}(${args})` : `${e.fn}({${args}})`;
+        }
+        // 字元：char(數字)；toupper / tolower 回傳的是 int，要再變成 char 才印得出字
+        if (e.fn == 'chr') return `char(${expr(a)})`;
+        if (e.fn == 'toupper' || e.fn == 'tolower') {
+          uses.cctype = true;
+          return `char(${e.fn}(${expr(a)}))`;
+        }
+        if (CHAR_TESTS.includes(e.fn)) {
+          uses.cctype = true;
+          return `${e.fn}(${expr(a)})`;
         }
         // 文字變整數、數字變文字
         if (e.fn == 'stoi' || e.fn == 'tostr') {
@@ -174,7 +189,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     if (left && e.t == 'str') return `string(${expr(e)})`;
     return expr(e, 6);
   };
-  const charSide = (e: Expr) => (e.t == 'str' && e.v.length == 1 ? `'${e.v == "'" ? "\\'" : e.v}'` : expr(e, 4));
+  const charSide = (e: Expr) => (e.t == 'str' && e.v.length == 1 ? charLit(e.v) : expr(e, 4));
 
   /** 條件；negate 時寫成相反的條件（給「重複直到」用） */
   const cond = (e: Expr, negate = false): string => {
@@ -213,7 +228,12 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
           emit(depth, `cin >> ${s.target}[${expr(s.index)}][${expr(s.index2)}];`);
           break;
         }
-        const container = v?.type == '堆疊' || v?.type == '佇列';
+        // map 的一格：cin >> m[k];
+        if (v?.type == '對應表' && s.index) {
+          emit(depth, `cin >> ${s.target}[${expr(s.index)}];`);
+          break;
+        }
+        const container = v?.type == '堆疊' || v?.type == '佇列' || v?.type == '集合' || v?.type == '優先佇列' || v?.type == '優先佇列小';
         if (v?.type != '清單' && v?.type != '陣列' && !container) {
           emit(depth, `cin >> ${s.target};`);
           break;
@@ -227,7 +247,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         const tmp = ({ string: 'inputText', float: 'inputFloat', int: 'inputNumber', 'long long': 'inputLong' } as const)[elemType(s.target) as 'string' | 'float' | 'int' | 'long long'] ?? 'inputNumber';
         uses[tmp] = true;
         emit(depth, `cin >> ${tmp};`);
-        emit(depth, container ? `${s.target}.push(${tmp});`
+        emit(depth, v?.type == '集合' ? `${s.target}.insert(${tmp});` : container ? `${s.target}.push(${tmp});`
           : s.place == 'insert' ? `${s.target}.insert(${s.target}.begin() + ${expr(s.index!, 5)}, ${tmp});` : `${s.target}.push_back(${tmp});`);
         break;
       }
@@ -246,6 +266,17 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         }
         // 整個 stack、queue：不能用 for 一個一個看，要複製一份，一個一個拿出來
         const kind = s.value.t == 'var' ? vars.get(s.value.name)?.type : undefined;
+        // map：一行一個「鍵 值」；set：由小到大
+        if (s.value.t == 'var' && kind == '對應表') {
+          emit(depth, `for (auto p : ${s.value.name}) cout << p.first << " " << p.second << endl;`);
+          break;
+        }
+        // priority_queue：複製一份，從 top 開始一個一個拿出來
+        if (s.value.t == 'var' && (kind == '優先佇列' || kind == '優先佇列小')) {
+          emit(depth, `for (auto copy = ${s.value.name}; !copy.empty(); copy.pop()) cout << copy.top() << " ";`);
+          emit(depth, 'cout << endl;');
+          break;
+        }
         if (s.value.t == 'var' && (kind == '堆疊' || kind == '佇列')) {
           const name = s.value.name;
           const cppKind = kind == '堆疊' ? 'stack' : 'queue';
@@ -302,9 +333,14 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
               : `${s.target}.assign(${expr(s.index!)}, vector<${elemType(s.target)}>(${expr(s.index2!)}, ${text ? '""' : '0'}));`);
             break;
           }
-          case '刪除': emit(depth, `${s.target}.erase(${s.target}.begin() + ${at});`); break;
+          case '刪除': {
+            // map、set：erase(鍵)
+            const ty = vars.get(s.target)?.type;
+            emit(depth, ty == '對應表' || ty == '集合' ? `${s.target}.erase(${expr(s.index!)});` : `${s.target}.erase(${s.target}.begin() + ${at});`);
+            break;
+          }
           case '清空': emit(depth, `${s.target}.clear();`); break;
-          case '放入': emit(depth, `${s.target}.push(${value});`); break;
+          case '放入': emit(depth, vars.get(s.target)?.type == '集合' ? `${s.target}.insert(${value});` : `${s.target}.push(${value});`); break;
           case '取出': emit(depth, `${s.target}.pop();`); break;
         }
         break;
@@ -423,6 +459,11 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       return `${pad}${v.init} ${v.name} = {${values.join(', ')}};`;
     }
     if (v.type == '佇列') return `${pad}queue<${elemType(v.name)}> ${v.name};`;
+    if (v.type == '集合') return `${pad}set<${elemType(v.name)}> ${v.name};`;
+    if (v.type == '對應表') return `${pad}map<${mapKeyCppType(v.init)}, ${elemType(v.name)}> ${v.name};`;
+    if (v.type == '優先佇列') return `${pad}priority_queue<${elemType(v.name)}> ${v.name};`;
+    // 小的先出來：priority_queue<int, vector<int>, greater<int>>
+    if (v.type == '優先佇列小') return `${pad}priority_queue<${elemType(v.name)}, vector<${elemType(v.name)}>, greater<${elemType(v.name)}>> ${v.name};`;
     if (v.type == '文字') return `${pad}string ${v.name} = ${JSON.stringify(stripQuotes(v.init))};`;
     return `${pad}${cppType('數字', v.float, v.long)} ${v.name} = ${v.init.trim() || '0'};`;
   };
@@ -455,14 +496,22 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   const isList = (v: VarInfo) => v.type == '清單' || v.type == '二維清單';
   const holdsText = (v: VarInfo) => isContainerType(v.type) && elemType(v.name) == 'string';
   const structs = getStructs();
-  const needString = uses.string || allVars.some(v => v.type == '文字' || holdsText(v)) || structs.some(s => s.fields.some(f => f.type == '文字'));
-  const needVector = uses.indexOf || allVars.some(isList);
+  /** 用到內建的 pair：裝 pair 的容器、pair 變數、map 的值 */
+  const pairs = allVars.filter(v => isPair(v.type == '對應表' ? mapParts(v.init).value : v.init));
+  const needString = uses.string || allVars.some(v => v.type == '文字' || holdsText(v)) || structs.some(s => s.fields.some(f => f.type == '文字'))
+    || allVars.some(v => v.type == '對應表' && mapParts(v.init).key == '文字') || pairs.some(v => v.init.includes('string'));
+  const needVector = uses.indexOf || allVars.some(isList) || allVars.some(v => v.type == '優先佇列小');
   const head = ['#include <iostream>'];
   if (needString) head.push('#include <string>');
   if (needVector) head.push('#include <vector>');
   if (allVars.some(v => v.type == '堆疊')) head.push('#include <stack>');
-  if (allVars.some(v => v.type == '佇列')) head.push('#include <queue>');
+  if (allVars.some(v => v.type == '佇列' || v.type == '優先佇列' || v.type == '優先佇列小')) head.push('#include <queue>');
+  if (allVars.some(v => v.type == '集合')) head.push('#include <set>');
+  if (allVars.some(v => v.type == '對應表')) head.push('#include <map>');
+  if (pairs.length) head.push('#include <utility>');
+  if (allVars.some(v => v.type == '優先佇列小')) uses.greater = true;
   if (uses.cmath) head.push('#include <cmath>');
+  if (uses.cctype) head.push('#include <cctype>');
   if (uses.sort) head.push('#include <algorithm>');
   if (uses.greater) head.push('#include <functional>');
   head.push('using namespace std;', '');
@@ -503,6 +552,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   const protos = modules.length > 1 ? [...modules.map(m => `${retType(m)} ${m.name}(${paramCode(m)});`), ''] : [];
   return [...head, ...protos, ...functions, 'int main() {', ...decls, ...(decls.length ? [''] : []), ...body, `${INDENT}return 0;`, '}', ''].join('\n');
 }
+
+/** 一個字寫成 C++ 的 char：'a'（單引號、反斜線要跳脫） */
+const charLit = (c: string) => `'${c == "'" || c == '\\' ? '\\' + c : c}'`;
 
 const stripQuotes = (s: string) => {
   const v = s.trim();

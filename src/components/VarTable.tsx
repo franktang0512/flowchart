@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
 import { isContainerType, type VarType } from '../engine/structure';
-import { findStruct, getStructs } from '../engine/structs';
+import { findStruct, getStructs, isPair, PAIR_TYPES } from '../engine/structs';
+import { mapParts } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { getTarget } from '../target';
 import { useCommit } from '../useCommit';
@@ -39,7 +40,14 @@ const CPP_CONTAINERS: [VarType, () => string, () => string][] = [
   ['陣列', () => t('array（陣列）', 'array'), () => t('array（陣列）：大小固定', 'array: fixed size')],
   ['堆疊', () => 'stack', () => t('stack（堆疊）：後放進去的先拿出來', 'stack: last in, first out')],
   ['佇列', () => 'queue', () => t('queue（佇列）：先放進去的先拿出來', 'queue: first in, first out')],
+  ['優先佇列', () => t('priority_queue（大的先）', 'priority_queue (largest first)'), () => t('priority_queue：最大的先拿出來', 'priority_queue: the largest comes out first')],
+  ['優先佇列小', () => t('priority_queue（小的先）', 'priority_queue (smallest first)'), () => t('priority_queue：最小的先拿出來（greater）', 'priority_queue: the smallest comes out first (greater)')],
+  ['集合', () => 'set', () => t('set：不重複，自動由小到大排好', 'set: no repeats, kept in order')],
+  ['對應表', () => 'map', () => t('map：用「鍵」找「值」，例如 名字 → 分數', 'map: find a value by its key, like name → score')],
 ];
+
+/** set、priority_queue 只能裝比得出大小的：數字、文字、pair（自己定義的 struct 不行） */
+const sortedType = (type: VarType) => type == '集合' || type == '優先佇列' || type == '優先佇列小';
 
 interface Props {
   rows: VarRow[];
@@ -336,8 +344,10 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
             const { type, float, long } = fromTypeValue(e.target.value);
             // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字；改成 int 時初始值的小數去掉
             // 換成別的容器時，原本裝的 struct 照樣留著
-            const keepStruct = isListType(type) && findStruct(row.init);
-            let init = isListType(type) ? (row.init == '文字' || row.init == '小數' || row.init == '長整數' || keepStruct ? row.init : '數字')
+            const keepStruct = isListType(type) && findStruct(row.init) && (!sortedType(type) || isPair(row.init));
+            // map：鍵→值，預設 string → int
+            let init = type == '對應表' ? (row.init.includes('→') ? row.init : '文字→數字')
+              : isListType(type) ? (row.init == '文字' || row.init == '小數' || row.init == '長整數' || keepStruct ? row.init : '數字')
               : row.type == '結構' ? (type == '數字' ? '0' : '')
               : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
@@ -350,7 +360,13 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
           <TypeOptions beforeString={cpp && containerOptions(['陣列'])} />
           {cpp
             ? <>
-                {containerOptions(['清單', '二維清單', '堆疊', '佇列'])}
+                {containerOptions(['清單', '二維清單', '堆疊', '佇列', '優先佇列', '優先佇列小', '集合', '對應表'])}
+                {/* 內建的 pair：跟 struct 一樣用 p.first、p.second */}
+                {(!allowed || allowed.includes('結構') || row.type == '結構') && (
+                  <optgroup label="pair">
+                    {PAIR_TYPES.map(p => <option key={p} value={STRUCT_PREFIX + p}>{p}</option>)}
+                  </optgroup>
+                )}
                 {/* 定義好的 struct 直接當型別（跟 C++ 寫 Edge e; 一樣）；題目也可以不給 struct */}
                 {(!allowed || allowed.includes('結構') || row.type == '結構') && getStructs().length > 0 && (
                   <optgroup label={t('自己定義的 struct', 'Your structs')}>
@@ -394,6 +410,26 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
               </span>
             </details>
           )
+          : row.type == '對應表'
+          ? (
+            // map：鍵是什麼、值是什麼（例如 string → int：用名字找分數）
+            <span className="map_types">
+              <select className="var_input" aria-label={t('鍵', 'Key')} title={t('鍵：用來找的（例如名字）', 'Key: what you look up by (like a name)')} value={mapParts(row.init).key}
+                onChange={e => { onChange(row.id, { init: `${e.target.value}→${mapParts(row.init).value}` }); onCommit(); }}>
+                <option value="文字">{t('鍵 string', 'key string')}</option>
+                <option value="數字">{t('鍵 int', 'key int')}</option>
+                <option value="長整數">{t('鍵 long long', 'key long long')}</option>
+              </select>
+              <span className="muted">→</span>
+              <select className="var_input" aria-label={t('值', 'Value')} title={t('值：找到的東西（例如分數）', 'Value: what you find (like a score)')} value={mapParts(row.init).value}
+                onChange={e => { onChange(row.id, { init: `${mapParts(row.init).key}→${e.target.value}` }); onCommit(); }}>
+                <option value="數字">{t('值 int', 'value int')}</option>
+                <option value="長整數">{t('值 long long', 'value long long')}</option>
+                <option value="小數">{t('值 float', 'value float')}</option>
+                <option value="文字">{t('值 string', 'value string')}</option>
+              </select>
+            </span>
+          )
           : isListType(row.type)
           ? (
             // 清單一開始是空的；這一欄改成選清單裡裝什麼（C++ 要寫成 vector<int> 還是 vector<string>，或 vector<Edge>）
@@ -412,8 +448,10 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
                     <option value="長整數">{t('裝 long long', 'long long')}</option>
                     <option value="小數">{t('裝 float', 'float')}</option>
                     <option value="文字">{t('裝 string', 'string')}</option>
-                    {/* 每一種容器都可以裝自己定義的 struct，例如 vector<vector<Edge>>（有權重的鄰接串列）、queue<Node> */}
-                    {getStructs().map(s => <option key={s.name} value={s.name}>{t(`裝 ${s.name}`, s.name)}</option>)}
+                    {/* 每一種容器都可以裝自己定義的 struct，例如 vector<vector<Edge>>（有權重的鄰接串列）、queue<Node>；
+                        set、priority_queue 要比大小，只能裝 pair */}
+                    {!sortedType(row.type) && getStructs().map(s => <option key={s.name} value={s.name}>{t(`裝 ${s.name}`, s.name)}</option>)}
+                    {PAIR_TYPES.map(p => <option key={p} value={p}>{t(`裝 ${p}`, p)}</option>)}
                   </>
                 : <>
                     <option value="數字">{t('裝數字', 'Numbers')}</option>

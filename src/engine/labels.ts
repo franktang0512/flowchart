@@ -103,6 +103,10 @@ export function splitRectangle(text: string): { target: string; action: RectActi
   return { target, action: m[2] as RectAction, index: '', index2: '', expr: m[3] };
 }
 
+/** C++ 的 map、set 的名稱（積木上的字照 C++ 的寫法：m[k] = v、s.insert(x)、erase）；App 依變數表更新 */
+let cppKinds: Record<string, 'map' | 'set' | 'string'> = {};
+export const setCppKinds = (kinds: Record<string, 'map' | 'set' | 'string'>) => { cppKinds = kinds; };
+
 /** 計算積木上顯示的字：清單的操作照 Scratch 積木的說法，下一堂改用 Scratch 時看得懂 */
 function rectangleLabel(text: string, en: boolean): string {
   let rest = text;
@@ -115,6 +119,13 @@ function rectangleLabel(text: string, en: boolean): string {
   }
   const { target, action, index, index2, expr } = splitRectangle(rest);
   const value = expr.trim() + round;
+  // map、set：照 C++ 的寫法
+  const ck = cppKinds[target];
+  // map 的一格、C++ 的 string 改其中一個字：m[k] = v、s[i] = 'a'
+  if ((ck == 'map' || ck == 'string') && action == '替換') return `${target}[${index}] = ${value}`;
+  if ((ck == 'map' || ck == 'set') && action == '刪除') return `${target}.erase(${index})`;
+  if ((ck == 'map' || ck == 'set') && action == '清空') return `${target}.clear()`;
+  if (ck == 'set' && action == '放入') return `${target}.insert(${value})`;
   // 二維清單（只有 C++ 用）：照 C++ 的寫法
   if (action == '替換' && index2) return en ? `${target}[${index}][${index2}] = ${value}` : text;
   if (action == '建立' && !index2) return en ? `make array ${target} of size ${index}` : `建立 array ${target}，大小 ${index}`;
@@ -154,6 +165,8 @@ function ioLabel(text: string, en: boolean): string {
   const insert = /^輸入 (.*?) 插入第 (.*) 項$/s.exec(text);
   if (insert) return en ? `Input → insert at ${itemWord(insert[2])} of ${insert[1]}` : `輸入 → 插入到 ${insert[1]} 的${itemWord(insert[2])}`;
   const item = /^輸入 (.+?)\[(.*)\]$/s.exec(text);
+  // map 的一格：輸入 m[k]
+  if (item && cppKinds[item[1].trim()] == 'map') return en ? text.replace(/^輸入/, 'Input') : text;
   if (item) return en ? `Input → replace ${itemWord(item[2])} of ${item[1]}` : `輸入 → 替換 ${item[1]} 的${itemWord(item[2])}`;
   return en ? text.replace(/^輸入/, 'Input').replace(/^輸出/, 'Output') : text;
 }

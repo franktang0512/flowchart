@@ -5,8 +5,9 @@ import { t } from '../i18n';
 import type { Diagram } from './diagram';
 import { FlowError, tokenize, type Token } from './decoder';
 import { parseSortKeys, splitRectangle, splitTarget, type RectAction, type SortKey } from './labels';
-import { parseCall, type ModuleInfo, type ModuleSource } from './modules';
+import { mapParts, parseCall, type ModuleInfo, type ModuleSource } from './modules';
 import { findStruct, type StructField } from './structs';
+import { getTarget } from '../target';
 import type { FlowNode } from './node';
 
 // ---------------- 流程圖的結構 ----------------
@@ -248,8 +249,8 @@ function rectStmt(text: string): Stmt {
 
 export type Expr =
   | { t: 'num'; v: string }
-  /** 字串（已經去掉引號） */
-  | { t: 'str'; v: string }
+  /** 字串（已經去掉引號）；ch 是用單引號寫的一個字 'a'（C++ 的 char） */
+  | { t: 'str'; v: string; ch?: boolean }
   | { t: 'var'; name: string }
   /** 清單或文字的某一項：obj[index] */
   | { t: 'idx'; obj: Expr; index: Expr }
@@ -266,16 +267,40 @@ export type Expr =
   | { t: 'bin'; op: string; a: Expr; b: Expr; span?: [number, number, number] }
   | { t: 'not'; a: Expr }
   | { t: 'neg'; a: Expr }
+  /** 大括號 {a, b}：一整筆 pair / struct（例如 q.push({x, y})），欄位照順序 */
+  | { t: 'brace'; items: Expr[] }
   /** 看不懂的寫法：原樣保留 */
   | { t: 'raw'; text: string };
 
 /** 函式：長度( )、項目編號( )、包含( )；C++ 還有 stoi( )（文字變整數）、to_string( )（數字變文字） */
-export type CallFn = 'len' | 'find' | 'has' | 'stoi' | 'tostr' | 'max' | 'min';
+export type CallFn = 'len' | 'find' | 'has' | 'stoi' | 'tostr' | 'max' | 'min'
+  /** C++ 的字元：char(數字) 變成字、toupper / tolower 換大小寫、isdigit… 判斷是哪一種字 */
+  | 'chr' | 'toupper' | 'tolower' | 'isdigit' | 'isalpha' | 'isupper' | 'islower';
 const CALLS: Record<string, CallFn> = {
   長度: 'len', length: 'len', 項目編號: 'find', indexof: 'find', 包含: 'has', contains: 'has', stoi: 'stoi', to_string: 'tostr',
   // C++：max(a, b)、min(a, b) 比大小；max(v)、min(v) 是整個 vector / array 裡最大、最小的
   max: 'max', min: 'min',
+  char: 'chr', toupper: 'toupper', tolower: 'tolower', isdigit: 'isdigit', isalpha: 'isalpha', isupper: 'isupper', islower: 'islower',
 };
+
+/** 判斷是哪一種字的函式（回傳真／假） */
+export const CHAR_TESTS: CallFn[] = ['isdigit', 'isalpha', 'isupper', 'islower'];
+
+/**
+ * 運算式的語法樹，加上每個運算元（數字、變數、s[i]、括號…）是第幾個到第幾個 token（[開頭, 結尾後面]）。
+ * C++ 的字元要變成數字來算（'a' + 1），執行時要知道把哪一段包起來（見 decoder）
+ */
+export function parseExprSpans(text: string): { e: Expr; spans: Map<Expr, [number, number]> } {
+  try {
+    const p = new Parser(tokenize(text));
+    const e = p.or();
+    if (!p.done()) throw new Error('extra');
+    return { e, spans: p.spans };
+  }
+  catch {
+    return { e: { t: 'raw', text: text.trim() }, spans: new Map() };
+  }
+}
 
 /** 學生寫的運算式 → 語法樹；看不懂就整段當成 raw */
 export function parseExpr(text: string): Expr {
@@ -292,6 +317,8 @@ export function parseExpr(text: string): Expr {
 
 class Parser {
   private k = 0;
+  /** 每個運算元是第幾個到第幾個 token（見 parseExprSpans） */
+  readonly spans = new Map<Expr, [number, number]>();
   constructor(private readonly tokens: Token[]) {}
 
   done() { return this.k >= this.tokens.length; }
@@ -354,6 +381,12 @@ class Parser {
     return a;
   }
   private unary(): Expr {
+    const from = this.k;
+    const e = this.unaryInner();
+    this.spans.set(e, [from, this.k]);
+    return e;
+  }
+  private unaryInner(): Expr {
     if (this.is('-')) { this.take(); return { t: 'neg', a: this.unary() }; }
     if (this.is('+')) { this.take(); return this.unary(); }
     return this.postfix();
@@ -396,11 +429,25 @@ class Parser {
       return { t: 'var', name: '::' + name.text };
     }
     if (tk.type == 'number') return { t: 'num', v: tk.text };
-    if (tk.type == 'string') return { t: 'str', v: tk.text.slice(1, -1) };
+    if (tk.type == 'string') {
+      const v = tk.text.slice(1, -1);
+      // 'a'：單引號裡一個字（C++ 的 char）
+      return tk.text[0] == "'" && [...v].length == 1 ? { t: 'str', v, ch: true } : { t: 'str', v };
+    }
     if (tk.text == '(') {
       const e = this.or();
       this.expect(')');
       return e;
+    }
+    // {a, b}：一整筆 pair / struct
+    if (tk.text == '{') {
+      const items: Expr[] = [];
+      if (!this.is('}')) {
+        items.push(this.or());
+        while (this.is(',')) { this.take(); items.push(this.or()); }
+      }
+      this.expect('}');
+      return { t: 'brace', items };
     }
     if (tk.type == 'name') {
       const fn = Object.prototype.hasOwnProperty.call(CALLS, tk.text) ? CALLS[tk.text] : undefined;
@@ -426,13 +473,19 @@ class Parser {
 /**
  * 變數的型別。清單在 C++ 是 vector；二維清單、陣列（array）、堆疊（stack）、佇列（queue）只有學習目標是 C++ 時才有
  */
-export type VarType = '數字' | '文字' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列' | '結構';
+export type VarType = '數字' | '文字' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列' | '結構'
+  /** C++ 的 set（不重複、由小到大）、map（鍵 → 值）、priority_queue（大的先出來；「小」是小的先出來） */
+  | '集合' | '對應表' | '優先佇列' | '優先佇列小';
 
 /** 容器：初始值欄是「裡面裝什麼」，不是一個值 */
-export const isContainerType = (type: VarType | undefined) => type == '清單' || type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列';
+export const isContainerType = (type: VarType | undefined) => type == '清單' || type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列'
+  || type == '集合' || type == '對應表' || type == '優先佇列' || type == '優先佇列小';
+
+/** priority_queue（大的先、小的先） */
+export const isPqType = (type: VarType | undefined) => type == '優先佇列' || type == '優先佇列小';
 
 /** 只有 C++ 有的型別（Scratch / Blockly 畫不出來） */
-export const isCppOnlyType = (type: VarType | undefined) => type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列' || type == '結構';
+export const isCppOnlyType = (type: VarType | undefined) => type != undefined && type != '數字' && type != '文字' && type != '清單';
 
 export interface VarInfo {
   name: string;
@@ -470,6 +523,7 @@ export function structOf(e: Expr, vars: Map<string, VarInfo>): string | null {
   }
   if (e.t == 'idx' && e.obj.t == 'var') {
     const v = vars.get(e.obj.name);
+    if (v?.type == '對應表') return findStruct(mapParts(v.init).value) ? mapParts(v.init).value : null;
     return (v?.type == '清單' || v?.type == '陣列') && findStruct(v.init) ? v.init : null;
   }
   // 二維 vector 的一格：g[u][k]（例如有權重的鄰接串列 vector<vector<Edge>>）
@@ -480,7 +534,7 @@ export function structOf(e: Expr, vars: Map<string, VarInfo>): string | null {
   // stack 的 top()、queue 的 front()、back()
   if (e.t == 'method' && e.obj.t == 'var' && ['top', 'front', 'back'].includes(e.name)) {
     const v = vars.get(e.obj.name);
-    return (v?.type == '堆疊' || v?.type == '佇列') && findStruct(v.init) ? v.init : null;
+    return (v?.type == '堆疊' || v?.type == '佇列' || isPqType(v?.type)) && findStruct(v!.init) ? v!.init : null;
   }
   return null;
 }
@@ -493,16 +547,18 @@ export function fieldOf(e: Expr & { t: 'field' }, vars: Map<string, VarInfo>): S
 export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInfo[] = []): ExprType {
   if (structOf(e, vars)) return 'struct';
   switch (e.t) {
+    case 'brace': return 'struct';
     case 'field': return fieldOf(e, vars)?.type == '文字' ? 'str' : 'num';
     case 'fcall': return modules.find(m => m.name == e.name)?.returns == '文字' ? 'str' : 'num';
     case 'num': return 'num';
-    case 'str': return 'str';
+    // C++ 的 'a' 是一個字（char）
+    case 'str': return e.ch && getTarget() == 'cpp' ? 'char' : 'str';
     case 'var': {
       const v = vars.get(e.name);
       return isContainerType(v?.type) ? 'list' : v?.type == '文字' ? 'str' : 'num';
     }
     case 'method': {
-      if (e.name == 'size' || e.name == 'length') return 'num';
+      if (e.name == 'size' || e.name == 'length' || e.name == 'count') return 'num';
       if (e.name == 'empty') return 'bool';
       if (e.name == 'substr') return 'str';
       // top()、front()、back()：容器裡裝的東西
@@ -513,6 +569,8 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
       if (o == 'str') return 'char';
       if (e.obj.t == 'var') {
         const v = vars.get(e.obj.name);
+        // map 的一格：值的型別
+        if (v?.type == '對應表') return mapParts(v.init).value == '文字' ? 'str' : 'num';
         // 二維清單只取一個 [ ]：是一整列
         if (v?.type == '二維清單') return 'list';
         return v?.init == '文字' ? 'str' : 'num';
@@ -528,13 +586,17 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
         if (e.args.length == 1 && a?.t == 'var') return vars.get(a.name)?.init == '文字' ? 'str' : 'num';
         return a ? exprType(a, vars, modules) : 'num';
       }
+      if (e.fn == 'chr' || e.fn == 'toupper' || e.fn == 'tolower') return 'char';
+      if (CHAR_TESTS.includes(e.fn)) return 'bool';
       return e.fn == 'has' ? 'bool' : e.fn == 'tostr' ? 'str' : 'num';
     }
     case 'bin':
       if (['==', '!=', '<', '<=', '>', '>=', 'and', 'or'].includes(e.op)) return 'bool';
       if (e.op == '+') {
         const a = exprType(e.a, vars, modules), b = exprType(e.b, vars, modules);
-        if (a == 'str' || b == 'str' || (a == 'char' && b == 'char')) return 'str';
+        if (a == 'str' || b == 'str') return 'str';
+        // C++：字 + 字、字 + 數字 都是數字（'a' + 1 是 98）；積木把兩個字接起來
+        if (a == 'char' && b == 'char' && getTarget() != 'cpp') return 'str';
       }
       return 'num';
     case 'not': return 'bool';

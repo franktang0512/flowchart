@@ -38,8 +38,9 @@ const PREC: Record<string, number> = {
 export function exprText(e: Expr, cond = false, parent = 0): string {
   switch (e.t) {
     case 'num': return e.v;
-    case 'str': return e.v.includes('"') ? `'${e.v}'` : `"${e.v}"`;
+    case 'str': return e.ch ? `'${e.v}'` : e.v.includes('"') ? `'${e.v}'` : `"${e.v}"`;
     case 'var': return e.name;
+    case 'brace': return `{${e.items.map(a => exprText(a, cond)).join(', ')}}`;
     case 'raw': return e.text;
     case 'idx': return `${exprText(e.obj, cond, 9)}[${exprText(e.index, cond)}]`;
     case 'method': return `${exprText(e.obj, cond, 9)}.${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
@@ -49,7 +50,7 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
     case 'not': return wrap(`not ${exprText(e.a, cond, 7)}`, 2.5, parent);
     case 'call': {
-      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min' }[e.fn];
+      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min', chr: 'char', toupper: 'toupper', tolower: 'tolower', isdigit: 'isdigit', isalpha: 'isalpha', isupper: 'isupper', islower: 'islower' }[e.fn];
       return `${name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     }
     case 'bin': {

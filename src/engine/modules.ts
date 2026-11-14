@@ -67,9 +67,21 @@ export interface LocalVar {
  */
 export const cppType = (type: '數字' | '文字', float?: boolean, long?: boolean) => (type == '文字' ? 'string' : float ? 'float' : long ? 'long long' : 'int');
 
-/** 容器裡裝的東西（變數表「初始值」欄選的）→ C++ 的型別：int、long long、float、string，或 struct 的名稱 */
-export const elemCppType = (init: string | undefined) => (findStruct(init) ? init!
+/**
+ * map 的初始值欄記著「鍵→值」的型別，例如 文字→數字 是 map<string, int>；
+ * 沒寫的（舊資料）當成 鍵是文字、值是數字
+ */
+export function mapParts(init: string | undefined): { key: string; value: string } {
+  const [key, value] = (init ?? '').split('→');
+  return { key: key || '文字', value: value || '數字' };
+}
+
+/** 容器裡裝的東西（變數表「初始值」欄選的）→ C++ 的型別：int、long long、float、string，或 struct 的名稱（map 是值的型別） */
+export const elemCppType = (init: string | undefined): string => (init?.includes('→') ? elemCppType(mapParts(init).value) : findStruct(init) ? init!
   : init == '文字' ? 'string' : init == '小數' ? 'float' : init == '長整數' ? 'long long' : 'int');
+
+/** map 的鍵的 C++ 型別 */
+export const mapKeyCppType = (init: string | undefined) => elemCppType(mapParts(init).key);
 
 /** 給學生看的型別名稱：C++ 寫 int / float / string、vector<int>…；Scratch、Blockly 寫數字、文字、清單 */
 export function typeLabel(type: string, float?: boolean, init?: string, size?: string, long?: boolean): string {
@@ -80,6 +92,10 @@ export function typeLabel(type: string, float?: boolean, init?: string, size?: s
     if (type == '陣列') return `${elem}[${size ?? ''}]`;
     if (type == '堆疊') return `stack<${elem}>`;
     if (type == '佇列') return `queue<${elem}>`;
+    if (type == '集合') return `set<${elem}>`;
+    if (type == '對應表') return `map<${mapKeyCppType(init)}, ${elem}>`;
+    if (type == '優先佇列') return `priority_queue<${elem}>`;
+    if (type == '優先佇列小') return `priority_queue<${elem}, vector<${elem}>, greater<${elem}>>`;
     if (type == '結構') return init ?? 'struct';
     return cppType(type == '文字' ? '文字' : '數字', float, long);
   }
@@ -129,7 +145,7 @@ const CPP_RESERVED = new Set([
   'double', 'else', 'endl', 'enum', 'false', 'float', 'for', 'fmod', 'if', 'include', 'indexOf', 'inputFloat', 'inputNumber', 'inputText',
   'int', 'long', 'main', 'namespace', 'new', 'not', 'or', 'private', 'public', 'return', 'short', 'signed', 'sizeof', 'static', 'std',
   'string', 'struct', 'switch', 'template', 'this', 'throw', 'to_string', 'true', 'try', 'typename', 'unsigned', 'using', 'vector', 'void', 'while',
-  'stack', 'queue', 'sort', 'stoi', 'greater',
+  'stack', 'queue', 'sort', 'stoi', 'greater', 'map', 'set', 'pair', 'priority_queue', 'make_pair',
 ]);
 
 /**
