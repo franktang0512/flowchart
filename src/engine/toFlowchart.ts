@@ -114,8 +114,10 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
           回傳: ` 回傳 ${v}`,
           放入: ` ${s.target} 放入 ${v}`,
           取出: ` ${s.target} 取出`,
-          // 排序是另一種結構（kind: 'sort'），不會走到這裡
+          // 排序、break、continue 是另一種結構，不會走到這裡
           排序: '',
+          跳出: '',
+          下一輪: '',
         }[s.action] + (ROUNDING_TEXT[s.round] ?? '');
         return { kind: 'node', node: node(text, 'Rectangle', s.round) };
       }
@@ -129,6 +131,13 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
         return { kind: 'node', node: node(callText(s.name, s.args.map(a => exprText(a))), 'Function') };
       case 'return':
         return { kind: 'node', ret: true, node: node(` 回傳 ${exprText(s.value)}` + (ROUNDING_TEXT[s.round] ?? ''), 'Rectangle', s.round) };
+      // C++ 的 for 迴圈、break、continue（積木改回流程圖時用不到，只是寫完整）
+      case 'for':
+        return { kind: 'loop', loop: node(`for (int ${s.name} = ${exprText(s.start)}; ${exprText(s.cond)}; ${s.update})`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
+      case 'break':
+        return { kind: 'node', node: node(' break', 'Rectangle') };
+      case 'continue':
+        return { kind: 'node', node: node(' continue', 'Rectangle') };
       case 'sort':
         return { kind: 'node', node: node(` ${s.target} 排序${s.count ? ` 前 ${exprText(s.count)} 個` : ''}${s.keys?.length ? ` 依 ${sortKeysText(s.keys)}` : ` ${s.desc ? '由大到小' : '由小到大'}`}`, 'Rectangle') };
     }

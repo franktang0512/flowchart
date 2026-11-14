@@ -220,8 +220,8 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
         const inputs = Object.fromEntries(s.args.map((a, k) => ['ARG' + k, input(expr(a))]));
         return [{ type: scratch ? 'scratch_proc_call' : 'procedures_callnoreturn', extraState: { name: s.name, params: names }, inputs }];
       }
-      // 排序只有 C++ 的計算積木可以選（積木沒有排序積木）
-      case 'sort': return [];
+      // 排序、for 迴圈、break、continue 只有 C++ 的積木可以選（看程式時積木不會遇到）
+      case 'sort': case 'for': case 'break': case 'continue': return [];
       case 'return':
         // 回傳在判斷裡面：Blockly 的「如果 成立 則回傳」積木（條件放「真」）；放在最後的回傳見下面 defs
         return [{

@@ -23,6 +23,14 @@ export type Stmt =
   | { kind: 'if'; cond: Expr; yes: Stmt[]; no: Stmt[] }
   /** 次數迴圈 */
   | { kind: 'repeat'; times: Expr; body: Stmt[] }
+  /**
+   * C++ 的 for 迴圈：for (int name = start; cond; update)；next 是每一輪之後 name 的新值（例如 i + 1），
+   * update 是學生寫的第三段（轉 C++ 照抄）
+   */
+  | { kind: 'for'; name: string; start: Expr; cond: Expr; next: Expr; update: string; body: Stmt[] }
+  /** 跳出最近的迴圈、直接進入下一輪 */
+  | { kind: 'break' }
+  | { kind: 'continue' }
   /** 條件迴圈：重複直到條件成立 */
   | { kind: 'until'; cond: Expr; body: Stmt[] }
   /** 執行模組（見 modules.ts） */
@@ -31,6 +39,43 @@ export type Stmt =
   | { kind: 'return'; value: Expr; round: string }
   /** 排序（C++ 的 sort）：count 是只排前幾個（array 常用 sort(a, a + n)）；keys 是 struct 依哪些欄位排（前面一樣大才比後面） */
   | { kind: 'sort'; target: string; count?: Expr; keys?: SortKey[]; desc: boolean };
+
+/** C++ 的 for 迴圈積木「for (int i = 0; i < n; i++)」→ 三段；不是這種寫法回傳 null */
+export function splitFor(text: string): { init: string; cond: string; update: string } | null {
+  const m = /^\s*for\s*\((.*?);(.*?);(.*)\)\s*$/s.exec(text);
+  return m ? { init: m[1].trim(), cond: m[2].trim(), update: m[3].trim() } : null;
+}
+
+/** 第一段「int i = 0」→ 計數變數的名稱、起始值；不是這種寫法回傳 null */
+export function forInit(init: string): { name: string; start: string } | null {
+  const m = /^int\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/s.exec(init.trim());
+  return m ? { name: m[1], start: m[2].trim() } : null;
+}
+
+/**
+ * 第三段：i++、++i、i--、--i、i = 式子、i += 式子（-=、*=、/= 也可以）→ 每一輪之後 i 的新值（例如 i + 1）；
+ * 不是改這個計數變數的寫法回傳 null
+ */
+export function forUpdate(update: string, name: string): string | null {
+  const u = update.trim();
+  const tight = u.replace(/\s+/g, '');
+  if (tight == name + '++' || tight == '++' + name) return `${name} + 1`;
+  if (tight == name + '--' || tight == '--' + name) return `${name} - 1`;
+  const op = new RegExp(`^${name}\\s*([+\\-*/])=\\s*(.+)$`, 's').exec(u);
+  if (op) return `${name} ${op[1]} (${op[2].trim()})`;
+  const set = new RegExp(`^${name}\\s*=(?!=)\\s*(.+)$`, 's').exec(u);
+  return set ? set[1].trim() : null;
+}
+
+/** 流程圖上 for 迴圈用到的計數變數名稱（不用在變數表宣告） */
+export function forLoopVars(nodes: (FlowNode | null)[]): string[] {
+  const names = nodes.flatMap(n => {
+    const h = n?.figure == 'For_Loop' ? splitFor(n.text) : null;
+    const init = h ? forInit(h.init) : null;
+    return init ? [init.name] : [];
+  });
+  return [...new Set(names)];
+}
 
 /** 一個模組：名稱、參數、裡面的步驟 */
 export interface ModuleProgram extends ModuleInfo {
@@ -68,14 +113,18 @@ export function structure(diagram: Diagram): Stmt[] {
   const broken = (n: FlowNode) => new FlowError(t('流程圖還沒接完整，先到第四步執行看看哪裡要修改。', 'The flowchart is not finished. Run it in step 4 to see what to fix.'), idx(n));
 
   /** 一個積木 → 結構，以及下一個要走的積木 */
-  const step = (n: FlowNode): { stmts: Stmt[]; next: FlowNode | undefined } => {
+  /** jumps：這條路以 break / continue 結束（後面不接箭頭） */
+  const step = (n: FlowNode): { stmts: Stmt[]; next: FlowNode | undefined; jumps?: boolean } => {
     switch (n.figure) {
       case 'Circle':
         return { stmts: [], next: n.text == '開始' ? nextOf(n) : undefined };
       case 'Parallelogram':
         return { stmts: [ioStmt(n.text)], next: nextOf(n) };
-      case 'Rectangle':
-        return { stmts: [rectStmt(n.text)], next: nextOf(n) };
+      case 'Rectangle': {
+        const s = rectStmt(n.text);
+        if (s.kind == 'break' || s.kind == 'continue') return { stmts: [s], next: undefined, jumps: true };
+        return { stmts: [s], next: nextOf(n) };
+      }
       case 'Function': {
         const call = parseCall(n.text);
         if (!call) throw broken(n);
@@ -84,14 +133,21 @@ export function structure(diagram: Diagram): Stmt[] {
       case 'Diamond': {
         const yes = branch(n, s => s.includes('true') || s.includes('真'));
         const no = branch(n, s => s.includes('false') || s.includes('假'));
-        return { stmts: [{ kind: 'if', cond: parseExpr(n.text), yes: yes.stmts, no: no.stmts }], next: yes.next };
+        // 一邊是 break / continue：接下去的是另一邊
+        const next = yes.next ?? (yes.jumps ? no.next : undefined);
+        return { stmts: [{ kind: 'if', cond: parseExpr(n.text), yes: yes.stmts, no: no.stmts }], next, jumps: !next && yes.jumps && no.jumps };
       }
       case 'For_Loop':
       case 'While_Loop': {
         const body = loop(n);
         const exit = nextOf(n, s => s.includes('離開迴圈') || s.includes('真'));
         if (!exit) throw broken(n);
-        const stmt: Stmt = n.figure == 'For_Loop'
+        const header = n.figure == 'For_Loop' ? splitFor(n.text) : null;
+        const init = header ? forInit(header.init) : null;
+        const next = header && init ? forUpdate(header.update, init.name) : null;
+        const stmt: Stmt = header && init && next != null
+          ? { kind: 'for', name: init.name, start: parseExpr(init.start), cond: parseExpr(header.cond), next: parseExpr(next), update: header.update, body }
+          : n.figure == 'For_Loop'
           ? { kind: 'repeat', times: parseExpr(n.text.slice(0, -1)), body }
           : { kind: 'until', cond: parseExpr(n.text), body };
         return { stmts: [stmt], next: exit };
@@ -110,7 +166,10 @@ export function structure(diagram: Diagram): Stmt[] {
       if (!next) throw broken(n);
       const r = step(next);
       body.push(...r.stmts);
-      if (!r.next) throw broken(next);
+      if (!r.next) {
+        if (r.jumps) break;
+        throw broken(next);
+      }
       next = r.next;
     }
     return body;
@@ -126,11 +185,12 @@ export function structure(diagram: Diagram): Stmt[] {
       guard();
       const r = step(next);
       stmts.push(...r.stmts);
+      if (r.jumps) return { stmts, next: undefined, jumps: true };
       if (!r.next && next.text != '結束') throw broken(next);
       next = r.next;
       num = linksInto(next);
     }
-    return { stmts, next };
+    return { stmts, next, jumps: false };
   };
 
   let node = nodes.find(n => n && n.text == '開始') ?? undefined;
@@ -172,6 +232,8 @@ function rectStmt(text: string): Stmt {
     }
   }
   const { target, action, index, index2, expr } = splitRectangle(rest);
+  if (action == '跳出') return { kind: 'break' };
+  if (action == '下一輪') return { kind: 'continue' };
   if (action == '回傳') return { kind: 'return', value: parseExpr(expr), round };
   if (action == '排序') return { kind: 'sort', target, ...(index ? { count: parseExpr(index) } : {}), ...(index2 ? { keys: parseSortKeys(index2) } : {}), desc: expr == '由大到小' };
   return {

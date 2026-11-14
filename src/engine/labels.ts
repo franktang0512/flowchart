@@ -14,7 +14,7 @@ const ROUNDING: [string, string][] = [
  * 計算積木做的事：「設為」一般的設定；清單才有的（名稱對應 Scratch 的清單積木）
  * 「加入」添加到最後、「插入」、「替換」第幾項、「刪除」第幾項、「清空」刪除所有項目
  */
-export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立' | '回傳' | '放入' | '取出' | '排序';
+export type RectAction = '設為' | '加入' | '插入' | '替換' | '刪除' | '清空' | '建立' | '回傳' | '放入' | '取出' | '排序' | '跳出' | '下一輪';
 
 /** struct 排序的一個條件：依哪個欄位、由大到小嗎（前面的一樣大，才比後面的） */
 export interface SortKey {
@@ -81,6 +81,9 @@ export function splitRectangle(text: string): { target: string; action: RectActi
   if (m) return { target: m[1].trim(), action: '刪除', index: m[2].trim(), index2: '', expr: '' };
   m = /^(.*?) 建立 (.*?) 列 (.*) 行$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '建立', index: m[2].trim(), index2: m[3].trim(), expr: '' };
+  // 迴圈控制（C++）：「 break」跳出最近的迴圈、「 continue」直接進入下一輪（積木後面不接箭頭）
+  m = /^\s*(break|continue)\s*$/.exec(text);
+  if (m) return { target: '', action: m[1] == 'break' ? '跳出' : '下一輪', index: '', index2: '', expr: '' };
   // 排序（C++ 的 sort）：「 a 排序 由小到大」「 a 排序 前 n 個 由小到大」「 edges 排序 依 w 由大到小」
   //   「 s 排序 依 score 由大到小、name 由小到大」（分數一樣時再比名字）
   //   index 是只排前幾個（沒有就是全部），index2 是 struct 的排序條件（見 parseSortKeys），expr 是最後一個由小到大 / 由大到小
@@ -113,6 +116,8 @@ function rectangleLabel(text: string, en: boolean): string {
   if (action == '替換' && index2) return en ? `${target}[${index}][${index2}] = ${value}` : text;
   if (action == '建立') return en ? `make ${target} ${index} rows × ${index2} columns` : `${target} 建立 ${index} 列 × ${index2} 行`;
   if (action == '回傳') return en ? `return ${value}` : `回傳 ${value}`;
+  if (action == '跳出') return en ? 'break (leave the loop)' : 'break（跳出迴圈）';
+  if (action == '下一輪') return en ? 'continue (next round)' : 'continue（下一輪）';
   if (action == '排序') {
     const dirText = (desc: boolean) => (desc ? (en ? 'large → small' : '由大到小') : (en ? 'small → large' : '由小到大'));
     const first = index ? (en ? ` first ${index}` : `前 ${index} 個`) : '';

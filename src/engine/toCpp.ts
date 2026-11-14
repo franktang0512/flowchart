@@ -307,6 +307,21 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         emit(depth, '}');
         break;
       }
+      case 'for': {
+        // for (int i = 0; i < n; i++)：迴圈裡面 i 是 int
+        const saved = vars.get(s.name);
+        vars.set(s.name, { name: s.name, type: '數字', init: '0' });
+        emit(depth, `for (int ${s.name} = ${expr(s.start)}; ${cond(s.cond)}; ${s.update.replace(/\s+/g, ' ').trim()}) {`);
+        loopNames.push(s.name);
+        stmts(s.body, depth + 1);
+        loopNames.pop();
+        if (saved) vars.set(s.name, saved);
+        else vars.delete(s.name);
+        emit(depth, '}');
+        break;
+      }
+      case 'break': emit(depth, 'break;'); break;
+      case 'continue': emit(depth, 'continue;'); break;
       case 'until':
         emit(depth, `while (${cond(s.cond, true)}) {`);
         stmts(s.body, depth + 1);

@@ -955,6 +955,47 @@ input, textarea, select, button {
 #node_info input[type=radio] {
     margin: 0 4px 0 10px;
 }
+/* C++ 的 for 迴圈：上面一行是整個 for (…; …; …)，下面三段各一列 */
+#node_info .for_editor {
+    text-align: left;
+    margin: 0 auto;
+    max-width: 640px;
+}
+#node_info .for_preview {
+    margin: 0 0 10px;
+    text-align: center;
+}
+#node_info .for_preview code {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: #f5fbf4;
+    border: 1px solid #cfe6cd;
+    font-family: Consolas, Menlo, monospace;
+    font-size: 1rem;
+}
+#node_info .for_row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0;
+}
+#node_info .for_label {
+    width: 4.5em;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+#node_info input.for_input {
+    width: 9em;
+    margin: 0;
+    font-family: Consolas, Menlo, monospace;
+}
+#node_info input.for_input:disabled {
+    background: #f3f4f6;
+}
+
 /* 算式欄位下面「點一下填入」：C++ 容器的函式 */
 #node_info .expr_helper {
     display: flex;
@@ -1522,8 +1563,9 @@ input, textarea, select, button {
   font-size: 0.9em;
 }
 /* C++ 的型別寫成「float（小數）」，選單要寬一點才看得完整 */
+/* C++ 的型別名稱比較長（array（陣列）、Student（struct）），欄位寬一點才不會被下拉箭頭蓋住 */
 .cpp_types select.var_input {
-  min-width: 128px !important;
+  min-width: 150px !important;
 }
 /* 參數表：初始值不能改（值由執行模組傳進來），說明可以寫 */
 #param_table td.param_init {

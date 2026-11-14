@@ -12,7 +12,7 @@ import { RunArea, type RunPane } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
 import { StructTable, type StructRename } from './components/StructTable';
 import { setStructs as setStructRegistry, type StructDef } from './engine/structs';
-import { isContainerType, type VarType } from './engine/structure';
+import { forLoopVars, isContainerType, type VarType } from './engine/structure';
 import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, shadowLabel, typeLists, withParams, type RunResult, type VarStore } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
@@ -182,6 +182,8 @@ export function App() {
     ...withParams(varStore, moduleOf(d)?.info.params ?? [], moduleOf(d)?.info.locals, !!moduleOf(d)),
     // 有回傳值的模組可以寫在算式裡
     calls: modulesRef.current.filter(m => m.info.returns).map(m => m.info.name),
+    // C++ 的 for 迴圈計數變數（不用宣告，這張流程圖裡的算式可以用）
+    loopVars: forLoopVars(d.nodes),
   });
   /** 這張流程圖是有回傳值的模組嗎（計算積木才有「回傳」） */
   const returnsIn = (d: Diagram) => !!moduleOf(d)?.info.returns;
@@ -1231,13 +1233,13 @@ export function App() {
           which={which}
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
-          varNames={vars.filter(v => v.name.trim()).map(runName)}
+          varNames={[...vars.filter(v => v.name.trim()).map(runName), ...forLoopVars(main.nodes)]}
           kinds={Object.fromEntries([...vars.map(v => ({ ...v, name: runName(v) })), ...modules.flatMap(m => m.info.locals ?? [])].filter(v => v.type == '堆疊' || v.type == '佇列' || v.type == '陣列').map(v => [v.name.trim(), v.type]))}
           sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
           moduleVars={modules.map((m, k) => ({
             sheet: k + 1,
             name: m.info.name,
-            names: [...m.info.params.map(p => p.name), ...(m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean)],
+            names: [...m.info.params.map(p => p.name), ...(m.info.locals ?? []).map(v => v.name.trim()).filter(Boolean), ...forLoopVars(m.diagram.nodes)],
           }))}
         />
       </div>

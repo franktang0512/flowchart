@@ -6,6 +6,7 @@ import type { RectAction, SortKey } from '../engine/labels';
 import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { byTarget, canReturn as canReturnTarget, getTarget, itemWord } from '../target';
+import { forInit } from '../engine/structure';
 import { fieldCppType, findStruct, type StructDef } from '../engine/structs';
 
 export type DialogKind =
@@ -31,7 +32,7 @@ export interface DialogForm {
    * 接收（執行有回傳值的模組，把回傳值存進變數：「a 設為 aaa(x)」，模組和參數用 moduleName、moduleArgs）；
    * '' = 還沒選。選了清單、二維清單再選 rectAction（添加、插入…）
    */
-  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列' | '結構';
+  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列' | '結構' | '迴圈控制';
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 變數：true 是「改變」（Scratch「變數改變」、Blockly「將變數的值加」），code 填加多少；存成「x 設為 x + 多少」 */
@@ -48,6 +49,10 @@ export interface DialogForm {
   sortDesc: boolean;
   /** 排序裝 struct 的：依哪些欄位，前面的一樣大才比後面的（例如分數由大到小、一樣再比名字） */
   sortKeys: SortKey[];
+  /** C++ 的 for 迴圈（radio 是 'cfor'）：for (第一段; 第二段; 第三段)，例如 int i = 0、i < n、i++ */
+  forInit: string;
+  forCond: string;
+  forUpdate: string;
   /** 輸入到清單時放在哪裡：添加到最後、插入到第幾項、替換第幾項（對應 Scratch 的清單積木） */
   ioPlace: '加入' | '插入' | '替換';
   /** 輸出積木輸出什麼：'' 是變數或字串（自己打）；'回傳' 是執行有回傳值的模組、輸出回傳值（moduleName、moduleArgs） */
@@ -74,6 +79,9 @@ const RECT_ACTIONS: [RectAction, () => string][] = [
   ['取出', () => t('pop（拿掉一個）', 'pop')],
   // C++：vector、array 排序
   ['排序', () => t('排序（sort）', 'Sort')],
+  // C++：迴圈裡用
+  ['跳出', () => t('break（跳出迴圈）', 'break (leave the loop)')],
+  ['下一輪', () => t('continue（直接進入下一輪）', 'continue (go to the next round)')],
 ];
 
 const RECT_HINT: Record<RectAction, () => string> = {
@@ -88,6 +96,8 @@ const RECT_HINT: Record<RectAction, () => string> = {
   放入: () => t('push：把值放進 stack（放在最上面），或放進 queue（排在最後面）...', 'push: put a value on top of a stack, or at the back of a queue...'),
   取出: () => t('pop：拿掉 stack 最上面的，或 queue 最前面的（要先確定裡面不是空的）。要用那個值，請先用 top() 或 front() 讀出來...', 'pop: remove the top of a stack, or the front of a queue (it must not be empty). To use the value, read it first with top() or front()...'),
   排序: () => t('sort：把 vector 或 array 由小到大（或由大到小）排好...', 'sort: put a vector or array in order, small to large (or large to small)...'),
+  跳出: () => t('break：馬上跳出最近的迴圈（這個積木後面不用接箭頭）...', 'break: leave the nearest loop right away (no arrow after this block)...'),
+  下一輪: () => t('continue：這一輪後面的不做了，直接進入下一輪（這個積木後面不用接箭頭）...', 'continue: skip the rest of this round and go to the next round (no arrow after this block)...'),
 };
 
 /** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
@@ -103,6 +113,8 @@ const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   放入: null,
   取出: null,
   排序: null,
+  跳出: null,
+  下一輪: null,
 };
 
 /** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
@@ -121,6 +133,8 @@ const RECT_VERB: Record<RectAction, (() => string) | null> = {
   放入: () => 'push',
   取出: null,
   排序: null,
+  跳出: null,
+  下一輪: null,
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -152,6 +166,9 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   rectField: '',
   sortDesc: false,
   sortKeys: [],
+  forInit: '',
+  forCond: '',
+  forUpdate: '',
   ioTarget: '',
   ioPlace: '加入',
   outputKind: '',
@@ -345,6 +362,46 @@ function ExprHelper({ inputId, types, holds, value, onChange }: { inputId: strin
   );
 }
 
+/**
+ * C++ 的 for 迴圈：三段一開始是空的、不能打字，點旁邊常用的寫法補上之後，才可以自己改。
+ * 上面一行即時顯示整個 for (…; …; …)
+ */
+function ForEditor({ f, set, helper }: { f: DialogForm; set: (patch: Partial<DialogForm>) => void; helper: (id: string, value: string, onChange: (v: string) => void) => ReactNode }) {
+  // 第二、三段的常用寫法照第一段的變數名稱（還沒選就是 i）
+  const v = forInit(f.forInit)?.name ?? 'i';
+  /** 點常用寫法：補上，游標放到最後面接著打 */
+  const fill = (id: string, patch: Partial<DialogForm>) => {
+    set(patch);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    });
+  };
+  const row = (n: string, label: string, id: string, field: 'forInit' | 'forCond' | 'forUpdate', presets: string[]) => (
+    <p className="for_row">
+      <span className="for_label">{n} {label}</span>
+      <input
+        id={id} className="for_input" value={f[field]} disabled={!f[field]}
+        placeholder={t('點右邊的寫法', 'pick one →')}
+        onChange={e => set({ [field]: e.target.value })}
+      />
+      {presets.map(p => (
+        <button type="button" key={p} className="snippet" onClick={() => fill(id, { [field]: p })}>{p.trim()}</button>
+      ))}
+    </p>
+  );
+  return (
+    <div className="for_editor">
+      <p className="for_preview"><code>for ({f.forInit || '①'}; {f.forCond || '②'}; {f.forUpdate || '③'})</code></p>
+      {row('①', t('開始', 'start'), 'for_init', 'forInit', ['int i = 0', 'int j = 0', 'int k = 0'])}
+      {row('②', t('條件', 'while'), 'for_cond', 'forCond', [`${v} < `, `${v} <= `, `${v} > `, `${v} >= `])}
+      {f.forCond && helper('for_cond', f.forCond, x => set({ forCond: x }))}
+      {row('③', t('每次', 'each time'), 'for_update', 'forUpdate', [`${v}++`, `${v} = ${v} + 1`, `${v}--`, `${v} += 2`])}
+    </div>
+  );
+}
+
 /** 輸入到清單時，下面那行說明 */
 const IO_NOTE: Record<DialogForm['ioPlace'], (list: string, k: string) => string> = {
   加入: list => t(`輸入的值會添加到清單「${list}」的最後面`, `The value goes to the end of the list "${list}".`),
@@ -408,6 +465,8 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
   const structOfVar = (name: string): StructDef | undefined => findStruct(holds[name]);
   const [f, setF] = useState<DialogForm>(() => {
     const form = { ...defaultForm(kind), ...request.initial };
+    // C++：新的迴圈預設用 for (int i = 0; i < n; i++)
+    if (kind == 'Loop' && getTarget() == 'cpp' && !request.initial?.radio) form.radio = 'cfor';
     // 打開已經畫好的輸入積木：依變數表判斷原本存到變數還是清單
     if (form.radio == '輸入' && !form.ioTarget && form.varSelect) {
       const v = form.varSelect;
@@ -683,15 +742,18 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       body = (
         <>
           <p id="hint">{t('離開迴圈的條件是？', 'When does the loop stop?')}</p>{' '}
-          {radio('for', t('執行完幾次', 'After some times'), () => set({ showWhile: false }))}{' '}
+          {/* C++：次數迴圈是 for (int i = 0; i < n; i++)；舊的「執行完幾次」只在打開舊積木時列出來 */}
+          {getTarget() == 'cpp' && radio('cfor', t('for 迴圈（計數）', 'for loop (counting)'), () => set({ showWhile: false }))}{' '}
+          {(getTarget() != 'cpp' || f.radio == 'for') && radio('for', t('執行完幾次', 'After some times'), () => set({ showWhile: false }))}{' '}
           {radio('while', t('達成某個條件', 'When something is true'), () => set({ showWhile: true }))}{' '}
           <br /><br />{' '}
+          {f.radio == 'cfor' && <ForEditor f={f} set={set} helper={helper} />}
           <div id="while_div" style={{ display: f.showWhile ? 'block' : 'none' }}>{' '}
             {conditionHint}{' '}
             {codeInput}{' '}
             {f.showWhile && helper('code', f.code, v => set({ code: v }))}
           </div>{' '}
-          <div id="for_div" style={{ display: f.showWhile ? 'none' : 'block' }}>{' '}
+          <div id="for_div" style={{ display: f.showWhile || f.radio == 'cfor' ? 'none' : 'block' }}>{' '}
             <p id="hint">{t('請輸入次數', 'How many times?')}</p>{' '}
             <input id="for_number" style={{ width: '80%' }} value={f.forNumber} onChange={e => set({ forNumber: e.target.value })} />{' '}
             {!f.showWhile && helper('for_number', f.forNumber, v => set({ forNumber: v }))}
@@ -754,7 +816,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       const pickKind = (k: DialogForm['rectKind']) => set({
         rectKind: k,
         varChange: false,
-        rectAction: k == '變數' || k == '接收' || k == '結構' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' ? '替換' : k == '堆疊' || k == '佇列' ? '放入' : '加入',
+        rectAction: k == '迴圈控制' ? '跳出' : k == '變數' || k == '接收' || k == '結構' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' ? '替換' : k == '堆疊' || k == '佇列' ? '放入' : '加入',
         rectField: '',
         ...([...namesFor(k), ...(k == '變數' || k == '接收' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
       });
@@ -779,6 +841,9 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
             )}
             {hasKind('queue', kind == '佇列') && (
               <label><input type="radio" name="rect_kind" checked={kind == '佇列'} onChange={() => pickKind('佇列')} />queue</label>
+            )}
+            {(getTarget() == 'cpp' || kind == '迴圈控制') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '迴圈控制'} onChange={() => pickKind('迴圈控制')} />break / continue</label>
             )}
             {hasKind('record', kind == '結構') && (
               <label><input type="radio" name="rect_kind" checked={kind == '結構'} onChange={() => pickKind('結構')} />{t('struct 的欄位', 'A struct field')}</label>
@@ -848,7 +913,13 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
               {actionRadio('排序', t('排序（sort）', 'Sort'))}
             </p>
           )}
-          {kind && kind != '回傳' && (
+          {kind == '迴圈控制' && (
+            <p className="rect_action">
+              {actionRadio('跳出', t('break（跳出迴圈）', 'break (leave the loop)'))}
+              {actionRadio('下一輪', t('continue（直接進入下一輪）', 'continue (next round)'))}
+            </p>
+          )}
+          {kind && kind != '回傳' && kind != '迴圈控制' && (
             <>
               {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ')
                 : kind == '陣列' ? 'array：' : kind == '堆疊' ? 'stack：' : kind == '佇列' ? 'queue：' : kind == '結構' ? 'struct：' : byTarget(t('清單：', 'List: '), 'vector：')}

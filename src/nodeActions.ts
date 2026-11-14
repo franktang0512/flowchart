@@ -4,7 +4,7 @@ import { createConnectors } from './engine/connector';
 import { checkCall, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
 import { parseSortKeys, sortKeysText, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
-import { parseExpr } from './engine/structure';
+import { forInit, forUpdate, parseExpr, splitFor } from './engine/structure';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
 import { t } from './i18n';
@@ -27,7 +27,8 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   const field = fieldTarget(f);
   // 二維 vector 的某一列後面添加：「 g[u] 加入 v」
   const rowPush = f.rectKind == '二維清單' && f.rectAction == '加入';
-  let text = field ? ` ${field} 設為 ${f.code}`
+  let text = f.rectAction == '跳出' ? ' break' : f.rectAction == '下一輪' ? ' continue'
+    : field ? ` ${field} 設為 ${f.code}`
     : rowPush ? `${target}[${f.rectIndex.trim()}] 加入 ${f.code}`
     // 排序：「 a 排序 前 n 個 依 w 由小到大」（前幾個、依欄位都可以沒有）
     : f.rectAction == '排序' ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''}${sortKeysOf(vars, f).length ? ` 依 ${sortKeysText(sortKeysOf(vars, f))}` : ` ${f.sortDesc ? '由大到小' : '由小到大'}`}`
@@ -78,7 +79,7 @@ function changeForm(f: DialogForm): DialogForm {
 }
 
 /** 刪除第幾項、刪除所有項目、建立二維清單、pop、排序不用填值 */
-const hasValue = (f: DialogForm) => f.rectAction != '刪除' && f.rectAction != '清空' && f.rectAction != '建立' && f.rectAction != '取出' && f.rectAction != '排序';
+const hasValue = (f: DialogForm) => !['刪除', '清空', '建立', '取出', '排序', '跳出', '下一輪'].includes(f.rectAction);
 
 function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (!f.rectKind) {
@@ -113,6 +114,8 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     }
     return checkVar(vars, f.code, true) && checkValueType(vars, modules, name, f.code, 'var');
   }
+  // break / continue：不用填什麼（只能用在迴圈裡，執行時檢查）
+  if (f.rectKind == '迴圈控制') return true;
   // struct 的欄位：要先選變數和欄位（容器還要填索引），值的型別要跟欄位一樣
   if (f.rectKind == '結構' && !f.rectField) {
     alert(t('請選要改哪個欄位。', 'Choose a field.'));
@@ -257,6 +260,37 @@ function isStructContainer(vars: VarStore, name: string) {
   return vars.type_var_list.array.includes(name) && findStruct(holds) != null;
 }
 
+/**
+ * C++ 的 for 迴圈積木的字「for (int i = 0; i < n; i++)」；檢查沒過回傳 null。
+ * 計數變數不用宣告，但不能跟變數表（參數、區域變數）同名
+ */
+function forText(vars: VarStore, f: DialogForm): string | null {
+  const [a, b, c] = [f.forInit.trim(), f.forCond.trim(), f.forUpdate.trim()];
+  if (!a || !b || !c) {
+    alert(t('for 的三段都要填：點每一段右邊的寫法補上，再改成你要的。', 'Fill in all three parts of the for loop. Pick a pattern on the right, then change it.'));
+    return null;
+  }
+  const init = forInit(a);
+  if (!init) {
+    alert(t('第一段要寫成「int i = 0」這樣（int、變數名稱、= 起始值）。', 'The first part must look like "int i = 0".'));
+    return null;
+  }
+  const name = init.name;
+  if (vars.var_list.name.includes(name)) {
+    alert(t(`變數表（或參數、區域變數）已經有「${name}」了：for 的計數變數不用在變數表宣告，請換一個名字，或刪掉變數表裡的「${name}」。`, `"${name}" is already in the variable table (or a parameter). A for counter needs no declaration. Rename it, or delete "${name}" from the table.`));
+    return null;
+  }
+  const next = forUpdate(c, name);
+  if (next == null) {
+    alert(t(`第三段要改「${name}」，例如 ${name}++、${name}--、${name} = ${name} + 1、${name} += 2。`, `The third part must change "${name}", like ${name}++, ${name}--, ${name} = ${name} + 1 or ${name} += 2.`));
+    return null;
+  }
+  // 第二、三段可以用計數變數
+  const inLoop: VarStore = { ...vars, loopVars: [...(vars.loopVars ?? []), name] };
+  if (!checkVar(vars, init.start, true) || !checkVar(inLoop, b, true) || !checkVar(inLoop, next, true)) return null;
+  return `for (${a}; ${b}; ${c})`;
+}
+
 /** 執行模組積木的文字「模組名稱(引數, …)」；檢查沒過回傳 null */
 function callNodeText(vars: VarStore, modules: ModuleInfo[], f: DialogForm): string | null {
   const m = modules.find(x => x.name == f.moduleName);
@@ -284,6 +318,10 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
     case 'Diamond':
       return checkVar(vars, f.code, true) && add(f.code, 'Diamond', getCodeVar(vars, f.code));
     case 'Loop':
+      if (f.radio == 'cfor') {
+        const text = forText(vars, f);
+        return text != null && add(text, 'For_Loop', getCodeVar(vars, text));
+      }
       if (checkVar(vars, f.forNumber, true) || checkVar(vars, f.code, true)) {
         const text = f.radio == 'while' ? f.code : f.forNumber + '次';
         return add(text, f.radio == 'for' ? 'For_Loop' : 'While_Loop', getCodeVar(vars, text));
@@ -331,6 +369,14 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
       return done();
     case 'For_Loop':
     case 'While_Loop': {
+      if (f.radio == 'cfor') {
+        const text = forText(vars, f);
+        if (text == null) return false;
+        node.figure = 'For_Loop';
+        node.text = text;
+        node.variables = getCodeVar(vars, text);
+        return done();
+      }
       const text = f.radio == 'while' ? f.code : f.forNumber + '次';
       node.figure = f.radio == 'for' ? 'For_Loop' : 'While_Loop';
       node.text = text;
@@ -419,12 +465,17 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       const call = parseCall(text);
       return { kind: 'Function', initial: call ? { moduleName: call.name, moduleArgs: call.args } : {} };
     }
-    case 'For_Loop':
+    case 'For_Loop': {
+      // C++ 的 for (int i = 0; i < n; i++)
+      const h = splitFor(text);
+      if (h) return { kind: 'For_Loop', initial: { radio: 'cfor', forInit: h.init, forCond: h.cond, forUpdate: h.update, showWhile: false } };
       return { kind: 'For_Loop', initial: { radio: 'for', forNumber: text.substring(0, text.length - 1), showWhile: false } };
+    }
     case 'While_Loop':
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
     case 'Rectangle': {
       const { target, action, index, index2, expr } = splitRectangle(text);
+      if (action == '跳出' || action == '下一輪') return { kind: 'Rectangle', initial: { rectKind: '迴圈控制', rectAction: action } };
       // struct 的欄位：「 e.from 設為 x」「 edges[i].w 設為 x」
       const field = action == '設為' ? splitField(target) : null;
       if (field) {

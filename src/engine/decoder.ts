@@ -23,7 +23,7 @@ import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, parseSortKeys, splitRectangle, splitTarget } from './labels';
 import { cppNameProblem, elemCppType, GLOBAL_PREFIX, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
-import { exprType, fieldOf, parseExpr, structOf, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
+import { exprType, fieldOf, forInit, forLoopVars, forUpdate, parseExpr, splitFor, structOf, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 import { fieldCppType, fieldInit, findStruct, getStructs } from './structs';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -59,6 +59,8 @@ export interface VarStore {
   globalVars?: VarStore;
   /** C++：被 main 的同名變數蓋住的全域變數（main 裡看不到，模組看得到） */
   shadowed?: string[];
+  /** C++：這張流程圖的 for 迴圈計數變數（例如 i；不用在變數表宣告，算式裡可以用） */
+  loopVars?: string[];
 }
 
 /** 區域變數照型別分好（給下拉選單、型別檢查用） */
@@ -255,7 +257,7 @@ function listItemTarget(str: string): { list: string; index: string } | null {
 export function checkVar(vars: VarStore, str: string | undefined, can_number: boolean): boolean {
   if (!str || !str.trim()) return false;
   const { type_var_list } = vars;
-  const defined = (name: string) => Object.values(type_var_list).some(list => list.includes(name));
+  const defined = (name: string) => Object.values(type_var_list).some(list => list.includes(name)) || !!vars.loopVars?.includes(name);
 
   if (!can_number) {
     // ::a：全域的數字、文字變數
@@ -919,13 +921,15 @@ function __show(v) {
 interface CodeResult {
   code: string;
   next: FlowNode | undefined;
+  /** 這條路以 break / continue 結束（積木後面不接箭頭） */
+  jumps?: boolean;
 }
 
 /** 把流程圖逐一走訪，產生對應的 JavaScript 程式碼 */
 class CodeGenerator {
   private readonly nodes: (FlowNode | null)[];
   private readonly diagram: Diagram;
-  private readonly vars: VarStore;
+  private vars: VarStore;
   private readonly varStr: string;
   private readonly counter = { n: 0 };
   /** 第幾張流程圖：0 是主程式，模組依序是 1、2… */
@@ -939,6 +943,36 @@ class CodeGenerator {
   private readonly globalRefs: boolean;
   /** 主程式：「開始」後面先宣告 main 自己的變數（C++，見 buildRun） */
   mainPrelude = '';
+  /** 正在哪些 for 迴圈裡面（計數變數的名稱，外層在前） */
+  private loopStack: string[] = [];
+  /** 在幾層迴圈裡面（break / continue 只能用在迴圈裡） */
+  private loopDepth = 0;
+
+  /** 在 for 迴圈裡面：計數變數當成 int 變數（算式、整數除法才認得它） */
+  private withLoopVar<T>(name: string, f: () => T): T {
+    const saved = this.vars;
+    this.vars = {
+      ...saved,
+      var_list: { name: [...saved.var_list.name, name], value: [...saved.var_list.value, '0'] },
+      type_var_list: { ...saved.type_var_list, number: [...saved.type_var_list.number, name] },
+    };
+    this.loopStack.push(name);
+    try {
+      return f();
+    }
+    finally {
+      this.loopStack.pop();
+      this.vars = saved;
+    }
+  }
+
+  /** 迴圈裡面不能改 for 的計數變數（由第三段 i++ 來改） */
+  private checkLoopVarChange(node: FlowNode, target: string) {
+    const name = target.trim();
+    if (this.loopStack.includes(name)) {
+      this.fail(t(`${label(node)}：「${name}」是 for 迴圈的計數變數，要靠迴圈的第三段（例如 ${name}++）來改，迴圈裡面不能改它。`, `${label(node)}: "${name}" is the counter of a for loop. Change it in the third part of the loop (like ${name}++), not inside the loop.`), node);
+    }
+  }
 
   constructor(diagram: Diagram, vars: VarStore, sheet = 0, modules: ModuleInfo[] = [], params: ParamInfo[] = [], locals: LocalVar[] = []) {
     this.diagram = diagram;
@@ -1278,7 +1312,8 @@ class CodeGenerator {
             const open = this.globalRefs ? 'with (__G) {\n' : '';
             // 這一層的參數和區域變數：第四步每個模組分開列出來（遞迴時每一層各一份）
             const own = [...this.params.map(p => p.name), ...this.locals.map(v => v.name.trim())];
-            const frame = `__frames.push({ sheet: ${this.sheet}, get: function () { return {${own.map(n => JSON.stringify(n) + ': ' + n).join(', ')}}; } });\n`;
+            const loopVars = forLoopVars(this.nodes);
+            const frame = `__frames.push({ sheet: ${this.sheet}, get: function () { var o = {${own.map(n => JSON.stringify(n) + ': ' + n).join(', ')}}; ${loopVars.map(n => `if (typeof ${n} != 'undefined') o[${JSON.stringify(n)}] = ${n};`).join(' ')} return o; } });\n`;
             return { code: head + frame + open + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
           }
           // 有回傳值的模組：走到結束時一定要已經「回傳」過
@@ -1312,6 +1347,7 @@ class CodeGenerator {
         if (parts[0].includes('輸入')) {
           const v = parts.slice(1).join(' ').trim();
           if (!v) this.fail(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), node);
+          this.checkLoopVarChange(node, v);
           const name = JSON.stringify(v);
           const item = listItemTarget(v);
           const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
@@ -1374,9 +1410,13 @@ class CodeGenerator {
         const el = this.branch(node, t => t.includes('false') || t.includes('假'), '假');
         const code = 'if(' + cond + '){\n' + update + ie.code
           + '}else{\n' + update + el.code + '}\n';
-        return { code: code + 'total_step ++;\n', next: ie.next };
+        const next = ie.next ?? (ie.jumps ? el.next : undefined);
+        return { code: code + 'total_step ++;\n', next, jumps: !next && ie.jumps && el.jumps };
       }
       case 'For_Loop': {
+        // C++ 的 for (int i = 0; i < n; i++)
+        const header = splitFor(node.text);
+        if (header) return this.forLoop(node, header, i, update);
         const times = '__count(' + expr(node.text.substring(0, node.text.length - 1)) + ', ' + i + ')';
         this.checkSyntax(node, 'return (' + times + ');');
         const c = 'counter' + i;
@@ -1398,6 +1438,14 @@ class CodeGenerator {
       }
       case 'Rectangle': {
         const { target, action, index, index2, expr: rest } = splitRectangle(node.text);
+        // break：跳出最近的迴圈；continue：直接進入下一輪（後面不接箭頭）
+        if (action == '跳出' || action == '下一輪') {
+          if (this.loopDepth == 0) {
+            this.fail(t(`${label(node)} 只能用在迴圈裡面：用判斷接到它，例如「找到了 → 真 → break」。`, `${label(node)} can only be used inside a loop. Connect it from a decision, like "found → Yes → break".`), node);
+          }
+          return { code: 'total_step ++;\n' + update + (action == '跳出' ? 'break;\n' : 'continue;\n'), next: undefined, jumps: true };
+        }
+        this.checkLoopVarChange(node, splitTarget(target)?.name ?? target);
         const value = (node.data || '') + '(' + expr(rest.split('(取')[0]) + ')';
         if (action == '回傳') {
           // 回傳：只能在有回傳值的模組裡，而且後面直接接「結束」（回傳完就離開模組）
@@ -1457,8 +1505,50 @@ class CodeGenerator {
     return this.diagram.links.filter(l => l && node && l.to == this.idx(node)).length;
   }
 
+  /** C++ 的 for 迴圈：計數變數只在迴圈裡面有（離開後拿掉，第四步就不會再列出來） */
+  private forLoop(node: FlowNode, header: { init: string; cond: string; update: string }, i: number, update: string): CodeResult {
+    const init = forInit(header.init);
+    if (!init) {
+      this.fail(t(`${label(node)} 的第一段要寫成「int i = 0」這樣（int、變數名稱、= 起始值）。`, `The first part of ${label(node)} must look like "int i = 0".`), node);
+    }
+    const name = init.name;
+    if (this.isVar(name)) {
+      this.fail(t(`${label(node)}：迴圈的計數變數「${name}」跟變數表（或參數、區域變數）的「${name}」同名。for 的計數變數不用在變數表宣告，請換一個名字，或刪掉變數表裡的「${name}」。`, `${label(node)}: the loop counter "${name}" has the same name as a variable in the table (or a parameter). A for counter needs no declaration. Rename it, or delete "${name}" from the table.`), node);
+    }
+    if (this.loopStack.includes(name)) {
+      this.fail(t(`${label(node)} 在另一個也用「${name}」的 for 迴圈裡面：裡面的迴圈請換一個名字，例如 j。`, `${label(node)} is inside another for loop that uses "${name}". Use another name for the inner loop, like j.`), node);
+    }
+    const nextValue = forUpdate(header.update, name);
+    if (nextValue == null) {
+      this.fail(t(`${label(node)} 的第三段要改「${name}」，例如 ${name}++、${name}--、${name} = ${name} + 1、${name} += 2。`, `The third part of ${label(node)} must change "${name}", like ${name}++, ${name}--, ${name} = ${name} + 1 or ${name} += 2.`), node);
+    }
+    const nm = JSON.stringify(name);
+    const start = this.expr(init.start, i);
+    return this.withLoopVar(name, () => {
+      const cond = this.expr(header.cond, i, true);
+      const step = this.expr(nextValue, i);
+      const head = `for (var ${name} = __int((${start}), ${i}, ${nm}); ${cond}; ${name} = __int((${step}), ${i}, ${nm})) {\n`;
+      this.checkSyntax(node, head + '}');
+      const l = this.loop(node, '進入迴圈', '離開迴圈');
+      const code = head + 'total_step ++;' + update + `if(--__loopTrap < 0) __err('tooManyLoops', ${i}, {});\n` + l.code + '\n}\n'
+        // 離開迴圈：計數變數就沒有了（跟 C++ 一樣）
+        + `${name} = undefined;\n` + 'total_step ++;' + update;
+      return { code, next: l.next };
+    });
+  }
+
   /** 迴圈：先走「進入迴圈/假」那條直到繞回自己，出口是「離開迴圈/真」那條 */
   private loop(node: FlowNode, enter: string, exit: string): CodeResult {
+    this.loopDepth++;
+    try {
+      return this.loopBody(node, enter, exit);
+    }
+    finally {
+      this.loopDepth--;
+    }
+  }
+
+  private loopBody(node: FlowNode, enter: string, exit: string): CodeResult {
     const isEnter = (t: string) => t.includes('進入迴圈') || t.includes('假');
     const isExit = (t: string) => t.includes('離開迴圈') || t.includes('真');
     let next = this.nextOf(node, isEnter);
@@ -1468,6 +1558,8 @@ class CodeGenerator {
       guard(this.counter);
       const r = this.toCode(next);
       code += r.code;
+      // break / continue：這條路到這裡結束
+      if (!r.next && r.jumps) break;
       if (!r.next) {
         if (next.text == '結束') this.fail(t(`迴圈${label(node)} 裡面的積木要接回迴圈，不能直接接到「結束」。`, `Blocks inside the loop ${label(node)} must go back to the loop, not to "End".`), next);
         this.fail(label(next) + t(' 後面沒有接箭頭：迴圈裡最後一個積木要用箭頭接回迴圈。', ' has no arrow. The last block in a loop needs an arrow back to the loop.'), next);
@@ -1489,11 +1581,12 @@ class CodeGenerator {
       guard(this.counter);
       const r = this.toCode(next);
       code += r.code;
+      if (r.jumps) return { code, next: undefined, jumps: true };
       if (!r.next && next.text != '結束') this.noNext(next);
       next = r.next;
       num = this.linksInto(next);
     }
-    return { code, next };
+    return { code, next, jumps: false };
   }
 
   /** 從「開始」走到「結束」 */
@@ -1674,7 +1767,8 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   for (const name of topNames) code += declare(gv ?? vars, name);
   // C++ 的 main 自己的變數：宣告在 flowchart_code 裡面（模組看不到；跟全域變數同名時蓋住全域的）
   const mainPrelude = cpp
-    ? mainNames.map(n => declare(vars, n)).join('') + 'var __mainNow = function(){ return {' + mainNames.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; };\n__mainSnap = __mainNow;\n'
+    ? mainNames.map(n => declare(vars, n)).join('') + 'var __mainNow = function(){ var o = {' + mainNames.map(n => JSON.stringify(n) + ': ' + n).join(',') + '}; '
+      + forLoopVars(diagram.nodes).map(n => `if (typeof ${n} != 'undefined') o[${JSON.stringify(n)}] = ${n};`).join(' ') + ' return o; };\n__mainSnap = __mainNow;\n'
     : '';
   // 「主流程的a」：模組裡讀寫主流程的 a（Scratch；見 withParams）
   if (!cpp) {
