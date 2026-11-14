@@ -6,6 +6,8 @@
 
 流程圖的積木可以點選工具再點畫布，也可以直接從左邊的工具列拖進畫布。
 
+流程圖太大時可以縮小：第三步、第四步的畫布右下角有「－ / 比例 / ＋」（30%～200%），第三步也可以按住 Ctrl 滾動滑鼠滾輪。第四步只能看、不能改，但可以拖曳把流程圖移到想看的位置；換下一步時，正在執行的積木跑出畫面會自動移過去。
+
 ## 變數型別與清單
 
 變數表的型別有「數字」「文字」「清單」（C++ 還有更多，見下面），第四步執行時會檢查：
@@ -34,7 +36,11 @@
 | `vector` | 選裝什麼 | 可以添加、插入、替換、刪除、排序 |
 | 二維 `vector` | 選裝什麼 | 「建立 n 列 m 行」；也可以「建立 n 列 0 行」再往某一列 `push_back`（鄰接串列） |
 | `stack`、`queue` | 選裝什麼 | `push`、`pop`、`top()`、`front()`、`back()`、`size()`、`empty()` |
-| `struct` | 先在變數表上面定義 struct（欄位 int / float / string），型別選單直接選 | 初始值可以填每個欄位（點一下展開）；每一種容器都可以裝 struct |
+| `priority_queue` | 選「大的先」或「小的先」、選裝什麼 | `push`、`pop`、`top()`、`size()`、`empty()`；小的先轉成 C++ 是 `greater` |
+| `set` | 選裝什麼 | `insert`（不重複、自動由小到大）、`erase`、`clear`、`count()`、`size()`、`empty()` |
+| `map` | 選「鍵 → 值」的型別（預設 string → int） | `m[k] = v`、`m[k]`、`erase`、`clear`、`count(k)`、`size()`；讀還沒有的鍵會先放 0（跟 C++ 一樣） |
+| `struct` | 先在變數表上面定義 struct（欄位 int / float / string），型別選單直接選 | 初始值可以填每個欄位（點一下展開）；每一種容器都可以裝 struct（`set`、`priority_queue` 除外） |
+| `pair` | 型別選單直接選 `pair<int,int>`、`pair<long long,int>`、`pair<int,string>`、`pair<string,int>` | 跟 struct 一樣用 `p.first`、`p.second`；每一種容器都可以裝，例如 `queue<pair<int,int>>` |
 
 勾「全域」的變數宣告在 main 外面，每個模組（函式）都用得到，遞迴的 DFS、合併排序就靠它。全域變數和 main 的變數可以同名：main 用自己的，模組用全域的；main 裡要改被蓋住的全域變數，選單裡選 `::a（全域）`。
 
@@ -44,8 +50,10 @@
 | --- | --- |
 | 排序 | 計算積木選「排序」：由小到大 / 由大到小；array 可以只排前 n 個；struct 依欄位排，可以一層一層加條件（分數由大到小，同分再依名字） |
 | 最大、最小 | `max(a, b)`、`min(a, b)`、`max(a, b, c)`；`max(v)`、`min(v)` 是整個 vector / array 裡最大、最小的 |
-| 字串 | `s.length()`、`s.size()`、`s.substr(開始, 幾個字)`、`s[i]`、`stoi(s)`、`to_string(n)` |
-| struct 欄位 | `e.from`、`edges[i].w`、`g[u][k].to`、`q.front().w` |
+| 字串 | `s.length()`、`s.size()`、`s.substr(開始, 幾個字)`、`s[i]`、`stoi(s)`、`to_string(n)`；計算積木選 string 變數再填索引，可以只改其中一個字 `s[i] = 'A'` |
+| 字元 | `'a'`（單引號）、`s[i] - '0'`、`'a' + k`、`char(x)`、`isdigit`、`isalpha`、`isupper`、`islower`、`toupper`、`tolower`；跟 C++ 一樣，字元拿來算是數字（`'a' + 1` 是 98） |
+| struct、pair 欄位 | `e.from`、`edges[i].w`、`g[u][k].to`、`q.front().w`、`pq.top().second` |
+| 一整筆 pair / struct | `{x, y}`：照欄位的順序，例如 `q.push({x, y})`、`pq.push({d, v})`、`p 設為 {1, 2}` |
 | 二維 vector 的列 | `g[u].size()`、`g[u].empty()`、「在某一列後面添加」（`g[u].push_back(v)`） |
 | 整數除法 | `int / int` 跟 C++ 一樣去掉小數 |
 
@@ -54,15 +62,16 @@
 | 題目程度 | 常見題型 | 現在 |
 | --- | --- | --- |
 | 第 1、2 題 | 輸入輸出、判斷、迴圈、陣列統計、找最大最小、排序 | 可以 |
-| 第 3 題 | 二維陣列、字串、遞迴、struct 排序、二分搜尋、前綴和、簡單 DP | 大多可以（字元運算除外） |
-| 第 4 題 | BFS / DFS、最短路徑、貪心、較難的 DP | 一部分：BFS、DFS、陣列版 Dijkstra 可以；要用 `priority_queue`、`map` 的不行 |
+| 第 3 題 | 二維陣列、字串、字元、遞迴、struct 排序、二分搜尋、前綴和、簡單 DP | 可以 |
+| 第 4 題 | BFS / DFS、最短路徑、貪心、較難的 DP | 可以（BFS 用 `queue<pair<int,int>>`、Dijkstra 用 `priority_queue` 小的先、計數用 `map`），但流程圖會很長 |
 
-氣泡排序、二分搜尋、遞迴 DFS 都實際畫過流程圖跑過，轉出來的 C++ 也正確。
+氣泡排序、二分搜尋、遞迴 DFS、字元運算、map 計數、set、priority_queue、pair 都實際畫過流程圖跑過，轉出來的 C++ 用 g++ 編譯執行，結果跟流程圖一樣。
 
 ### 還不能做、或有限制的
 
-- **字元運算**：`s[i] - '0'`、`'a' + k`、判斷大小寫還不支援（數字字元可以先用 `stoi(s.substr(i, 1))` 代替）。
-- **`priority_queue`、`pair`、`map`、`set`** 還沒有。
+- **`map`、`set` 的走訪**：只能整個輸出（map 一行一個「鍵 值」，set 由小到大），不能用 for 一個一個看；`begin()`、`find()`、`lower_bound()` 這類寫法還沒有。
+- **型別轉換** 只有 `char(x)` 這種寫法，沒有 `(char)x`。
+- **`set`、`priority_queue`** 不能裝自己定義的 struct（C++ 要另外寫比大小），可以裝 pair。
 - **讀到輸入結束**（`while (cin >> x)`）還沒有，題目要先給筆數。
 - **`::a`** 只能用在全域的數字、文字變數。
 - **struct** 不能當模組的參數或回傳值，不能巢狀（欄位只能是 int / float / string），不能整筆輸出或比大小。
@@ -78,7 +87,8 @@
 
 - **匯出尚未完成的作品**：下載一個 `.json`，內容是班級座號姓名、第一步的三個問題、第二步的測資、第三步的變數表（含 struct 定義、全域、array 大小、欄位初始值）與流程圖（含箭頭標籤、直角箭頭的折點）、模組，以及存檔時在第幾步。
 - **匯入作品資料**：選之前匯出的 `.json`，回到存檔時的狀態。如果檔案是別題的作品，會問要不要切換到那一題。
-- **匯出 PDF（交作業）**：跟以前一樣，要先填班級、座號。
+- **下載 PDF（交作業）**：要先填班級、座號。直接產生 PDF 檔（不用經過列印視窗），題目也一起印進去；流程圖照原本的大小，可以跨好幾頁，只在兩個積木中間換頁。
+- **列印**：用瀏覽器的列印視窗。
 
 存檔格式寫在 [src/workFile.ts](src/workFile.ts)。
 
@@ -132,7 +142,7 @@ C++ 的題目可以加 `var_types`，限制變數表能選哪些容器（數字�
 "var_types": ["array"]
 ```
 
-可以寫 `vector`、`2d_vector`、`array`、`stack`、`queue`、`struct`；沒寫就是都可以。
+可以寫 `vector`、`2d_vector`、`array`、`stack`、`queue`、`priority_queue`、`priority_queue_min`（小的先）、`set`、`map`、`struct`（含 pair）；沒寫就是都可以。
 
 ## 程式結構
 
@@ -147,6 +157,7 @@ C++ 的題目可以加 `var_types`，限制變數表能選哪些容器（數字�
 | `src/engine/decoder.ts` | 檢查學生寫的運算式、把流程圖轉成程式並逐步執行 |
 | `src/engine/structure.ts` | 流程圖、運算式整理成結構（看程式、轉 C++ 用） |
 | `src/engine/toCpp.ts` | 流程圖轉成 C++ |
-| `src/engine/structs.ts` | struct 的定義 |
+| `src/engine/structs.ts` | struct 的定義、內建的 pair |
+| `src/pdf.ts` | 交作業：列印畫面直接存成 PDF |
 | `src/nodeActions.ts` | 對話框按「確認」後新增或修改積木 |
 | `src/workFile.ts` | 尚未完成作品的存檔格式、匯出、匯入 |
