@@ -79,6 +79,9 @@ export function splitRectangle(text: string): { target: string; action: RectActi
   if (m) return { target: m[1].trim(), action: '清空', index: '', index2: '', expr: '' };
   m = /^(.*?) 刪除第 (.*) 項$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '刪除', index: m[2].trim(), index2: '', expr: '' };
+  // array 在流程圖中建立：「 a 建立大小 n」（C++ 的 int a[n];）
+  m = /^(.*?) 建立大小 (.+)$/s.exec(text);
+  if (m) return { target: m[1].trim(), action: '建立', index: m[2].trim(), index2: '', expr: '' };
   m = /^(.*?) 建立 (.*?) 列 (.*) 行$/s.exec(text);
   if (m) return { target: m[1].trim(), action: '建立', index: m[2].trim(), index2: m[3].trim(), expr: '' };
   // 迴圈控制（C++）：「 break」跳出最近的迴圈、「 continue」直接進入下一輪（積木後面不接箭頭）
@@ -114,6 +117,7 @@ function rectangleLabel(text: string, en: boolean): string {
   const value = expr.trim() + round;
   // 二維清單（只有 C++ 用）：照 C++ 的寫法
   if (action == '替換' && index2) return en ? `${target}[${index}][${index2}] = ${value}` : text;
+  if (action == '建立' && !index2) return en ? `make array ${target} of size ${index}` : `建立 array ${target}，大小 ${index}`;
   if (action == '建立') return en ? `make ${target} ${index} rows × ${index2} columns` : `${target} 建立 ${index} 列 × ${index2} 行`;
   if (action == '回傳') return en ? `return ${value}` : `回傳 ${value}`;
   if (action == '跳出') return en ? 'break (leave the loop)' : 'break（跳出迴圈）';

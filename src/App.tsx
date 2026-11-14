@@ -27,6 +27,7 @@ import { getLang, link, onLangChange, t, useLang } from './i18n';
 import { getTarget, setTarget, targetName, useTarget, type Target } from './target';
 import { COURSES, courseFits } from './courses';
 import { useCommit } from './useCommit';
+import { savePdf } from './pdf';
 import { downloadWorkFile, makeWorkFile, parseWorkFile, pickTextFile, stashPendingImport, takePendingImport, type WorkContent, type WorkFile } from './workFile';
 
 /** 開發測試用：true 時不用填班級座號也能交作業 */
@@ -107,9 +108,11 @@ export function App() {
   /** 「看程式」視窗開著嗎 */
   const [codeOpen, setCodeOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
+  /** 正在產生 PDF（列印畫面畫在畫面外面，產生完就收起來） */
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [printData, setPrintData] = useState<PrintData | null>(null);
-  const [printImg, setPrintImg] = useState<string>();
-  const [printModules, setPrintModules] = useState<{ title: string; src: string }[]>([]);
+  const [printImg, setPrintImg] = useState<{ src: string; cuts: number[] }>();
+  const [printModules, setPrintModules] = useState<{ title: string; src: string; cuts: number[] }[]>([]);
   /** 模組（每個有自己的一張流程圖）；sheet 是畫面上這一張：0 是主程式，其他是模組的 id */
   const [modules, setModulesState] = useState<AppModule[]>([]);
   /** C++ 的 struct 定義（執行、檢查、轉程式用的是 engine/structs 裡的那份，兩邊一起改） */
@@ -526,6 +529,7 @@ export function App() {
     store.var_list.value = rows.map(r => r.init);
     store.type_var_list = typeLists(rows);
     store.sizes = Object.fromEntries(rows.filter(r => r.type == '陣列').map(r => [r.name, r.size ?? '']));
+    store.flowSized = rows.filter(r => r.type == '陣列' && r.sizeLater).map(r => r.name);
     store.structInits = Object.fromEntries(rows.filter(r => r.type == '結構' && r.fieldInit).map(r => [r.name, r.fieldInit!]));
     store.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
     store.longs = rows.filter(r => r.type == '數字' && r.long).map(r => r.name);
@@ -802,25 +806,21 @@ export function App() {
   const hint2Commit = useCommit<HTMLInputElement>(el => autoVars(t('輸出用的到', 'for output'))(el));
 
   // ---------------- 交作業 ----------------
-  const downloadPDF = async () => {
-    setMenuOpen(false);
-    if (printing) {
-      setPrinting(false);
-      return;
-    }
+  /** 交作業要印的內容：班級座號、題目、變數、測資、流程圖；沒填班級座號回傳 false */
+  const preparePrint = () => {
     const className = classRef.current!.value;
     const number = numberRef.current!.value;
     if (!((className && number) || DEBUG_MODE)) {
       alert(t('請填寫班級座號', 'Please fill in your class and number.'));
-      return;
+      return false;
     }
-    setPrinting(true);
-    document.title = className + number;
     setPrintData({
       className,
       number,
       name: nameRef.current!.value,
       questionName: questionIn(question, getLang()).title,
+      // 題目內容一起印出來（敘述、附表、範例）
+      question: questionIn(question, getLang()),
       questionNote: noteRef.current!.value,
       vars: [
         ...varsRef.current.map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long), v.init, v.desc]),
@@ -829,12 +829,46 @@ export function App() {
       ],
       cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     });
-    setPrintImg(main.toImage() ?? undefined);
+    setPrintImg(main.toImageWithCuts() ?? undefined);
     setPrintModules(modulesRef.current.flatMap(m => {
-      const src = m.diagram.toImage();
+      const img = m.diagram.toImageWithCuts();
       const params = m.info.params.map(p => p.name).join(', ');
-      return src ? [{ title: `${m.info.name}(${params})`, src }] : [];
+      return img ? [{ title: `${m.info.name}(${params})`, ...img }] : [];
     }));
+    return true;
+  };
+
+  /** 下載 PDF（交作業）：直接存檔，檔名是「班級-座號-姓名-題目.pdf」 */
+  const downloadPDF = async () => {
+    setMenuOpen(false);
+    if (pdfBusy || !preparePrint()) return;
+    setPdfBusy(true);
+    try {
+      // 等列印畫面畫好（在畫面外面，學生看不到）
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const parts = [classRef.current!.value.trim(), numberRef.current!.value.trim().padStart(2, '0'), nameRef.current!.value.trim(), questionIn(question, getLang()).title]
+        .filter(Boolean).map(s => s.replace(/[\\/:*?"<>|]/g, ''));
+      await savePdf(document.getElementById('print')!, parts.join('-') + '.pdf');
+    }
+    catch (e) {
+      console.error(e);
+      alert(t('PDF 產生失敗，請改用「列印」存成 PDF。', 'Could not make the PDF. Please use "Print" to save it as a PDF.'));
+    }
+    finally {
+      setPdfBusy(false);
+    }
+  };
+
+  /** 列印（也可以在列印視窗選「另存為 PDF」）：要印紙本，或想要可以選取文字的 PDF 時用 */
+  const printPDF = async () => {
+    setMenuOpen(false);
+    if (printing) {
+      setPrinting(false);
+      return;
+    }
+    if (!preparePrint()) return;
+    setPrinting(true);
+    document.title = classRef.current!.value + numberRef.current!.value;
     await new Promise(resolve => setTimeout(resolve, 1000));
     window.print();
   };
@@ -913,6 +947,7 @@ export function App() {
       ...(v.size != null ? { size: String(v.size) } : {}),
       ...(v.fieldInit && typeof v.fieldInit == 'object' ? { fieldInit: Object.fromEntries(Object.entries(v.fieldInit).map(([k, x]) => [k, String(x)])) } : {}),
       ...(v.global ? { global: true } : {}),
+      ...(v.sizeLater ? { sizeLater: true } : {}),
       // 以前的作品沒有 int / float：C++ 初始值有小數點的當成 float
       ...(v.float || (getTarget() == 'cpp' && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
       ...(v.long && v.type == '數字' ? { long: true } : {}),
@@ -940,6 +975,7 @@ export function App() {
             ...(v.fieldInit && typeof v.fieldInit == 'object' ? { fieldInit: Object.fromEntries(Object.entries(v.fieldInit).map(([k, x]) => [k, String(x)])) } : {}),
             ...(v.float ? { float: true } : {}),
             ...(v.long ? { long: true } : {}),
+            ...(v.sizeLater ? { sizeLater: true } : {}),
           })),
         } : {}),
       },
@@ -1044,7 +1080,7 @@ export function App() {
           <label>{t('座號', 'No.')}<input id="number" placeholder={t('必填', 'Required')} ref={numberRef} /></label>
           <label>{t('姓名', 'Name')}<input id="name" placeholder={t('非必填', 'Optional')} ref={nameRef} /></label>
           {printing ? (
-            <button className="submit-button" id="finish" onClick={downloadPDF}>{t('返回編輯', 'Back to edit')}</button>
+            <button className="submit-button" id="finish" onClick={printPDF}>{t('返回編輯', 'Back to edit')}</button>
           ) : (
             <div className="file_menu" ref={menuRef}>
               <button className="submit-button" id="file_select" aria-expanded={menuOpen} onClick={() => setMenuOpen(o => !o)}>
@@ -1059,8 +1095,11 @@ export function App() {
                     {t('匯入作品資料', 'Open my work')}
                   </button>
                   <div className="file_menu_sep" />
-                  <button role="menuitem" id="finish" onClick={downloadPDF}>
-                    {t('匯出 PDF（交作業）', 'Save as PDF (hand in)')}
+                  <button role="menuitem" id="finish" onClick={downloadPDF} disabled={pdfBusy}>
+                    {pdfBusy ? t('PDF 產生中…', 'Making the PDF…') : t('下載 PDF（交作業）', 'Download PDF (hand in)')}
+                  </button>
+                  <button role="menuitem" onClick={printPDF}>
+                    {t('列印', 'Print')}
                   </button>
                 </div>
               )}
@@ -1080,7 +1119,7 @@ export function App() {
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
         open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
-        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, fieldInit: v.fieldInit, global: v.global }))}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, sizeLater: v.sizeLater, fieldInit: v.fieldInit, global: v.global }))}
       />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>
@@ -1244,7 +1283,7 @@ export function App() {
         />
       </div>
 
-      <PrintView visible={printing} data={printData} imgSrc={printImg} modules={printModules} />
+      <PrintView visible={printing || pdfBusy} capture={pdfBusy && !printing} data={printData} imgSrc={printImg} modules={printModules} />
 
       <div id="footer">
         <div className="contact">

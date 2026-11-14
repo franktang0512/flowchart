@@ -10,15 +10,25 @@ export interface PrintData {
   vars: string[][];
   /** [輸入, 輸出, 測試重點] */
   cases: string[][];
+  /** 題目內容（敘述、附表、範例），跟題目區一樣（照現在的語言） */
+  question?: QuestionText;
 }
 
 import { t, useLang } from '../i18n';
+import type { QuestionText } from '../questions';
+
+// 題目附表與範例的內容是老師寫的 HTML（有些題目用 <br> 換行），跟題目區一樣直接當 HTML 顯示
+const html = (s: string) => ({ dangerouslySetInnerHTML: { __html: s } });
 
 
-export function PrintView({ visible, data, imgSrc, modules }: { visible: boolean; data: PrintData | null; imgSrc: string | undefined; modules: { title: string; src: string }[] }) {
+/** capture：產生 PDF 用，畫在畫面外面、固定寬度（學生看不到，產生完就收起來） */
+/** 流程圖圖片：data-cuts 是可以切開換頁的位置（兩個積木中間），下載 PDF 時用 */
+type FlowImage = { src: string; cuts: number[] };
+
+export function PrintView({ visible, capture = false, data, imgSrc, modules }: { visible: boolean; capture?: boolean; data: PrintData | null; imgSrc: FlowImage | undefined; modules: ({ title: string } & FlowImage)[] }) {
   useLang();
   return (
-    <div id="print" style={{ display: visible ? 'block' : 'none' }}>
+    <div id="print" className={capture ? 'pdf_capture' : undefined} style={{ display: visible ? 'block' : 'none' }}>
       <div className="print_head">
         {t('班級：', 'Class: ')}<span id="print_class">{data?.className}</span>
         {t('座號：', 'No.: ')}<span id="print_number">{data?.number}</span>
@@ -30,6 +40,41 @@ export function PrintView({ visible, data, imgSrc, modules }: { visible: boolean
             <th>{t('題目名稱', 'Problem')}</th>
             <td id="print_question_name">{data?.questionName}</td>
           </tr>
+          {data?.question && (
+            <tr>
+              <th>{t('題目內容', 'Problem')}</th>
+              <td>
+                <div className="print_question">{data.question.question.trimEnd()}</div>
+                {data.question.array.length > 0 && (
+                  <table className="print_table" rules="all">
+                    <tbody>
+                      {data.question.array.map((row, i) => (
+                        <tr key={i}>{row.map((cell, j) => <td key={j} {...html(cell)} />)}</tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {data.question.test_case.length > 0 && (
+                  <table className="print_table" rules="all">
+                    <tbody>
+                      <tr>
+                        <th style={{ width: '30%' }}>{t('範例輸入', 'Example input')}</th>
+                        <th style={{ width: '30%' }}>{t('範例輸出', 'Example output')}</th>
+                        <th>{t('說明', 'Why')}</th>
+                      </tr>
+                      {data.question.test_case.map((tc, i) => (
+                        <tr key={i}>
+                          <td {...html(tc.input.replaceAll('\n', '<br>'))} />
+                          <td {...html(tc.output)} />
+                          <td {...html(tc.note)} />
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </td>
+            </tr>
+          )}
           <tr>
             <th>{t('題目重點', 'Main idea')}</th>
             <td id="print_question_note">{data?.questionNote}</td>
@@ -80,12 +125,12 @@ export function PrintView({ visible, data, imgSrc, modules }: { visible: boolean
           </tr>
           <tr>
             <th>{t('流程圖', 'Flowchart')}</th>
-            <td id="print_img">{imgSrc && <img id="flow_chart" src={imgSrc} />}</td>
+            <td id="print_img">{imgSrc && <img id="flow_chart" src={imgSrc.src} data-cuts={imgSrc.cuts.join(',')} />}</td>
           </tr>
           {modules.map(m => (
             <tr key={m.title}>
               <th>{t('模組', 'Module')}<br />{m.title}</th>
-              <td><img className="flow_chart_module" src={m.src} /></td>
+              <td><img className="flow_chart_module" src={m.src} data-cuts={m.cuts.join(',')} /></td>
             </tr>
           ))}
         </tbody>

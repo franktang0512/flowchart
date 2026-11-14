@@ -37,6 +37,7 @@ function rectangleText(vars: VarStore, f: DialogForm) {
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
     : f.rectAction == '清空' ? `${target} 刪除所有項目`
     : f.rectAction == '取出' ? `${target} 取出`
+    : f.rectAction == '建立' && f.rectKind == '陣列' ? `${target} 建立大小 ${f.rectIndex.trim()}`
     : f.rectAction == '建立' ? `${target} 建立 ${f.rectIndex.trim()} 列 ${f.rectIndex2.trim()} 行`
     : f.rectAction == '回傳' ? ` 回傳 ${f.code}`
     : `${target} ${f.rectAction} ${f.code}`;
@@ -162,7 +163,7 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     if (!checkVar(vars, f.rectIndex, true) || !checkVar(vars, f.rectIndex2, true)) return false;
     return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
   }
-  if (f.rectAction == '建立') {
+  if (f.rectAction == '建立' && f.rectKind != '陣列') {
     alert(t('請選一個二維清單。', 'Choose a 2D list.'));
     return false;
   }
@@ -180,6 +181,14 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     if (!vars.type_var_list.fixed.includes(list)) {
       alert(t('請選一個 array。', 'Choose an array.'));
       return false;
+    }
+    // 在流程圖中建立：變數表的大小要選「流程圖中建立」
+    if (f.rectAction == '建立') {
+      if (!vars.flowSized?.includes(list)) {
+        alert(t(`「${list}」的大小在變數表已經固定了：要在流程圖中建立，請到變數表把大小改成「流程圖中建立」。`, `The size of "${list}" is already fixed in the table. To make it in the flowchart, change its size to "made in flowchart".`));
+        return false;
+      }
+      return checkVar(vars, f.rectIndex, true);
     }
     return checkVar(vars, f.rectIndex, true) && checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item');
   }
@@ -512,7 +521,7 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           rectAction: action,
           ...(action == '排序' ? { sortKeys: index2 ? parseSortKeys(index2) : [], sortDesc: expr == '由大到小' } : {}),
           // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
-          rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' || (action == '替換' && index2) ? '二維清單'
+          rectKind: action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' && !index2 ? '陣列' : action == '建立' || (action == '替換' && index2) ? '二維清單'
             : action == '放入' || action == '取出' ? (vars?.type_var_list.queue.includes(target) ? '佇列' : '堆疊')
             // 二維 vector 某一列 push_back：「 g[u] 加入 v」
             : action == '加入' && splitTarget(target) ? '二維清單'

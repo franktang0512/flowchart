@@ -36,6 +36,8 @@ export interface VarStore {
   type_var_list: { number: string[]; text: string[]; array: string[]; grid: string[]; fixed: string[]; stack: string[]; queue: string[]; record: string[] };
   /** 陣列的大小（變數表填的） */
   sizes?: Record<string, string>;
+  /** 大小在流程圖中建立的 array（一開始還沒有，建立之後每格都還沒放值） */
+  flowSized?: string[];
   /** struct 變數每個欄位的初始值（變數名稱 → 欄位 → 值） */
   structInits?: Record<string, Record<string, string>>;
   /** 在模組裡：模組的參數（也放在 number / text 裡，算式可以用） */
@@ -153,6 +155,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
       number: [...params.filter(p => p.type == '數字').map(p => p.name), ...lt.number],
       text: [...params.filter(p => p.type == '文字').map(p => p.name), ...lt.text],
     }),
+    flowSized: [...(base.flowSized ?? []).filter(n => !own.has(n)), ...named.filter(v => v.type == '陣列' && v.sizeLater).map(v => v.name.trim())],
     sizes: { ...base.sizes, ...Object.fromEntries(named.filter(v => v.type == '陣列').map(v => [v.name.trim(), v.size ?? ''])) },
     structInits: { ...base.structInits, ...Object.fromEntries(named.filter(v => v.type == '結構' && v.fieldInit).map(v => [v.name.trim(), v.fieldInit!])) },
     globals: vars.globals,
@@ -712,6 +715,11 @@ const runtimeMessages = () => ({
   notGrid: t('「{name}」不是二維清單，不能用 [列][行]。', '"{name}" is not a 2D list. You cannot use [row][column].'),
   stackEmpty: t('stack「{name}」是空的，不能用 {m}()：裡面要先有東西（push），可以先用 {name}.empty() 檢查是不是空的。', 'The stack "{name}" is empty, so you cannot use {m}(). Push something first, or check with {name}.empty().'),
   queueEmpty: t('queue「{name}」是空的，不能用 {m}()：裡面要先有東西（push），可以先用 {name}.empty() 檢查是不是空的。', 'The queue "{name}" is empty, so you cannot use {m}(). Push something first, or check with {name}.empty().'),
+  notCreated: t('array「{name}」還沒建立大小：先用計算積木「建立」設定大小（例如先輸入 n，再建立大小 n）。', 'The array "{name}" has no size yet. First make it with a Math block (for example, input n, then make it with size n).'),
+  arrTwice: t('array「{name}」已經建立過了：C++ 的 array 只能宣告一次。', 'The array "{name}" is already made. A C++ array can be declared only once.'),
+  arrSize: t('array「{name}」的大小要是 1 到 100000 的整數，現在是 {n}。', 'The size of the array "{name}" must be a whole number from 1 to 100000. Now it is {n}.'),
+  unsetItem: t('「{name}」的這一格還沒放值：用 int {name}[n]; 宣告的 array，每一格要先放值才能讀（C++ 裡沒放值的格子是亂碼）。', 'This item of "{name}" has no value yet. An array declared like int {name}[n]; must get a value before you read it (in C++ it would be garbage).'),
+  unsetShow: t('array 裡還有格子沒放值，不能整個輸出：先把每一格都放好值。', 'Some items of the array have no value yet, so it cannot be printed. Give every item a value first.'),
   sortRange: t('排序「{name}」：要排前 {n} 個，可是只有 {len} 個（要是 0 到 {len} 的整數）。', 'Sorting "{name}": you want the first {n}, but there are only {len} (it must be a whole number from 0 to {len}).'),
   substrRange: t('「{name}」只有 {len} 個字，substr 的開始位置只能是 0 到 {len}，現在是 {k}。', '"{name}" has only {len} letters. The start of substr must be 0 to {len}. Now it is {k}.'),
   maxArgs: t('max( )、min( ) 的括號裡要放兩個以上的值（例如 max(a, b)），或一個 vector / array（例如 max(v)）。', 'Put two or more values in max( ) / min( ) (like max(a, b)), or one vector / array (like max(v)).'),
@@ -780,6 +788,7 @@ function __list(v, i, name) {
   return v.slice();
 }
 function __index(list, name, i, k) {
+  if (list === null && __FLOW[name]) __err('notCreated', i, { name: name });
   var isText = typeof list == 'string';
   if (!Array.isArray(list) && !isText) __err('notList', i, { name: name });
   if (!(Number.isInteger(k) && k >= __BASE && k < list.length + __BASE)) {
@@ -789,7 +798,20 @@ function __index(list, name, i, k) {
   }
   return k - __BASE;
 }
-function __at(list, name, i, k) { return list[__index(list, name, i, k)]; }
+function __at(list, name, i, k) {
+  var v = list[__index(list, name, i, k)];
+  // 流程圖中建立的 array：還沒放值的格子是 undefined（C++ 裡是亂碼）
+  if (v === undefined && Array.isArray(list)) __err('unsetItem', i, { name: name });
+  return v;
+}
+// 流程圖中建立 array：int a[n];（每格都還沒放值；裝 struct 的每格是一筆全部 0 的 struct）
+function __newArr(cur, name, i, n, sname) {
+  if (cur !== null) __err('arrTwice', i, { name: name });
+  if (!(Number.isInteger(n) && n >= 1 && n <= 100000)) __err('arrSize', i, { name: name, n: n });
+  var a = [];
+  for (var k = 0; k < n; k++) a.push(sname ? __new(sname) : undefined);
+  return a;
+}
 function __set(list, name, i, k, v) {
   if (typeof list == 'string') __err('textItemSet', i, { name: name });
   list[__index(list, name, i, k)] = v;
@@ -911,6 +933,7 @@ function __show(v) {
   if (typeof v == 'boolean' && __BASE == 0) return v ? 1 : 0;
   if (v && typeof v == 'object' && !Array.isArray(v)) __err('showStruct', -1, {});
   if (!Array.isArray(v)) return v;
+  if (v.some(function (x) { return x === undefined; })) __err('unsetShow', -1, {});
   if (v.length && v[0] && typeof v[0] == 'object' && !Array.isArray(v[0])) __err('showStruct', -1, {});
   if (v.some(function (row) { return Array.isArray(row) && row.some(function (x) { return x && typeof x == 'object'; }); })) __err('showStruct', -1, {});
   if (v.length && Array.isArray(v[0])) return v.map(function (row) { return row.join(' '); }).join('\\n');
@@ -947,6 +970,8 @@ class CodeGenerator {
   private loopStack: string[] = [];
   /** 在幾層迴圈裡面（break / continue 只能用在迴圈裡） */
   private loopDepth = 0;
+  /** 在幾層判斷裡面（建立 array 要在最外層） */
+  private ifDepth = 0;
 
   /** 在 for 迴圈裡面：計數變數當成 int 變數（算式、整數除法才認得它） */
   private withLoopVar<T>(name: string, f: () => T): T {
@@ -1406,8 +1431,15 @@ class CodeGenerator {
       case 'Diamond': {
         const cond = expr(node.text, true);
         this.checkSyntax(node, 'return (' + cond + ');');
-        const ie = this.branch(node, t => t.includes('true') || t.includes('真'), '真');
-        const el = this.branch(node, t => t.includes('false') || t.includes('假'), '假');
+        this.ifDepth++;
+        let ie: CodeResult, el: CodeResult;
+        try {
+          ie = this.branch(node, t => t.includes('true') || t.includes('真'), '真');
+          el = this.branch(node, t => t.includes('false') || t.includes('假'), '假');
+        }
+        finally {
+          this.ifDepth--;
+        }
         const code = 'if(' + cond + '){\n' + update + ie.code
           + '}else{\n' + update + el.code + '}\n';
         const next = ie.next ?? (ie.jumps ? el.next : undefined);
@@ -1446,6 +1478,15 @@ class CodeGenerator {
           return { code: 'total_step ++;\n' + update + (action == '跳出' ? 'break;\n' : 'continue;\n'), next: undefined, jumps: true };
         }
         this.checkLoopVarChange(node, splitTarget(target)?.name ?? target);
+        // 建立 array：要在最外層（C++ 在大括號裡宣告的 array，出了大括號就不能用）
+        if (action == '建立' && !index2) {
+          if (!this.isFixed(target) || !(this.vars.flowSized ?? []).includes(target)) {
+            this.fail(t(`${label(node)}：「${target}」不是「在流程圖中建立」的 array。請到第三步把它的大小改成「流程圖中建立」。`, `${label(node)}: "${target}" is not an array made in the flowchart. Change its size to "made in the flowchart" in step 3.`), node);
+          }
+          if (this.loopDepth > 0 || this.ifDepth > 0) {
+            this.fail(t(`${label(node)} 要放在最外層，不能在判斷或迴圈裡面：C++ 的 array 在大括號裡宣告，出了大括號就不能用。`, `${label(node)} must be at the top level, not inside a decision or a loop. In C++ an array declared inside braces cannot be used outside them.`), node);
+          }
+        }
         const value = (node.data || '') + '(' + expr(rest.split('(取')[0]) + ')';
         if (action == '回傳') {
           // 回傳：只能在有回傳值的模組裡，而且後面直接接「結束」（回傳完就離開模組）
@@ -1486,6 +1527,7 @@ class CodeGenerator {
           : action == '刪除' ? `__remove(${target}, ${name}, ${i}, (${expr(index)}));\n`
           : action == '清空' ? `__clear(${target}, ${name}, ${i});\n`
           // 二維清單設定大小：每一格放 0（裝文字的放空的文字）
+          : action == '建立' && !index2 ? `${target} = __newArr(${target}, ${name}, ${i}, (${expr(index)}), ${JSON.stringify(structNameOf(this.vars, target) ?? null)});\n`
           : action == '建立' ? `${target} = __grid(${name}, ${i}, (${expr(index)}), (${expr(index2)}), ${this.gridHoldsText(target) ? '""' : '0'}, ${JSON.stringify(structNameOf(this.vars, target) ?? null)});\n`
           : this.assign(action == '替換' ? `${target}[${index}]${index2 ? `[${index2}]` : ''}` : target, value, i);
         this.checkSyntax(node, code);
@@ -1665,6 +1707,7 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
     return parts.length ? `Object.assign(__new(${JSON.stringify(raw)}), {${parts.join(', ')}})` : `__new(${JSON.stringify(raw)})`;
   }
   // C++ 的 array：一開始就有固定的格數，每格是 0（裝 string 的是空的文字），跟 int a[5] = {}; 一樣
+  if (vars.type_var_list.fixed.includes(name) && vars.flowSized?.includes(name)) return 'null';
   if (vars.type_var_list.fixed.includes(name)) {
     const size = (vars.sizes?.[name] ?? '').trim();
     if (!/^\d+$/.test(size) || Number(size) < 1 || Number(size) > 1000) {
@@ -1752,6 +1795,12 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
   const fixedNames = [...vars.type_var_list.fixed, ...(gv?.type_var_list.fixed ?? []), ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列').map(v => v.name.trim()))];
   code += 'var __FIXED = ' + JSON.stringify(Object.fromEntries(fixedNames.map(n => [n, true]))) + ';\n';
+  // 大小在流程圖中建立的 array
+  const flowNames = [...(vars.flowSized ?? []), ...(gv?.flowSized ?? []), ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列' && v.sizeLater).map(v => v.name.trim()))];
+  code += 'var __FLOW = ' + JSON.stringify(Object.fromEntries(flowNames.map(n => [n, true]))) + ';\n';
+  // 全域變數在 main 外面宣告，大小要固定
+  const globalFlow = gv?.flowSized?.[0];
+  if (globalFlow) throw new FlowError(t(`全域的 array「${globalFlow}」大小要在變數表固定：C++ 的全域 array 不能用變數決定大小。`, `The global array "${globalFlow}" needs a fixed size in the variable table. A global C++ array cannot use a variable for its size.`));
   for (const s of getStructs()) {
     if (!s.fields.length) throw new FlowError(t(`struct ${s.name} 還沒有欄位：請到第三步替它加上欄位，或把它刪掉。`, `The struct ${s.name} has no fields yet. Add fields in step 3, or delete it.`));
   }

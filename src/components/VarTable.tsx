@@ -18,6 +18,8 @@ export interface VarRow {
   float?: boolean;
   /** C++ 的 array：大小（宣告時就決定） */
   size?: string;
+  /** C++ 的 array：大小在流程圖中用計算積木「建立」決定（先輸入 n，再 int a[n];） */
+  sizeLater?: boolean;
   /** C++：數字是 long long（很大的整數）；int 超過約 21 億會溢位 */
   long?: boolean;
   /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字） */
@@ -422,9 +424,16 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
           : <input {...text('init')} />}
         {row.type == '陣列' && (
           // array 的大小：C++ 宣告時就要寫，例如 int a[5]
-          <label className="array_size" title={t('array 有幾格（宣告時就決定，之後不能改）', 'How many items (fixed when declared)')}>
-            {t('大小', 'Size')} <input {...text('size')} inputMode="numeric" />
-          </label>
+          <span className="array_size">
+            <select
+              className="var_input" value={row.sizeLater ? 'flow' : 'fixed'} aria-label={t('大小', 'Size')}
+              onChange={e => { onChange(row.id, { sizeLater: e.target.value == 'flow' || undefined, ...(e.target.value == 'fixed' && !row.size?.trim() ? { size: '5' } : {}) }); onCommit(); }}
+            >
+              <option value="fixed">{t('大小', 'Size')}</option>
+              <option value="flow">{t('流程圖中建立', 'Made in flowchart')}</option>
+            </select>
+            {!row.sizeLater && <input {...text('size')} inputMode="numeric" title={t('array 有幾格（宣告時就決定，之後不能改）', 'How many items (fixed when declared)')} />}
+          </span>
         )}
       </td>
       <td><input {...text('desc')} /></td>

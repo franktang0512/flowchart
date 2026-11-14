@@ -1079,6 +1079,26 @@ input, textarea, select, button {
 .print_table {
     border: 1px solid #555;
 }
+/* 下載 PDF：列印畫面畫在畫面外面（學生看不到），固定寬度，產生完就收起來 */
+#print.pdf_capture {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 760px;
+    margin: 0;
+    background: #fff;
+}
+/* 列印：左邊的標題靠上（流程圖跨頁時，標題跟著開頭那一段） */
+#print .my_table > tbody > tr > th {
+    vertical-align: top;
+}
+
+/* 列印：題目敘述（照原本的換行） */
+.print_question {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    margin: 4px 0;
+}
 .print_table th,
 .print_table td {
     border: 1px solid #555;

@@ -803,8 +803,10 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       const cell = kind == '二維清單' && f.rectAction == '替換';
       /** 二維 vector 的某一列後面添加（鄰接串列 g[u].push_back(v)） */
       const rowPush = kind == '二維清單' && f.rectAction == '加入';
-      const indexLabel = !kind ? null : cell || rowPush ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
-      const index2Label = !kind ? null : f.rectAction == '建立' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
+      /** 在流程圖中建立 array：填大小 */
+      const makeArray = kind == '陣列' && f.rectAction == '建立';
+      const indexLabel = !kind ? null : makeArray ? () => t('大小', 'Size') : cell || rowPush ? () => t('列（索引）', 'Row index') : RECT_INDEX[f.rectAction];
+      const index2Label = !kind ? null : f.rectAction == '建立' && kind == '二維清單' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
       const verb = kind && kind != '接收' ? RECT_VERB[f.rectAction] : null;
       // 有回傳值的模組（Scratch 的模組不能回傳，看不到這個選項）
       const returning = modules.filter(x => x.returns);
@@ -825,7 +827,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       );
       body = (
         <>
-          <p id="hint">{change ? t('將數字變數的值加上多少（減少就填負數）...', 'Add an amount to a number variable (use a negative number to take away)...') : kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
+          <p id="hint">{change ? t('將數字變數的值加上多少（減少就填負數）...', 'Add an amount to a number variable (use a negative number to take away)...') : kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : makeArray ? t('建立 array：決定大小，例如輸入 n 之後，建立大小 n...', 'Make the array: set its size, like size n after you input n...') : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
           <p className="io_choice rect_kind">
             {t('要改：', 'Change: ')}
             <label><input type="radio" name="rect_kind" checked={kind == '變數'} onChange={() => pickKind('變數')} />{t('變數', 'A variable')}</label>
@@ -911,6 +913,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
               {t('怎麼改：', 'How: ')}
               {actionRadio('替換', t('替換某一格', 'Change one item'))}
               {actionRadio('排序', t('排序（sort）', 'Sort'))}
+              {actionRadio('建立', t('建立（設定大小）', 'Make (set the size)'))}
             </p>
           )}
           {kind == '迴圈控制' && (

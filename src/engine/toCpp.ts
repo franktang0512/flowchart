@@ -24,7 +24,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     ...globalOnly.map(v => ['::' + v.name, { ...v, name: '::' + v.name }] as const),
   ]);
   /** 模組的區域變數（寫在函式裡面） */
-  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, fieldInit: v.fieldInit }));
+  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, sizeLater: v.sizeLater, fieldInit: v.fieldInit }));
   /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數和區域變數 */
   let vars = globals;
   /** 目前寫到哪個模組（null 是主程式） */
@@ -86,6 +86,11 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     }
   };
 
+  /** array 的大小：變數表固定的照寫；流程圖中建立的用 sizeof 算出來 */
+  function arraySize(v: VarInfo) {
+    return v.sizeLater ? `(sizeof(${v.name}) / sizeof(${v.name}[0]))` : v.size?.trim() || '0';
+  }
+
   /** int 和 long long 都是整數 */
   function isIntType(type: string) {
     return type == 'int' || type == 'long long';
@@ -112,7 +117,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
           uses.sort = true;
           if (e.args.length == 1) {
             const v = a.t == 'var' ? vars.get(a.name) ?? allVars.find(x => x.name == a.name) : undefined;
-            const range = v?.type == '陣列' ? `${a.t == 'var' ? a.name : expr(a, 9)}, ${expr(a, 9)} + ${v.size?.trim() || '0'}` : `${expr(a, 9)}.begin(), ${expr(a, 9)}.end()`;
+            const range = v?.type == '陣列' ? `${a.t == 'var' ? a.name : expr(a, 9)}, ${expr(a, 9)} + ${arraySize(v)}` : `${expr(a, 9)}.begin(), ${expr(a, 9)}.end()`;
             return `*${e.fn}_element(${range})`;
           }
           const args = e.args.map(x => expr(x)).join(', ');
@@ -126,7 +131,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         const isText = typeOf(a) == 'str';
         // array 沒有 size()：大小就是宣告時寫的數字
         const array = a.t == 'var' && typeOfVar(a.name) == '陣列' ? (vars.get(a.name) ?? allVars.find(v => v.name == a.name)) : undefined;
-        if (e.fn == 'len') return array ? (array.size?.trim() || '0') : `${expr(a, 9)}.${isText ? 'length' : 'size'}()`;
+        if (e.fn == 'len') return array ? arraySize(array) : `${expr(a, 9)}.${isText ? 'length' : 'size'}()`;
         if (!b) return '0';
         if (isText) {
           uses.string = true;
@@ -135,7 +140,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         // 在 array 裡找要另一個版本的 indexOf（不用 vector）
         if (array) uses.indexOfArray = true;
         else uses.indexOf = true;
-        return e.fn == 'find' ? `indexOf(${expr(a)}, ${expr(b)})` : wrap(`indexOf(${expr(a)}, ${expr(b)}) != -1`, 3, parent);
+        // array 要把大小一起傳進去（流程圖中建立的 int a[n]; 也可以用）
+        const args = array ? `${expr(a)}, ${arraySize(array)}, ${expr(b)}` : `${expr(a)}, ${expr(b)}`;
+        return e.fn == 'find' ? `indexOf(${args})` : wrap(`indexOf(${args}) != -1`, 3, parent);
       }
       case 'bin': {
         const p = PREC[e.op];
@@ -246,6 +253,14 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
           emit(depth, 'cout << endl;');
           break;
         }
+        // 流程圖中建立的 array（int a[n];）不能用 for (auto item : a)，要用索引一格一格輸出
+        const flowArray = s.value.t == 'var' ? vars.get(s.value.name) : undefined;
+        if (flowArray?.type == '陣列' && flowArray.sizeLater) {
+          const c = counterName();
+          emit(depth, `for (int ${c} = 0; ${c} < ${arraySize(flowArray)}; ${c}++) cout << ${flowArray.name}[${c}] << " ";`);
+          emit(depth, 'cout << endl;');
+          break;
+        }
         if (typeOf(s.value) == 'list') {
           emit(depth, `for (auto item : ${expr(s.value)}) cout << item << " ";`);
           emit(depth, 'cout << endl;');
@@ -271,6 +286,11 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
           case '插入': emit(depth, `${s.target}.insert(${s.target}.begin() + ${at}, ${value});`); break;
           case '替換': emit(depth, `${s.target}[${expr(s.index!)}]${s.index2 ? `[${expr(s.index2)}]` : ''} = ${value};`); break;
           case '建立': {
+            // 在流程圖中建立的 array：int a[n];
+            if (!s.index2 && vars.get(s.target)?.type == '陣列') {
+              emit(depth, `${elemType(s.target)} ${s.target}[${expr(s.index!)}];`);
+              break;
+            }
             // 二維清單設定大小：r 列，每列 c 格，都先放 0（文字放 ""）
             const text = elemType(s.target) == 'string';
             // 0 行：每一列先是空的（鄰接串列，之後再 g[u].push_back(v)）
@@ -336,7 +356,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         const v = vars.get(s.target) ?? allVars.find(x => x.name == s.target);
         const elem = elemType(s.target);
         const isArray = v?.type == '陣列';
-        const n = s.count ? expr(s.count, 5) : isArray ? (v?.size?.trim() || '0') : '';
+        const n = s.count ? expr(s.count, 5) : isArray ? arraySize(v!) : '';
         const range = isArray ? `${s.target}, ${s.target} + ${n}` : `${s.target}.begin(), ${s.count ? `${s.target}.begin() + ${n}` : `${s.target}.end()`}`;
         if (s.keys?.length) {
           // struct 依欄位排：寫一個比較函式，前面的欄位不一樣就比前面的，一樣才比下一個；
@@ -385,6 +405,8 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     if (v.type == '清單') return `${pad}vector<${elemType(v.name)}> ${v.name};`;
     if (v.type == '二維清單') return `${pad}vector<vector<${elemType(v.name)}>> ${v.name};`;
     // array：每一格先放 0（string 本來就是空的）
+    // 在流程圖中建立的 array：寫在「建立」那個積木的位置
+    if (v.type == '陣列' && v.sizeLater) return '';
     if (v.type == '陣列') return `${pad}${elemType(v.name)} ${v.name}[${v.size?.trim() || '0'}]${elemType(v.name) == 'string' ? '' : ' = {}'};`;
     if (v.type == '堆疊') return `${pad}stack<${elemType(v.name)}> ${v.name};`;
     // struct 變數：每個欄位先是 0（string 是空的）
@@ -418,7 +440,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     if (m.returns == '文字') uses.string = true;
     const code = lines.splice(0);
     // 區域變數：寫在函式最上面，每次執行都重新從初始值開始，只有這個函式用得到
-    const locals = [...localsOf(m).map(v => declLine(v, INDENT)), ...tmpDecls(code, INDENT)];
+    const locals = [...localsOf(m).map(v => declLine(v, INDENT)), ...tmpDecls(code, INDENT)].filter(Boolean);
     const localPart = locals.length ? [`${INDENT}// ${t('區域變數：只有這個函式裡用得到', 'Local variables: only this function can use them')}`, ...locals, ''] : [];
     return [`${retType(m)} ${m.name}(${paramCode(m)}) {`, ...localPart, ...code, '}', ''];
   });
@@ -426,8 +448,8 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   if (modules.some(m => m.params.some(p => p.type == '文字'))) uses.string = true;
 
   // 主流程的變數宣告在 main 裡面；勾了「全域」的宣告在 main 外面（每個函式都用得到）
-  const decls = [...varList.filter(v => !v.global).map(v => declLine(v, INDENT)), ...tmpDecls(body, INDENT)];
-  const globalDecls = varList.filter(v => v.global).map(v => declLine(v, ''));
+  const decls = [...varList.filter(v => !v.global).map(v => declLine(v, INDENT)), ...tmpDecls(body, INDENT)].filter(Boolean);
+  const globalDecls = varList.filter(v => v.global).map(v => declLine(v, '')).filter(Boolean);
 
   // 用到才 #include：文字變數、裝文字的容器或用到 string 的寫法才要 <string>；有 vector 才要 <vector>；stack、queue 也一樣
   const isList = (v: VarInfo) => v.type == '清單' || v.type == '二維清單';
@@ -466,9 +488,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
   if (uses.indexOfArray) {
     head.push(
       '// ' + t('在 array 裡找 x，回傳它的索引；找不到回傳 -1', 'Find x in the array. Return its index, or -1 if it is not there.'),
-      'template <typename T, int N, typename U>',
-      'int indexOf(const T (&list)[N], const U& x) {',
-      `${INDENT}for (int i = 0; i < N; i++) {`,
+      'template <typename T, typename U>',
+      'int indexOf(const T list[], int n, const U& x) {',
+      `${INDENT}for (int i = 0; i < n; i++) {`,
       `${INDENT}${INDENT}if (list[i] == x) return i;`,
       `${INDENT}}`,
       `${INDENT}return -1;`,

@@ -448,6 +448,8 @@ export interface VarInfo {
   long?: boolean;
   /** 陣列（array）的大小：宣告時就決定，之後不能改 */
   size?: string;
+  /** array 的大小在流程圖中用計算積木「建立」決定（例如先輸入 n，再 int a[n];） */
+  sizeLater?: boolean;
   /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字），跟 C++ 的 Edge e = {1, 2, 7}; 一樣 */
   fieldInit?: Record<string, string>;
   /** C++：全域變數（宣告在 main 外面，每個模組都用得到） */

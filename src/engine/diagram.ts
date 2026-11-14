@@ -298,6 +298,14 @@ export class Diagram {
 
   /** 把流程圖畫成圖片（只裁出有東西的範圍，白底、不含選取框），交作業列印用；沒有積木時回傳 null */
   toImage(): string | null {
+    return this.toImageWithCuts()?.src ?? null;
+  }
+
+  /**
+   * 交作業用的流程圖圖片（只留積木和箭頭的範圍），以及可以切開換頁的位置：
+   * cuts 是兩個積木中間空隙的高度（0 到 1，從圖片頂端算），PDF 換頁時才不會把積木切成兩半
+   */
+  toImageWithCuts(): { src: string; cuts: number[] } | null {
     const nodes = this.nodes.filter((n): n is FlowNode => n != null);
     if (!nodes.length) return null;
     const pad = 30;
@@ -318,7 +326,15 @@ export class Diagram {
     nodes.forEach(n => n.draw(ctx));
     this.links.forEach(l => l?.draw(ctx));
     connectorState.r = r;
-    return c.toDataURL('image/png');
+    // 積木佔的高度範圍合併起來，中間沒有積木的空隙就是可以切開的地方（切在空隙正中間）
+    const spans = nodes.map(n => [n.y - minY, n.y + n.h - minY]).sort((a, b) => a[0] - b[0]);
+    const cuts: number[] = [];
+    let bottom = spans[0][1];
+    for (const [top, end] of spans.slice(1)) {
+      if (top > bottom) cuts.push((bottom + top) / 2 / c.height);
+      bottom = Math.max(bottom, end);
+    }
+    return { src: c.toDataURL('image/png'), cuts };
   }
 
   /** 積木文字改了之後：放不下就把積木放大，相連的箭頭跟著重新計算 */

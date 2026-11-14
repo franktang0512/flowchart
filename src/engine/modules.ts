@@ -53,6 +53,8 @@ export interface LocalVar {
   float?: boolean;
   /** C++ 的 array：大小 */
   size?: string;
+  /** array 的大小在流程圖中建立 */
+  sizeLater?: boolean;
   /** C++：數字是 long long */
   long?: boolean;
   /** struct 變數每個欄位的初始值 */

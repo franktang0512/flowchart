@@ -84,6 +84,8 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
             : isRecords ? <RecordTable rows={v as Record<string, unknown>[]} prev={Array.isArray(before?.[name]) ? before![name] as unknown[] : null} indexed kind={kinds[name]} />
             : isGrid ? <GridValue rows={v as unknown[][]} prev={before?.[name]} />
             : isList ? <ListValue items={v} prev={before?.[name]} kind={kinds[name]} />
+            // 流程圖中建立的 array 還沒建立
+            : v === null && kinds[name] == '陣列' ? <span className="muted">{t('（還沒建立）', '(not made yet)')}</span>
             : String(v)}
         </span>
       </div>
@@ -330,7 +332,8 @@ function ListValue({ items, prev, kind }: { items: unknown[]; prev: unknown; kin
       {kind == '佇列' && <span className="list_end" aria-hidden="true">←</span>}
       {items.map((item, k) => (
         <span key={k} ref={k == changed ? changedRef : undefined} className={'list_item' + (k == changed ? ' changed' : '') + (kind && kind != '陣列' && !tag(k) ? ' is_inner' : '')}>
-          {tag(k) && <small>{tag(k)}</small>}{String(item)}
+          {/* 還沒放值的格子（int a[n]; 宣告後還沒放值）顯示 ? */}
+          {tag(k) && <small>{tag(k)}</small>}{item === null || item === undefined ? '?' : String(item)}
         </span>
       ))}
       {(kind == '堆疊' || kind == '佇列') && <span className="list_end" aria-hidden="true">{kind == '堆疊' ? '⇆' : '⇠'}</span>}
