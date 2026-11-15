@@ -18,7 +18,12 @@ const PY_OP: Record<string, string> = { notin: 'not in' };
 /** 「重複直到」要寫成 while 不成立：比較可以直接換成相反的符號 */
 const NEGATE: Record<string, string> = { '==': '!=', '!=': '==', '<': '>=', '<=': '>', '>': '<=', '>=': '<', in: 'notin', notin: 'in' };
 
-export function toPython(program: Stmt[], varList: VarInfo[], modules: ModuleProgram[] = []): string {
+export interface PythonOptions {
+  /** 大測資：用 sys.stdin 讀，比 input() 快很多 */
+  fastInput?: boolean;
+}
+
+export function toPython(program: Stmt[], varList: VarInfo[], modules: ModuleProgram[] = [], options: PythonOptions = {}): string {
   const mainVars = new Map(varList.map(v => [v.name, v] as const));
   const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, fieldInit: v.fieldInit }));
   /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數和區域變數（同名時用自己的） */
@@ -44,6 +49,7 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
       case 'num': return e.v;
       case 'str': return JSON.stringify(e.v);
       case 'bool': return e.v ? 'True' : 'False';
+      case 'list': return `[${e.items.map(a => expr(a)).join(', ')}]`;
       case 'var': return e.name.replace(/^::/, '');
       case 'brace': return `(${e.items.map(a => expr(a)).join(', ')}${e.items.length == 1 ? ',' : ''})`;
       case 'raw': return e.text;
@@ -161,7 +167,9 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
       }
       case 'output': {
         const parts = s.value.t == 'raw' ? splitArgs(s.value.text).map(parseExpr) : [s.value];
-        const one = parts.length == 1 && parts[0].t == 'var' ? parts[0].name : null;
+        // print(..., end=" ")：印完不換行，後面加一個空白
+        const end = s.noNewline ? `${parts.length ? ', ' : ''}end=" "` : '';
+        const one = parts.length == 1 && parts[0].t == 'var' && !s.noNewline ? parts[0].name : null;
         const kind = one ? typeOfVar(one) : undefined;
         // 整個二維 list：一列一行；dict：一行一個「鍵 值」
         if (one && kind == '二維清單') {
@@ -181,7 +189,7 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
           if (p.t == 'var' && (k == '清單' || k == '佇列' || k == '陣列' || k == '堆疊')) return `*${p.name}`;
           return expr(p);
         });
-        emit(depth, `print(${shown.join(', ')})`);
+        emit(depth, `print(${shown.join(', ')}${end})`);
         break;
       }
       case 'rect': {
@@ -294,7 +302,17 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
         const n = s.count ? expr(s.count) : '';
         // 只排前 n 個：a[:n] = sorted(a[:n])
         const part = n ? `${s.target}[:${n}]` : s.target;
-        if (s.keys?.length) {
+        const reverse = s.desc ? 'reverse=True' : '';
+        if (s.key) {
+          // 自訂 key：每一項用 x 代表
+          const owner = vars.get(s.target);
+          const elem: VarInfo = { name: 'x', type: owner?.init == '文字' ? '文字' : findStruct(owner?.init) ? '結構' : '數字', init: owner?.init ?? '', float: owner?.init == '小數' };
+          let key = '';
+          withLoopVar('x', elem, () => { key = expr(s.key!); });
+          const args = [`key=lambda x: ${key}`, ...(reverse ? [reverse] : [])].join(', ');
+          emit(depth, n ? `${part} = sorted(${part}, ${args})` : `${s.target}.sort(${args})`);
+        }
+        else if (s.keys?.length) {
           // tuple 依欄位排：Python 的排序是穩定的，從最後一個條件排到第一個，就是「前面的一樣大才比後面的」
           const idx = (field: string) => (field == 'first' ? 0 : field == 'second' ? 1 : field);
           if (n) emit(depth, `part = ${part}`);
@@ -379,10 +397,52 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
   const body = lines.splice(0);
   const decls = varList.map(v => initLine(v, ''));
 
+  // 模組自己執行自己（或互相執行）：遞迴。Python 預設最多大約 1000 層，很深的時候要調大
+  const callsOf = (list: Stmt[]): string[] => list.flatMap(s => {
+    const inExpr = (e: Expr | undefined): string[] => {
+      if (!e) return [];
+      switch (e.t) {
+        case 'fcall': return [e.name, ...e.args.flatMap(inExpr)];
+        case 'bin': return [...inExpr(e.a), ...inExpr(e.b)];
+        case 'not': case 'neg': return inExpr(e.a);
+        case 'call': return e.args.flatMap(inExpr);
+        case 'method': return [...inExpr(e.obj), ...e.args.flatMap(inExpr)];
+        case 'idx': return [...inExpr(e.obj), ...inExpr(e.index)];
+        case 'chain': case 'brace': case 'list': return e.items.flatMap(inExpr);
+        default: return [];
+      }
+    };
+    switch (s.kind) {
+      case 'call': return [s.name, ...s.args.flatMap(inExpr)];
+      case 'rect': return [...inExpr(s.value), ...inExpr(s.index)];
+      case 'return': return inExpr(s.value);
+      case 'output': return inExpr(s.value);
+      case 'if': return [...inExpr(s.cond), ...callsOf(s.yes), ...callsOf(s.no)];
+      case 'until': return [...inExpr(s.cond), ...callsOf(s.body)];
+      case 'repeat': case 'for': case 'range': case 'each': return callsOf(s.body);
+      default: return [];
+    }
+  });
+  const recursive = modules.some(m => {
+    // 從 m 出發，走得回 m 嗎
+    const seen = new Set<string>();
+    const walk = (name: string): boolean => {
+      for (const c of callsOf(modules.find(x => x.name == name)?.body ?? [])) {
+        if (c == m.name) return true;
+        if (!seen.has(c)) { seen.add(c); if (walk(c)) return true; }
+      }
+      return false;
+    };
+    return walk(m.name);
+  });
+
   const head: string[] = [];
+  if (options.fastInput || recursive) head.push('import sys');
   if (uses.deque) head.push('from collections import deque');
   if (uses.heapq) head.push('from heapq import heappush, heappop');
   if (uses.math) head.push('import math');
+  if (options.fastInput) head.push('', `# ${t('大測資：用 sys.stdin 讀一行，比 input() 快很多', 'Big input: sys.stdin reads a line much faster than input()')}`, 'input = lambda: sys.stdin.readline().rstrip("\\n")');
+  if (recursive) head.push('', `# ${t('遞迴：Python 預設最多大約 1000 層，調大才不會出錯', 'Recursion: Python allows about 1000 levels by default; raise the limit')}`, 'sys.setrecursionlimit(100000)');
   if (head.length) head.push('', '');
   return [...head, ...functions, ...(decls.length ? [...decls, ''] : []), ...body, ''].join('\n');
 }

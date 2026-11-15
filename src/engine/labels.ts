@@ -26,6 +26,19 @@ export interface SortKey {
 export const sortKeysText = (keys: SortKey[]) => keys.map(k => `${k.field} ${k.desc ? '由大到小' : '由小到大'}`).join('、');
 
 /** 「score 由大到小、name 由小到大」→ 排序條件（看不懂的那段略過） */
+/** Python 自訂排序的 key：「key: len(x) 由大到小」→ 算式（x 是每一項）；不是這種寫法回傳 null */
+export function sortKeyExpr(spec: string): string | null {
+  const m = /^\s*key:\s*(.+?)\s+(由小到大|由大到小)\s*$/s.exec(spec);
+  return m ? m[1].trim() : null;
+}
+
+/** 輸出積木最後的「(不換行)」：Python 的 print(..., end=" ") */
+export const NO_NEWLINE = ' (不換行)';
+/** 輸出的內容拆成要印的東西、要不要換行 */
+export function splitOutput(rest: string): { what: string; noNewline: boolean } {
+  return rest.endsWith(NO_NEWLINE.trim()) ? { what: rest.slice(0, -NO_NEWLINE.trim().length).trim(), noNewline: true } : { what: rest.trim(), noNewline: false };
+}
+
 export function parseSortKeys(spec: string): SortKey[] {
   return spec.split('、').flatMap(part => {
     const m = /^\s*(\S+)\s+(由小到大|由大到小)\s*$/.exec(part);
@@ -139,6 +152,10 @@ function rectangleLabel(text: string, en: boolean): string {
   if (action == '回傳') return en ? `return ${value}` : `回傳 ${value}`;
   if (action == '跳出') return en ? 'break (leave the loop)' : 'break（跳出迴圈）';
   if (action == '下一輪') return en ? 'continue (next round)' : 'continue（下一輪）';
+  // Python 的 key：a.sort(key=lambda x: len(x), reverse=True)
+  const pyKey = action == '排序' && isPython() && index2 ? sortKeyExpr(index2) : null;
+  if (pyKey) return `${index ? `${target}[:${index}] = sorted(${target}[:${index}], ` : `${target}.sort(`}key=lambda x: ${pyKey}${expr == '由大到小' ? ', reverse=True' : ''})`;
+  if (action == '排序' && isPython()) return index ? `${target}[:${index}] = sorted(${target}[:${index}]${expr == '由大到小' ? ', reverse=True' : ''})` : `${target}.sort(${expr == '由大到小' ? 'reverse=True' : ''})`;
   if (action == '排序') {
     const dirText = (desc: boolean) => (desc ? (en ? 'large → small' : '由大到小') : (en ? 'small → large' : '由小到大'));
     const first = index ? (en ? ` first ${index}` : `前 ${index} 個`) : '';
@@ -203,6 +220,8 @@ function pyRectLabel(target: string, action: RectAction, index: string, index2: 
 
 /** 輸入積木上顯示的字：輸入到清單某一項時，照 Scratch 的說法寫出插入/替換 */
 function ioLabel(text: string, en: boolean): string {
+  // Python：什麼都沒填的輸出就是 print()（只換行）
+  if (isPython() && text.trim() == '輸出') return en ? 'New line (print())' : '換行（print()）';
   // Python：整行切開存進 list、加到二維 list 的最後一列
   const whole = /^輸入 (\S+)$/.exec(text);
   const wk = whole && isPython() ? cppKinds[whole[1]] : undefined;

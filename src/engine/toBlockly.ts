@@ -66,6 +66,7 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       case 'brace': return literal('', false);
       // 只有 Python 有的寫法（「看程式」只有 Python 會用到，這裡只是寫完整）
       case 'bool': return { type: 'logic_boolean', fields: { BOOL: e.v ? 'TRUE' : 'FALSE' } };
+      case 'list': return literal('', false);
       case 'slice': return expr(e.obj);
       case 'chain': return e.items.slice(1).map((b, k) => expr({ t: 'bin', op: e.ops[k], a: e.items[k], b })).reduce((a, b) => ({ type: 'logic_operation', fields: { OP: 'AND' }, inputs: { A: input(a), B: input(b) } }));
       case 'raw': return literal(e.text, false);

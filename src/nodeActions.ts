@@ -2,7 +2,7 @@
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
 import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
-import { parseSortKeys, sortKeysText, splitRectangle, splitTarget } from './engine/labels';
+import { NO_NEWLINE, parseSortKeys, sortKeyExpr, sortKeysText, splitOutput, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { forInit, forUpdate, parseExpr, pyFor, splitFor } from './engine/structure';
 import { isPython } from './target';
@@ -35,6 +35,8 @@ function rectangleText(vars: VarStore, f: DialogForm) {
     : letterTarget(vars, f) ? ` ${letterTarget(vars, f)} 設為 ${f.code}`
     : rowPush ? `${target}[${f.rectIndex.trim()}] 加入 ${f.code}`
     // 排序：「 a 排序 前 n 個 依 w 由小到大」（前幾個、依欄位都可以沒有）
+    // Python 的 key：「 a 排序 依 key: len(x) 由大到小」
+    : f.rectAction == '排序' && isPython() && f.sortKey.trim() ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''} 依 key: ${f.sortKey.trim()} ${f.sortDesc ? '由大到小' : '由小到大'}`
     : f.rectAction == '排序' ? `${target} 排序${f.rectIndex.trim() ? ` 前 ${f.rectIndex.trim()} 個` : ''}${sortKeysOf(vars, f).length ? ` 依 ${sortKeysText(sortKeysOf(vars, f))}` : ` ${f.sortDesc ? '由大到小' : '由小到大'}`}`
     : f.rectAction == '插入' ? `${target} 在第 ${f.rectIndex} 項插入 ${f.code}`
     : f.rectAction == '替換' ? `${target}${cell} 設為 ${f.code}`
@@ -72,6 +74,8 @@ function fieldTarget(f: DialogForm): string | null {
 
 /** 排序的條件：裝 struct 的才有（依哪些欄位）；沒選欄位的那一列不算 */
 function sortKeysOf(vars: VarStore, f: DialogForm) {
+  // Python 用 key（lambda x: …），不用一個一個選欄位
+  if (isPython()) return [];
   return isStructContainer(vars, f.varSelect.trim()) ? f.sortKeys.filter(k => k.field) : [];
 }
 
@@ -144,6 +148,11 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   }
   const letter = letterTarget(vars, f);
   if (letter) return checkVar(vars, letter, false) && checkVar(vars, f.code, true) && checkValueType(vars, modules, letter, f.code, 'var');
+  // Python 的 list：整個換掉（例如 [1, 2, 3]），要放一個 list
+  if (f.rectAction == '設為' && isPython() && f.rectKind == '清單') {
+    if (!checkVar(vars, f.varSelect, false) || !checkVar(vars, f.code, true)) return false;
+    return checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
+  }
   // Python 的 tuple 變數：整個換掉，要放同一種 tuple
   if (f.rectAction == '設為' && isPython() && vars.type_var_list.record.includes(f.varSelect.trim())) {
     return checkVar(vars, f.code, true) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'item');
@@ -156,6 +165,10 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     if (!vars.type_var_list.array.includes(list)) {
       alert(t('請選一個 vector 或 array。', 'Choose a vector or an array.'));
       return false;
+    }
+    // Python 的 key：x 是每一項
+    if (isPython() && f.sortKey.trim()) {
+      return checkVar({ ...vars, loopVars: [...(vars.loopVars ?? []), 'x'] }, f.sortKey, true) && (!f.rectIndex.trim() || checkVar(vars, f.rectIndex, true));
     }
     if (isStructContainer(vars, list)) {
       const fields = sortKeysOf(vars, f).map(k => k.field);
@@ -324,8 +337,16 @@ function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): stri
     const args = m.params.map((_, k) => (f.moduleArgs[k] ?? '').trim());
     return checkCall(vars, modules, m.name, args) ? '輸出 ' + callText(m.name, args) : null;
   }
+  // Python：什麼都不填就是 print()（只換行）；不換行在後面加「(不換行)」
+  if (isPython() && !f.varSelectOutput.trim()) {
+    if (f.noNewline) {
+      alert(t('不換行的話，要填要印什麼。', 'For no new line, enter what to print.'));
+      return null;
+    }
+    return '輸出';
+  }
   if (checkVar(vars, f.varSelectOutput, true)) {
-    return f.radio + (f.varSelectOutput ? ' ' + f.varSelectOutput : '');
+    return f.radio + (f.varSelectOutput ? ' ' + f.varSelectOutput : '') + (isPython() && f.noNewline ? NO_NEWLINE : '');
   }
   return null;
 }
@@ -528,6 +549,10 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       const radio = text.substring(0, 2);
       const rest = text.substring(3);
       if (radio == '輸出') {
+        // Python 的不換行：「輸出 x (不換行)」
+        if (isPython() && splitOutput(rest).noNewline) {
+          return { kind: 'Parallelogram', initial: { radio, ioText: '變數或字串：', varSelectOutput: splitOutput(rest).what, noNewline: true, varSelectOutputDisplay: 'inline-block', varSelectDisplay: 'none' } };
+        }
         const call = returningCall(rest, modules);
         if (call) return { kind: 'Parallelogram', initial: { radio, ioText: '變數或字串：', outputKind: '回傳', moduleName: call.name, moduleArgs: call.args, varSelectOutputDisplay: 'inline-block', varSelectDisplay: 'none' } };
         return {
@@ -617,9 +642,11 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           // 舊資料沒有取整方式時，維持預設的「不需要」
           ...(node.data != null ? { radio: node.data } : {}),
           rectAction: action,
-          ...(action == '排序' ? { sortKeys: index2 ? parseSortKeys(index2) : [], sortDesc: expr == '由大到小' } : {}),
+          ...(action == '排序' ? { sortKeys: index2 ? parseSortKeys(index2) : [], sortKey: (index2 && sortKeyExpr(index2)) ?? '', sortDesc: expr == '由大到小' } : {}),
           // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
           rectKind: vars?.type_var_list.map.includes(target) ? '對應表' : vars?.type_var_list.set.includes(target) ? '集合' : vars?.type_var_list.pq.includes(target) ? '優先佇列'
+            // Python 的 list 整個換掉：「 a 設為 [1, 2, 3]」
+            : action == '設為' && isPython() && vars?.type_var_list.array.includes(target) ? '清單'
             : action == '設為' ? '變數' : action == '回傳' ? '回傳'
             // Python 的 list 建立 n 格、pop()
             : (action == '建立' || action == '取出') && !index2 && isPython() && vars?.type_var_list.array.includes(target) ? '清單'

@@ -48,6 +48,10 @@ export interface DialogForm {
   ioMany: string[];
   /** Python 的 for 迴圈（radio 是 'pyfor'）：整行「for i in range(n)」「for x in a」 */
   pyFor: string;
+  /** Python 的輸出不換行：print(..., end=" ") */
+  noNewline: boolean;
+  /** Python 排序的 key：lambda x: 後面的算式（空白是比每一項本身） */
+  sortKey: string;
   /** struct 的欄位：struct 變數的 e.from，或裝 struct 的容器那一格的 edges[i].w；'' 是一整筆（只有容器可以） */
   rectField: string;
   /** 排序：由大到小（false 是由小到大） */
@@ -181,6 +185,8 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   ioTarget: '',
   ioMany: ['', ''],
   pyFor: '',
+  noNewline: false,
+  sortKey: '',
   ioPlace: '加入',
   outputKind: '',
   moduleName: '',
@@ -913,6 +919,14 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                         />
                       </p>
                       {helper('var_select_output', f.varSelectOutput, v => set({ varSelectOutput: v }))}
+                      {py && (
+                        <>
+                          <p className="io_choice">
+                            <label><input type="checkbox" id="no_newline" checked={f.noNewline} onChange={e => set({ noNewline: e.target.checked })} />{t('不換行：印完加一個空白，下一次接著印在同一行（print(..., end=" ")）', 'No new line: add a space and keep printing on the same line (print(..., end=" "))')}</label>
+                          </p>
+                          <span className="dialog_note">{t('什麼都不填就是只換行（print()），例如同一行印完之後換到下一行。', 'Leave it empty to just start a new line (print()), for example after printing a row.')}</span>
+                        </>
+                      )}
                     </>
                   )}
               </>
@@ -1118,6 +1132,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                   {actionRadio('取出', t('pop()（拿掉最後一個）', 'pop() (remove the last)'))}
                   {actionRadio('清空', 'clear()')}
                   {actionRadio('排序', 'sort()')}
+                  {actionRadio('設為', t('整個換掉（例如 [1, 2, 3]）', 'Replace it all (like [1, 2, 3])'))}
                   {actionRadio('建立', t('建立 n 格（[0] * n）', 'Make n items ([0] * n)'))}
                 </>
                 : RECT_ACTIONS.filter(([action]) => ['加入', '插入', '替換', '刪除', '清空', ...(getTarget() == 'cpp' ? ['排序'] : [])].includes(action)).map(([action, label]) => actionRadio(action, label()))}
@@ -1238,7 +1253,22 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           )}
           {/* struct 變數：選要改哪個欄位 */}
           {kind == '結構' && fieldPicker(structOfVar(f.varSelect), false)}
-          {f.rectAction == '排序' && (kind == '清單' || kind == '陣列') && (
+          {/* Python：順序，再加上可以不填的 key（lambda x: …） */}
+          {f.rectAction == '排序' && kind == '清單' && py && (
+            <>
+              <p className="rect_action">
+                {t('順序：', 'Order: ')}
+                <label><input type="radio" name="sort_dir" checked={!f.sortDesc} onChange={() => set({ sortDesc: false })} />{t('由小到大', 'Small → large')}</label>
+                <label><input type="radio" name="sort_dir" checked={f.sortDesc} onChange={() => set({ sortDesc: true })} />{t('由大到小', 'Large → small')}</label>
+              </p>
+              <p>
+                {t('依什麼排（key，可以不填）：', 'Sort by (key, optional): ')}<code>lambda x:</code>{' '}
+                <input id="sort_key" style={{ width: '40%' }} value={f.sortKey} placeholder={t('例如 len(x)、x[1]', 'like len(x), x[1]')} onChange={e => set({ sortKey: e.target.value })} />
+              </p>
+              <span className="dialog_note">{t('x 代表 list 的每一項。不填就比每一項本身（tuple 先比第一個，一樣再比第二個）；len(x) 是依長度、x[1] 是依 tuple 的第二個、-x[0] 是第一個由大到小。', 'x is each item of the list. Empty: compare the items themselves (tuples compare the first value, then the second). len(x) sorts by length, x[1] by the second value of a tuple, -x[0] by the first value from large to small.')}</span>
+            </>
+          )}
+          {f.rectAction == '排序' && (kind == '清單' || kind == '陣列') && !py && (
             <>
               {structOfVar(f.varSelect)
                 // 裝 struct：一層一層選欄位和順序，前面的一樣大才比下一個

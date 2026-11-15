@@ -178,8 +178,10 @@ function programOf(diagram: Diagram, modules: ModuleSource[]) {
 function CppCode({ diagram, vars, modules }: { diagram: Diagram; vars: VarInfo[]; modules: ModuleSource[] }) {
   const { program, modules: mods, error } = programOf(diagram, modules);
   const [copied, setCopied] = useState(false);
+  /** Python：大測資用 sys.stdin 讀（比 input() 快很多） */
+  const [fast, setFast] = useState(false);
   if (!program) return <p className="run_error">{error}</p>;
-  const code = isPython() ? toPython(program, vars, mods) : toCpp(program, vars, mods);
+  const code = isPython() ? toPython(program, vars, mods, { fastInput: fast }) : toCpp(program, vars, mods);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);
@@ -200,6 +202,14 @@ function CppCode({ diagram, vars, modules }: { diagram: Diagram; vars: VarInfo[]
           {isPython()
             ? t(`這些名稱 Python 不能用：${badNames.join('、')}。請到第三步改名字（流程圖裡用到的地方會跟著改）。`, `Python cannot use these names: ${badNames.join(', ')}. Rename them in step 3.`)
             : t(`這些名稱 C++ 不能用：${badNames.join('、')}。C++ 的名稱只能用英文字母、數字和底線，請到第三步改名字（流程圖裡用到的地方會跟著改）。`, `C++ cannot use these names: ${badNames.join(', ')}. Use English letters, numbers and _ only. Rename them in step 3.`)}
+        </p>
+      )}
+      {isPython() && (
+        <p className="code_option">
+          <label title={t('APCS 這類大測資：input() 讀很多行會太慢，改用 sys.stdin 讀', 'For big test data (like APCS): input() is slow for many lines, so read with sys.stdin')}>
+            <input type="checkbox" id="fast_input" checked={fast} onChange={e => setFast(e.target.checked)} />
+            {t('大測資用快速讀取（sys.stdin）', 'Fast input for big test data (sys.stdin)')}
+          </label>
         </p>
       )}
       <div className="code_cpp_wrap">

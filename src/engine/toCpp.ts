@@ -110,6 +110,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'raw': return `/* ${e.text} */`;
       // 只有 Python 有的寫法（C++ 的運算式不會解析成這些）
       case 'bool': return e.v ? 'true' : 'false';
+      case 'list': return `{${e.items.map(a => expr(a)).join(', ')}}`;
       case 'slice': return expr(e.obj);
       case 'chain': return e.items.slice(1).map((b, k) => expr({ t: 'bin', op: e.ops[k], a: e.items[k], b }, 3)).join(' && ');
       case 'idx': return `${expr(e.obj, 9)}[${expr(e.index)}]`;

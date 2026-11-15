@@ -4,7 +4,7 @@
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
 import { FlowError, tokenize, type Token } from './decoder';
-import { parseSortKeys, splitRectangle, splitTarget, type RectAction, type SortKey } from './labels';
+import { parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget, type RectAction, type SortKey } from './labels';
 import { mapParts, parseCall, splitArgs, type ModuleInfo, type ModuleSource } from './modules';
 import { findStruct, type StructField } from './structs';
 import { getTarget, isPython } from '../target';
@@ -15,7 +15,8 @@ import type { FlowNode } from './node';
 export type Stmt =
   /** 輸入：存到變數、添加到清單最後、插入到某個位置、替換某個位置（二維清單的一格：index2 是行） */
   | { kind: 'input'; target: string; place: 'var' | 'append' | 'insert' | 'replace'; index?: Expr; index2?: Expr }
-  | { kind: 'output'; value: Expr }
+  /** noNewline：Python 的 print(..., end=" ")（印完不換行，後面加一個空白） */
+  | { kind: 'output'; value: Expr; noNewline?: boolean }
   /**
    * 計算積木（見 RectAction）；round 是 Math.round / Math.floor / Math.ceil 或空的。
    * 二維清單：「建立」的 index、index2 是列數、行數；「替換」一格時 index2 是行
@@ -43,7 +44,8 @@ export type Stmt =
   /** 模組回傳值（流程圖上後面直接接「結束」） */
   | { kind: 'return'; value: Expr; round: string }
   /** 排序（C++ 的 sort）：count 是只排前幾個（array 常用 sort(a, a + n)）；keys 是 struct 依哪些欄位排（前面一樣大才比後面） */
-  | { kind: 'sort'; target: string; count?: Expr; keys?: SortKey[]; desc: boolean };
+  /** key：Python 自訂排序的 key（x 是每一項，例如 len(x)） */
+  | { kind: 'sort'; target: string; count?: Expr; keys?: SortKey[]; key?: Expr; desc: boolean };
 
 /** C++ 的 for 迴圈積木「for (int i = 0; i < n; i++)」→ 三段；不是這種寫法回傳 null */
 export function splitFor(text: string): { init: string; cond: string; update: string } | null {
@@ -234,7 +236,10 @@ export function structure(diagram: Diagram): Stmt[] {
 /** 輸入/輸出積木的文字 → 結構（格式見 nodeActions 的 ioText） */
 function ioStmt(text: string): Stmt {
   const rest = text.substring(3).trim();
-  if (!text.startsWith('輸入')) return { kind: 'output', value: parseExpr(rest) };
+  if (!text.startsWith('輸入')) {
+    const out = isPython() ? splitOutput(rest) : { what: rest, noNewline: false };
+    return { kind: 'output', value: parseExpr(out.what), ...(out.noNewline ? { noNewline: true } : {}) };
+  }
   const insert = /^(.*?) 插入第 (.*) 項$/s.exec(rest);
   if (insert) return { kind: 'input', target: insert[1].trim(), place: 'insert', index: parseExpr(insert[2]) };
   const item = splitTarget(rest);
@@ -260,7 +265,10 @@ function rectStmt(text: string): Stmt {
   if (action == '跳出') return { kind: 'break' };
   if (action == '下一輪') return { kind: 'continue' };
   if (action == '回傳') return { kind: 'return', value: parseExpr(expr), round };
-  if (action == '排序') return { kind: 'sort', target, ...(index ? { count: parseExpr(index) } : {}), ...(index2 ? { keys: parseSortKeys(index2) } : {}), desc: expr == '由大到小' };
+  if (action == '排序') {
+    const key = index2 ? sortKeyExpr(index2) : null;
+    return { kind: 'sort', target, ...(index ? { count: parseExpr(index) } : {}), ...(index2 && !key ? { keys: parseSortKeys(index2) } : {}), ...(key ? { key: parseExpr(key) } : {}), desc: expr == '由大到小' };
+  }
   return {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,
@@ -277,6 +285,8 @@ export type Expr =
   | { t: 'str'; v: string; ch?: boolean }
   /** Python 的 True、False */
   | { t: 'bool'; v: boolean }
+  /** Python 的 list：[1, -1, 0, 0]、[] */
+  | { t: 'list'; items: Expr[] }
   /** Python 的切片：s[a:b]、s[::-1]（沒寫的是 undefined） */
   | { t: 'slice'; obj: Expr; start?: Expr; stop?: Expr; step?: Expr }
   /** Python 連在一起的比較：0 <= x < 10（ops[k] 在 items[k] 和 items[k + 1] 中間） */
@@ -557,6 +567,17 @@ class Parser {
       // 'a'：單引號裡一個字（C++ 的 char）
       return tk.text[0] == "'" && [...v].length == 1 ? { t: 'str', v, ch: true } : { t: 'str', v };
     }
+    // Python 的 list：[1, -1, 0, 0]
+    if (this.py && tk.text == '[') {
+      const items: Expr[] = [];
+      while (!this.is(']')) {
+        items.push(this.or());
+        if (!this.is(',')) break;
+        this.take();
+      }
+      this.expect(']');
+      return this.mark(from, { t: 'list', items });
+    }
     if (tk.text == '(') {
       const e = this.or();
       // Python 的 tuple：(a, b)
@@ -597,7 +618,8 @@ class Parser {
         // 其他名稱後面接 ( )：有回傳值的模組
         return this.mark(from, fn ? { t: 'call', fn, args } : { t: 'fcall', name: tk.text, args }, [from]);
       }
-      return { t: 'var', name: tk.text };
+      // Python：記下變數是第幾個 token（t[0]、h[0] 執行時要換掉變數那個 token）
+      return this.mark(from, { t: 'var', name: tk.text });
     }
     throw new Error('unexpected ' + tk.text);
   }
@@ -698,6 +720,7 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
   if (tf) return tf.type == '文字' ? 'str' : 'num';
   switch (e.t) {
     case 'bool': return 'bool';
+    case 'list': return 'list';
     case 'chain': return 'bool';
     case 'slice': return exprType(e.obj, vars, modules) == 'str' ? 'str' : 'list';
     case 'brace': return 'struct';
@@ -754,8 +777,9 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
     }
     case 'bin':
       if (['==', '!=', '<', '<=', '>', '>=', 'and', 'or', 'in', 'notin'].includes(e.op)) return 'bool';
-      // Python："-" * 10 是 10 個 -
+      // Python："-" * 10 是 10 個 -；[0] * n 是 n 個 0；list + list 接起來
       if (e.op == '*' && isPython() && (exprType(e.a, vars, modules) == 'str' || exprType(e.b, vars, modules) == 'str')) return 'str';
+      if ((e.op == '*' || e.op == '+') && isPython() && (exprType(e.a, vars, modules) == 'list' || exprType(e.b, vars, modules) == 'list')) return 'list';
       if (e.op == '+') {
         const a = exprType(e.a, vars, modules), b = exprType(e.b, vars, modules);
         if (a == 'str' || b == 'str') return 'str';

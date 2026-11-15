@@ -20,7 +20,7 @@
 import { t } from '../i18n';
 import { getTarget, indexBase, isCode, isPython } from '../target';
 import type { Diagram } from './diagram';
-import { displayLinkText, displayNodeText, parseSortKeys, splitRectangle, splitTarget } from './labels';
+import { displayLinkText, displayNodeText, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget } from './labels';
 import { cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
@@ -690,6 +690,11 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
       alert(pyFloatToInt(target, v));
       return false;
     }
+    // Python：list 整個換掉，要放一個 list
+    if (isPython() && (vars.type_var_list.array.includes(target) || vars.type_var_list.grid.includes(target)) && type != 'list') {
+      alert(t(`「${target}」是 list，要放一個 list，例如 [1, 2, 3]，但「${v}」是${what}。`, `"${target}" is a list. Put a list in it, like [1, 2, 3], but "${v}" is ${what}.`));
+      return false;
+    }
     // Python：數字不能直接存進 str 變數
     if (isPython() && vars.type_var_list.text.includes(target) && type == 'num') {
       alert(t(`變數「${target}」是 str（文字），「${v}」是數字：Python 要先用 str( ) 變成文字，例如 str(${v})。`, `"${target}" is a str, but "${v}" is a number. In Python, turn it into text with str( ) first, like str(${v}).`));
@@ -947,6 +952,9 @@ const PY_MESSAGES = () => ({
   pyTypeCmp: t('文字和數字不能比大小（TypeError）：數字的文字要先用 int( ) 變成數字。', 'Text and numbers cannot be compared (TypeError). Use int( ) to turn text into a number first.'),
   pyIterHeap: t('heap 不能用 for 一個一個看（順序不是由小到大）：要由小到大請用 heappop 一個一個拿出來。', 'Do not loop over a heap with for (it is not in order). Use heappop to take them out from small to large.'),
   pyIterType: t('for … in 後面要放 list、字串、set、dict 或 deque。', 'After for … in, put a list, string, set, dict or deque.'),
+  pyBig: t('數字太大了（超過大約 9×10¹⁵）：網頁裡算不準，真的 Python 可以算。請改用比較小的測資，或用真的 Python 執行。', 'The number is too big (over about 9×10¹⁵). The web page cannot compute it exactly, but real Python can. Use smaller test data, or run it with real Python.'),
+  pyListType: t('「{name}」是 list，要放一個 list，例如 [1, 2, 3]。', '"{name}" is a list. Put a list in it, like [1, 2, 3].'),
+  pyGridType: t('「{name}」是二維 list，要放 list 裡面放 list，例如 [[1, 2], [3, 4]]。', '"{name}" is a 2D list. Put lists in a list, like [[1, 2], [3, 4]].'),
   pyListAssign: t('「{name}」是 list，要整個換掉時，右邊也要是 list（例如 s.split()）。', '"{name}" is a list. To replace the whole list, the right side must be a list too (like s.split()).'),
 });
 
@@ -991,6 +999,7 @@ function __long(v, i, name) { return Math.trunc(__num(v, i, name)); }
 function __listItem(v, i, name, elem) {
   // Python：int 的 list 不能放小數（不會自己去掉小數）
   if (__PY && elem == 'int' && typeof v == 'number' && !Number.isInteger(v)) __err('pyNotInt', i, { name: name, v: __pyrepr(v, true) });
+  if (__PY && elem == 'int' && typeof v == 'number' && !Number.isSafeInteger(v)) __err('pyBig', i, {});
   if (elem == 'string') {
     if (typeof v != 'string') __err('numToTextList', i, { v: v, name: name });
     return v;
@@ -1198,13 +1207,15 @@ function __method(c, name, i, m, kind, a, b) {
 }
 // C++ 的 sort：只排前 n 個（沒給就是全部）；desc 由大到小
 // keys 是 struct 的排序條件 [[欄位, 由大到小嗎], …]：前面的一樣大，才比下一個；全部一樣大照原本的順序（stable_sort）
-function __sort(list, name, i, n, keys, desc) {
+function __sort(list, name, i, n, keys, desc, keyFn) {
   if (n === null) n = list.length;
   if (!(Number.isInteger(n) && n >= 0 && n <= list.length)) __err('sortRange', i, { name: name, n: n, len: list.length });
   var part = list.slice(0, n);
   // pair（Python 的 tuple）沒選欄位時整筆比：先比第一個，一樣再比第二個
   var cmp = function (x, y, down) { var c = __cmp(x, y); return down ? -c : c; };
   part.sort(function (p, q) {
+    // Python 的 key=lambda x: …：比 key 算出來的值
+    if (keyFn) return cmp(keyFn(p), keyFn(q), desc);
     if (!keys) return cmp(p, q, desc);
     for (var k = 0; k < keys.length; k++) {
       var c = cmp(p[keys[k][0]], q[keys[k][0]], keys[k][1]);
@@ -1269,7 +1280,10 @@ function __pyrepr(v, fl, quote) {
   if (typeof v == 'string') return quote ? "'" + v + "'" : v;
   if (typeof v == 'number') {
     if (!isFinite(v)) return isNaN(v) ? 'nan' : v > 0 ? 'inf' : '-inf';
-    if (!fl && Number.isInteger(v)) return String(v);
+    if (!fl && Number.isInteger(v)) {
+      if (!Number.isSafeInteger(v)) __err('pyBig', -1, {});
+      return String(v);
+    }
     var a = Math.abs(v);
     if (a != 0 && (a >= 1e16 || a < 1e-4)) return v.toExponential().replace(/e([+-])(\\d)$/, 'e$10$2');
     return Number.isInteger(v) ? v.toFixed(1) : String(v);
@@ -1295,8 +1309,20 @@ function __pyshow(v, fl) {
 function __pyint(v, i, name) {
   v = __num(v, i, name);
   if (!Number.isInteger(v)) __err('pyNotInt', i, { name: name, v: __pyrepr(v, true) });
+  if (!Number.isSafeInteger(v)) __err('pyBig', i, {});
   return v;
 }
+// a = [1, 2, 3]：整個 list 換掉，每一項照 list 裝的型別檢查（複製一份）
+function __pylist(v, i, name, elem, sname) {
+  if (!Array.isArray(v)) __err('pyListType', i, { name: name });
+  return v.map(function (x) { return sname ? __rec(x, i, name, sname) : __listItem(x, i, name, elem); });
+}
+function __pygrid(v, i, name, elem, sname) {
+  if (!Array.isArray(v) || v.some(function (row) { return !Array.isArray(row); })) __err('pyGridType', i, { name: name });
+  return v.map(function (row) { return __pylist(row, i, name, elem, sname); });
+}
+// list + list：接起來
+function __ladd(a, b) { return Array.isArray(a) && Array.isArray(b) ? a.concat(b) : a + b; }
 // 讀一整行（input()）
 function __line(input, i, name) {
   if (!input.length) __err('noInput', i, { name: name });
@@ -1343,7 +1369,15 @@ function __pymod(a, b, i) {
 }
 function __pow(a, b) { return Math.pow(a, b); }
 // "-" * 10
-function __smul(a, b) { return typeof a == 'string' ? a.repeat(Math.max(0, b)) : b.repeat(Math.max(0, a)); }
+function __smul(a, b) {
+  // [0] * n：n 個 0（裡面的東西照樣複製，跟 Python 一樣是同一個）
+  if (Array.isArray(a) || Array.isArray(b)) {
+    var list = Array.isArray(a) ? a : b, n = Array.isArray(a) ? b : a, out = [];
+    for (var k = 0; k < n; k++) out = out.concat(list);
+    return out;
+  }
+  return typeof a == 'string' ? a.repeat(Math.max(0, b)) : b.repeat(Math.max(0, a));
+}
 // 比較（== 會比 list、tuple 裡面的值；0 <= x < 10 每一段都要成立）
 function __eq(a, b) {
   if (a && b && typeof a == 'object' && typeof b == 'object') return __cmp(a.__set || a.__map || a, b.__set || b.__map || b) == 0 && Object.keys(a).length == Object.keys(b).length;
@@ -1790,6 +1824,7 @@ class CodeGenerator {
     const visit = (e: Expr) => {
       switch (e.t) {
         case 'bool': ops.set(marks.get(e)![0], e.v ? 'true' : 'false'); break;
+        case 'list': e.items.forEach(visit); break;
         case 'bin': {
           visit(e.a);
           visit(e.b);
@@ -1799,7 +1834,13 @@ class CodeGenerator {
           if (e.op == '+' && ((ta == 'str' && tb == 'num') || (ta == 'num' && tb == 'str'))) {
             fail(t(`「${text.trim()}」：Python 不能把文字和數字直接用 + 接起來（TypeError），數字要先用 str( ) 變成文字，例如 "答案：" + str(x)。`, `"${text.trim()}": Python cannot join text and a number with + (TypeError). Turn the number into text with str( ) first, like "Answer: " + str(x).`));
           }
-          if (e.op == '*' && (ta == 'str' || tb == 'str')) {
+          // list + list：接起來（JavaScript 的 + 會變成文字）
+          if (e.op == '+' && (ta == 'list' || tb == 'list')) {
+            wrap(from, to, '__ladd(', ')');
+            ops.set(at[0], ', ');
+            break;
+          }
+          if (e.op == '*' && (ta == 'str' || tb == 'str' || ta == 'list' || tb == 'list')) {
             wrap(from, to, '__smul(', ')');
             ops.set(at[0], ', ');
             break;
@@ -2070,6 +2111,11 @@ class CodeGenerator {
     const name = JSON.stringify(target);
     if (number.includes(target)) return `${target} = ${this.numConv(target)}(${value}, ${i}, ${name});\n`;
     if (text.includes(target)) return `${target} = __text(${value}, ${i}, ${name});\n`;
+    if (this.py && (this.isList(target) || this.isGrid(target))) {
+      const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(target)];
+      const sname = findStruct(holds) ? JSON.stringify(holds) : 'null';
+      return `${target} = ${this.isGrid(target) ? '__pygrid' : '__pylist'}(${value}, ${i}, ${name}, ${JSON.stringify(elemCppType(holds))}, ${sname});\n`;
+    }
     if (this.isList(target)) return `${target} = __list(${value}, ${i}, ${name});\n`;
     if (this.vars.type_var_list.record.includes(target)) return `${target} = __rec(${value}, ${i}, ${name}, ${JSON.stringify(this.vars.var_list.value[this.vars.var_list.name.indexOf(target)])});\n`;
     return `${target} = ${value};\n`;
@@ -2114,7 +2160,7 @@ class CodeGenerator {
             const own = [...this.params.map(p => p.name), ...this.locals.map(v => v.name.trim())];
             const loopVars = forLoopVars(this.nodes);
             const frame = `__frames.push({ sheet: ${this.sheet}, get: function () { var o = {${own.map(n => JSON.stringify(n) + ': ' + n).join(', ')}}; ${loopVars.map(n => `if (typeof ${n} != 'undefined') o[${JSON.stringify(n)}] = ${n};`).join(' ')} return o; } });\n`;
-            return { code: head + frame + open + `if (++__depth > 500) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
+            return { code: head + frame + open + `if (++__depth > ${this.py ? 3000 : 500}) __err('tooDeep', ${i}, {});\ntotal_step ++;\n` + update, next: this.nextOf(node) };
           }
           // 有回傳值的模組：走到結束時一定要已經「回傳」過
           const check = m.returns ? `if (__ret === undefined) __err('noReturn', ${i}, { name: ${name} });\n` : '';
@@ -2150,7 +2196,8 @@ class CodeGenerator {
           code = this.pyInput(node, v, i);
         }
         else if (!parts[0].includes('輸入') && this.py) {
-          code = this.pyOutput(parts.slice(1).join(' ').trim(), i);
+          const out = splitOutput(parts.slice(1).join(' ').trim());
+          code = this.pyOutput(out.what, i, out.noNewline);
         }
         else if (parts[0].includes('輸入')) {
           const v = parts.slice(1).join(' ').trim();
@@ -2344,6 +2391,7 @@ class CodeGenerator {
         const code = kind == 'set' && action == '放入' ? `__sins(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
           : kind == 'pq' && action == '放入' ? `__pqpush(${target}, ${name}, ${i}, ${this.item(target, value, i)}, ${pqMin});\n`
           : (kind == 'set' || this.isMap(target)) && action == '刪除' ? `__erase(${target}, ${name}, ${i}, ${this.isMap(target) ? this.mapDesc(target) : 'null'}, (${expr(index)}));\n`
+          : action == '排序' && index2 && sortKeyExpr(index2) ? `__sort(${target}, ${name}, ${i}, ${index ? `(${expr(index)})` : 'null'}, null, ${rest == '由大到小'}, ${this.sortKeyFn(target, sortKeyExpr(index2)!, i)});\n`
           : action == '排序' ? `__sort(${target}, ${name}, ${i}, ${index ? `(${expr(index)})` : 'null'}, ${index2 ? JSON.stringify(parseSortKeys(index2).map(k => [k.field, k.desc])) : 'null'}, ${rest == '由大到小'});\n`
           : action == '放入' ? `__push(${target}, ${name}, ${i}, ${this.item(target, value, i)});\n`
           : action == '取出' ? `__pop(${target}, ${name}, ${i}, ${JSON.stringify(kind)});\n`
@@ -2370,6 +2418,21 @@ class CodeGenerator {
 
   private linksInto(node: FlowNode | undefined) {
     return this.diagram.links.filter(l => l && node && l.to == this.idx(node)).length;
+  }
+
+  /** Python 排序的 key=lambda x: …：x 是 list 的每一項（照 list 裝的東西決定型別） */
+  private sortKeyFn(list: string, key: string, i: number): string {
+    const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
+    const as: { type: VarType; init: string; float?: boolean } = findStruct(holds) ? { type: '結構', init: holds } : holds == '文字' ? { type: '文字', init: '' } : { type: '數字', init: '0', float: holds == '小數' };
+    // x 跟變數表的 x 同名時，lambda 裡的 x 是每一項
+    const saved = this.vars;
+    this.vars = { ...saved, type_var_list: mapTypes(saved.type_var_list, l => l.filter(n => n != 'x')) };
+    try {
+      return this.withLoopVar('x', () => `function (x) { return (${this.expr(key, i)}); }`, as);
+    }
+    finally {
+      this.vars = saved;
+    }
   }
 
   /** 變數的型別（Python 的 input、print 用）：變數表選的型別 */
@@ -2450,7 +2513,7 @@ class CodeGenerator {
   }
 
   /** Python 的 print：「輸出 a, b」用空白隔開；整個 list、set、dict 是 print(*a) 這樣一項一項印 */
-  private pyOutput(what: string, i: number): string {
+  private pyOutput(what: string, i: number, noNewline = false): string {
     const map = varInfoMap(this.vars);
     const parts = splitArgs(what).map(p => {
       const e = parseExpr(p);
@@ -2464,7 +2527,8 @@ class CodeGenerator {
       }
       return `__pyrepr(${this.expr(p, i)}, ${isFloatExpr(e, map, this.modules)})`;
     });
-    return `output_result += ([${parts.join(', ')}].join(' ') + "\\n");\n`;
+    // print(..., end=" ")：後面加一個空白，不換行
+    return `output_result += ([${parts.join(', ')}].join(' ') + ${noNewline ? '" "' : '"\\n"'});\n`;
   }
 
   /** Python 的 for 迴圈：for i in range(start, stop, step)、for x in 清單 */

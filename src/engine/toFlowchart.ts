@@ -43,6 +43,7 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     case 'brace': return `{${e.items.map(a => exprText(a, cond)).join(', ')}}`;
     // 下面三種只有 Python 有（積木改回流程圖時用不到，只是寫完整）
     case 'bool': return e.v ? 'True' : 'False';
+    case 'list': return `[${e.items.map(a => exprText(a, cond)).join(', ')}]`;
     case 'slice': return `${exprText(e.obj, cond, 9)}[${e.start ? exprText(e.start, cond) : ''}:${e.stop ? exprText(e.stop, cond) : ''}${e.step ? ':' + exprText(e.step, cond) : ''}]`;
     case 'chain': return e.items.map(a => exprText(a, cond, 4)).reduce((acc, x, k) => `${acc} ${e.ops[k - 1]} ${x}`);
     case 'raw': return e.text;
