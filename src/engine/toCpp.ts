@@ -108,6 +108,10 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'var': return e.name;
       case 'brace': return `{${e.items.map(a => expr(a)).join(', ')}}`;
       case 'raw': return `/* ${e.text} */`;
+      // 只有 Python 有的寫法（C++ 的運算式不會解析成這些）
+      case 'bool': return e.v ? 'true' : 'false';
+      case 'slice': return expr(e.obj);
+      case 'chain': return e.items.slice(1).map((b, k) => expr({ t: 'bin', op: e.ops[k], a: e.items[k], b }, 3)).join(' && ');
       case 'idx': return `${expr(e.obj, 9)}[${expr(e.index)}]`;
       case 'method': return `${expr(e.obj, 9)}.${e.name}(${e.args.map(a => expr(a)).join(', ')})`;
       case 'field': return `${expr(e.obj, 9)}.${e.name}`;
@@ -378,6 +382,12 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       }
       case 'break': emit(depth, 'break;'); break;
       case 'continue': emit(depth, 'continue;'); break;
+      // Python 的 for（C++ 不會有，只是寫完整）
+      case 'range':
+      case 'each':
+        emit(depth, `// for ${s.name} ...`);
+        stmts(s.body, depth + 1);
+        break;
       case 'until':
         emit(depth, `while (${cond(s.cond, true)}) {`);
         stmts(s.body, depth + 1);

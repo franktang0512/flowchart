@@ -12,20 +12,20 @@ import { RunArea, type RunPane } from './components/RunArea';
 import { VarTable, type VarRow } from './components/VarTable';
 import { StructTable, type StructRename } from './components/StructTable';
 import { setStructs as setStructRegistry, type StructDef } from './engine/structs';
-import { setCppKinds } from './engine/labels';
+import { setCppKinds, type LabelKind } from './engine/labels';
 import { forLoopVars, isContainerType, type VarType } from './engine/structure';
 import { connectorState, createConnectors } from './engine/connector';
 import { buildRun, createVarStore, FlowError, shadowLabel, typeLists, withParams, type RunResult, type VarStore } from './engine/decoder';
 import { canvasPoint, Diagram, type DiagramHooks } from './engine/diagram';
 import type { FromBlocks } from './engine/fromBlockly';
-import { callText, cppNameProblem, cppType, GLOBAL_PREFIX, isName, parseCall, renameFieldInText, renameInText, splitId, typeLabel, usesField, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
+import { callText, cppNameProblem, cppType, pyTypeName, GLOBAL_PREFIX, isName, parseCall, renameFieldInText, renameInText, splitId, typeLabel, usesField, usesName, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './engine/modules';
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { allowedVarTypes, EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
 import { fitRowOnInput } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
 import { getLang, link, onLangChange, t, useLang } from './i18n';
-import { getTarget, setTarget, targetName, useTarget, type Target } from './target';
+import { getTarget, isCode, isPython, setTarget, targetName, useTarget, type Target } from './target';
 import { COURSES, courseFits } from './courses';
 import { useCommit } from './useCommit';
 import { savePdf } from './pdf';
@@ -702,10 +702,11 @@ export function App() {
    * 第四步並排的流程圖：主流程 → 一層一層執行進來的模組（標出執行模組的積木）→ 正在執行的。
    * 太多層（遞迴）時只放主流程和最後兩層
    */
-  // 積木上 map、set 的操作照 C++ 的寫法（見 labels.ts）
-  setCppKinds(getTarget() != 'cpp' ? {} : Object.fromEntries([...vars, ...modules.flatMap(m => m.info.locals ?? [])]
-    .filter(v => v.type == '對應表' || v.type == '集合' || v.type == '文字')
-    .map(v => [v.name.trim(), v.type == '對應表' ? 'map' as const : v.type == '集合' ? 'set' as const : 'string' as const])));
+  // 積木上 map、set 的操作照 C++ 的寫法；Python 的 list、deque、heapq 也照 Python 的寫法（見 labels.ts）
+  const labelKind = (type: VarType): LabelKind | null => (type == '對應表' ? 'map' : type == '集合' ? 'set' : type == '文字' ? 'string'
+    : !isPython() ? null : type == '清單' ? 'list' : type == '二維清單' ? 'grid' : type == '佇列' ? 'deque' : type == '優先佇列' || type == '優先佇列小' ? 'heap' : null);
+  setCppKinds(!isCode() ? {} : Object.fromEntries([...vars, ...modules.flatMap(m => m.info.locals ?? [])]
+    .flatMap(v => { const k = labelKind(v.type); return k ? [[v.name.trim(), k]] : []; })));
   const runPanes: RunPane[] = (() => {
     if (page != 3) return [];
     const diagrams = allDiagrams();
@@ -962,7 +963,7 @@ export function App() {
       ...(v.global ? { global: true } : {}),
       ...(v.sizeLater ? { sizeLater: true } : {}),
       // 以前的作品沒有 int / float：C++ 初始值有小數點的當成 float
-      ...(v.float || (getTarget() == 'cpp' && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
+      ...(v.float || (isCode() && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
       ...(v.long && v.type == '數字' ? { long: true } : {}),
     })));
     // 先清空舊的變數清單，不然會被當成「改名」而去改到流程圖裡的字
@@ -1073,7 +1074,7 @@ export function App() {
         <LangToggle />
         {/* 學習目標：全部列出來，換的話目前的作答全部清掉（每種語言能用的積木不一樣） */}
         <div className="lang_toggle target_toggle" role="group" aria-label={t('學習目標', 'Learning')}>
-          {(['scratch', 'blockly', 'cpp'] as Target[]).map(x => {
+          {(['scratch', 'blockly', 'cpp', 'python'] as Target[]).map(x => {
             const fits = !course || courseFits(course, x);
             return (
               <button
@@ -1085,7 +1086,6 @@ export function App() {
               </button>
             );
           })}
-          <button disabled title={t('準備中', 'Coming soon')}>Python</button>
         </div>
         </div>
         <div id="student_info">
@@ -1162,7 +1162,7 @@ export function App() {
                     name: m.info.name,
                     params: m.info.params,
                     // 區域變數只有 C++ 有（舊作品換了學習目標還留著的話，也列出來讓學生刪掉）
-                    locals: getTarget() == 'cpp' || m.info.locals?.length ? m.info.locals ?? [] : null,
+                    locals: isCode() || m.info.locals?.length ? m.info.locals ?? [] : null,
                     onLocals: (next: LocalVar[], rename?: [string, string]) => setLocals(m.id, next, rename),
                     localProblem: (name: string, id: number, rows: LocalVar[]) => localVarProblem(m, name, id, rows),
                     onParam: (k: number, patch: Partial<ParamInfo>) => editParam(m, k, patch),
@@ -1252,8 +1252,8 @@ export function App() {
                 <div className="module_bar">
                   <span>
                     {t('定義', 'Define')} <b>{m.info.name}</b>
-                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${getTarget() == 'cpp' ? `［${cppType(p.type, p.float, p.long)}］` : p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
-                    {m.info.returns && <>{t('，回傳', ', returns ')}{getTarget() == 'cpp' ? ' ' + cppType(m.info.returns, m.info.returnsFloat, m.info.returnsLong) : m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
+                    {m.info.params.length > 0 && <>（{t('參數：', 'parameters: ')}{m.info.params.map(p => `${p.name}${isPython() ? `［${pyTypeName(p.type, p.float)}］` : getTarget() == 'cpp' ? `［${cppType(p.type, p.float, p.long)}］` : p.type == '文字' ? t('［文字］', ' [text]') : ''}`).join('、')}）</>}
+                    {m.info.returns && <>{t('，回傳', ', returns ')}{isPython() ? ' ' + pyTypeName(m.info.returns, m.info.returnsFloat) : getTarget() == 'cpp' ? ' ' + cppType(m.info.returns, m.info.returnsFloat, m.info.returnsLong) : m.info.returns == '文字' ? t('文字', 'text') : t('數字', 'a number')}</>}
                   </span>
                   <span className="muted">{t('從「開始」做到「結束」，做完回到執行它的地方', 'Runs from Start to End, then goes back to where it was run')}</span>
                   <button onClick={() => editModule(m)}>{t('修改名稱、參數', 'Edit name, parameters')}</button>

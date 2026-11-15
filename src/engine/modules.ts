@@ -5,10 +5,10 @@
 // 模組可以有參數（Scratch 只能讀；Blockly、C++ 可以改，只改到自己的那一份）、回傳值（Blockly、C++）、
 // 區域變數（只有 C++）。要把結果帶回來也可以存到全域變數（變數表的變數大家都能用）。
 import { t } from '../i18n';
-import { getTarget } from '../target';
+import { getTarget, isPython } from '../target';
 import type { Diagram } from './diagram';
 import type { VarType } from './structure';
-import { findStruct } from './structs';
+import { findStruct, isPair } from './structs';
 
 export interface ParamInfo {
   name: string;
@@ -85,6 +85,7 @@ export const mapKeyCppType = (init: string | undefined) => elemCppType(mapParts(
 
 /** 給學生看的型別名稱：C++ 寫 int / float / string、vector<int>…；Scratch、Blockly 寫數字、文字、清單 */
 export function typeLabel(type: string, float?: boolean, init?: string, size?: string, long?: boolean): string {
+  if (isPython()) return pyTypeName(type, float, init);
   if (getTarget() == 'cpp') {
     const elem = elemCppType(init);
     if (type == '清單') return `vector<${elem}>`;
@@ -100,6 +101,28 @@ export function typeLabel(type: string, float?: boolean, init?: string, size?: s
     return cppType(type == '文字' ? '文字' : '數字', float, long);
   }
   return type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : type == '二維清單' ? t('二維清單', '2D list') : t('數字', 'Number');
+}
+
+/** Python 裡容器裝的東西：int、float、str，或 tuple[int, int]（內建的 pair） */
+export function pyElemName(init: string | undefined): string {
+  if (init && isPair(init)) {
+    const parts = init.replace(/\s+/g, '').slice(5, -1).split(',');
+    return `tuple[${parts.map(p => (p == 'string' ? 'str' : p == 'float' ? 'float' : 'int')).join(', ')}]`;
+  }
+  return init == '文字' ? 'str' : init == '小數' ? 'float' : 'int';
+}
+
+/** Python 的型別名稱（給學生看的）：int、list[int]、deque[str]、dict[str, int]、heapq（list[int]）… */
+export function pyTypeName(type: string, float?: boolean, init?: string): string {
+  const elem = pyElemName(init?.includes('→') ? mapParts(init).value : init);
+  if (type == '清單' || type == '陣列' || type == '堆疊') return `list[${elem}]`;
+  if (type == '二維清單') return `list[list[${elem}]]`;
+  if (type == '佇列') return `deque[${elem}]`;
+  if (type == '集合') return `set[${elem}]`;
+  if (type == '對應表') return `dict[${pyElemName(mapParts(init).key)}, ${elem}]`;
+  if (type == '優先佇列' || type == '優先佇列小') return `heapq（list[${elem}]）`;
+  if (type == '結構') return pyElemName(init);
+  return type == '文字' ? 'str' : float ? 'float' : 'int';
 }
 
 /**
@@ -154,12 +177,30 @@ const CPP_RESERVED = new Set([
  * 沒問題（或學習目標不是 C++）回傳 null
  */
 export function cppNameProblem(name: string): string | null {
+  if (isPython() && name) return pyNameProblem(name);
   if (getTarget() != 'cpp' || !name) return null;
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
     return t(`「${name}」不能當 C++ 的名稱：C++ 只能用英文字母、數字和底線（_），不能用中文或空白，也不能用數字開頭。例如 money、distance、total_fee。`,
       `"${name}" cannot be a C++ name. Use English letters, numbers and _ only (no spaces), and do not start with a number. For example: money, distance, total_fee.`);
   }
   if (CPP_RESERVED.has(name)) return t(`「${name}」是 C++ 已經用掉的字，請換一個名字。`, `"${name}" is already used by C++. Choose another name.`);
+  return null;
+}
+
+/** Python 已經用掉的字（關鍵字、轉成程式會用到的函式），不能拿來當名字 */
+const PY_RESERVED = new Set([
+  'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else', 'except', 'finally',
+  'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try', 'while', 'with', 'yield',
+  'print', 'input', 'int', 'float', 'str', 'len', 'range', 'list', 'dict', 'set', 'tuple', 'max', 'min', 'abs', 'sum', 'ord', 'chr', 'round',
+  'sorted', 'map', 'deque', 'heapq', 'heappush', 'heappop', 'math', 'sys', 'type', 'bool', 'id', 'main',
+]);
+
+/** Python 的名稱：可以用中英文、數字、底線（不能用數字開頭），不能是 Python 已經用掉的字 */
+function pyNameProblem(name: string): string | null {
+  if (!isName(name)) {
+    return t(`「${name}」不能當 Python 的名稱：只能用文字、數字和底線（_），不能有空白或符號，也不能用數字開頭。`, `"${name}" cannot be a Python name. Use letters, numbers and _ only (no spaces or symbols), and do not start with a number.`);
+  }
+  if (PY_RESERVED.has(name)) return t(`「${name}」是 Python 已經用掉的字，請換一個名字。`, `"${name}" is already used by Python. Choose another name.`);
   return null;
 }
 

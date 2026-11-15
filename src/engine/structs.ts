@@ -33,7 +33,7 @@ export function setStructs(defs: StructDef[]) {
  * C++ 的 pair：內建的，不用自己定義，欄位是 first、second（例如 BFS 的座標、Dijkstra 的 {距離, 點}）。
  * 跟 struct 一樣用（p.first、q.front().second），也可以裝在每一種容器裡
  */
-export const PAIR_TYPES = ['pair<int,int>', 'pair<long long,int>', 'pair<int,string>', 'pair<string,int>'];
+export const PAIR_TYPES = ['pair<int,int>', 'pair<long long,int>', 'pair<int,string>', 'pair<string,int>', 'pair<float,int>'];
 const CPP_FIELD = /^pair<(int|long long|float|string),(int|long long|float|string)>$/;
 const pairField = (name: string, cpp: string): StructField => ({ name, type: cpp == 'string' ? '文字' : '數字', ...(cpp == 'float' ? { float: true } : {}), ...(cpp == 'long long' ? { long: true } : {}) });
 function pairOf(name: string): StructDef | undefined {

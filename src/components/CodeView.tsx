@@ -1,6 +1,6 @@
 // 「看程式」：把目前的流程圖轉成程式給學生看（只能看、不能改）。
 // 學習目標是積木 → 畫成積木，可以切換 Scratch / Blockly 兩種外觀（跟全國賽練習網頁 individual_demo 一樣）；
-// 是 C++ → 顯示 C++ 程式碼，可以複製。
+// 是 C++ 或 Python → 顯示程式碼，可以複製。
 import { useEffect, useRef, useState } from 'react';
 import type { Diagram } from '../engine/diagram';
 import { FlowError } from '../engine/decoder';
@@ -12,8 +12,9 @@ import type { ModuleSource } from '../engine/modules';
 import { isCppOnlyType, structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
 import { blocklyLoadError, toBlockly, type BlockMode } from '../engine/toBlockly';
 import { toCpp } from '../engine/toCpp';
+import { toPython } from '../engine/toPython';
 import { getLang, t, useLang } from '../i18n';
-import { getTarget, targetName } from '../target';
+import { getTarget, isCode, isPython, targetName } from '../target';
 
 // Blockly 只有打開「看程式」時才從 CDN 載入（不放進打包檔，網站一開始比較快）；版本跟練習網頁一樣。
 // 用 Blockly 官方的 <script> 檔（掛在全域的 window.Blockly），不用 jsDelivr 的 +esm：
@@ -132,11 +133,11 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
           {t('看程式', 'See the code')}<span className="target_badge">{targetName(target)}</span>
         </h5>
         <span className="muted">
-          {target == 'cpp' ? t('流程圖變成程式的樣子（只能看，不能改）', 'Your flowchart as code (read only)') : t('流程圖變成積木的樣子', 'Your flowchart as blocks')}
+          {isCode(target) ? t('流程圖變成程式的樣子（只能看，不能改）', 'Your flowchart as code (read only)') : t('流程圖變成積木的樣子', 'Your flowchart as blocks')}
         </span>
         <button onClick={onClose}>{t('關閉', 'Close')}</button>
       </div>
-      {open && (target == 'cpp'
+      {open && (target == 'cpp' || target == 'python'
         ? <CppCode diagram={diagram} vars={vars()} modules={modules()} />
         : <BlocklyCode mode={target} diagram={diagram} vars={vars()} modules={modules()} onApply={onApply} />)}
       {/* Blockly 的輸入框、下拉選單放這裡：蓋滿整個畫面、不擋滑鼠（見 .blockly_layer） */}
@@ -178,7 +179,7 @@ function CppCode({ diagram, vars, modules }: { diagram: Diagram; vars: VarInfo[]
   const { program, modules: mods, error } = programOf(diagram, modules);
   const [copied, setCopied] = useState(false);
   if (!program) return <p className="run_error">{error}</p>;
-  const code = toCpp(program, vars, mods);
+  const code = isPython() ? toPython(program, vars, mods) : toCpp(program, vars, mods);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code);
@@ -196,7 +197,9 @@ function CppCode({ diagram, vars, modules }: { diagram: Diagram; vars: VarInfo[]
     <div className="code_view_body">
       {badNames.length > 0 && (
         <p className="run_error code_name_warning">
-          {t(`這些名稱 C++ 不能用：${badNames.join('、')}。C++ 的名稱只能用英文字母、數字和底線，請到第三步改名字（流程圖裡用到的地方會跟著改）。`, `C++ cannot use these names: ${badNames.join(', ')}. Use English letters, numbers and _ only. Rename them in step 3.`)}
+          {isPython()
+            ? t(`這些名稱 Python 不能用：${badNames.join('、')}。請到第三步改名字（流程圖裡用到的地方會跟著改）。`, `Python cannot use these names: ${badNames.join(', ')}. Rename them in step 3.`)
+            : t(`這些名稱 C++ 不能用：${badNames.join('、')}。C++ 的名稱只能用英文字母、數字和底線，請到第三步改名字（流程圖裡用到的地方會跟著改）。`, `C++ cannot use these names: ${badNames.join(', ')}. Use English letters, numbers and _ only. Rename them in step 3.`)}
         </p>
       )}
       <div className="code_cpp_wrap">

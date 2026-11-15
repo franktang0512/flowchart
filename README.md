@@ -2,7 +2,7 @@
 
 學生依四個步驟完成一題：看題目 → 想測資 → 定義變數、設計流程 → 測試執行並除錯，最後列印成 PDF 交作業。第一步和第二步在同一個畫面，還不能做的那一塊會用半透明灰色蓋住。
 
-學習目標可以選 **Scratch**、**Blockly** 或 **C++**（首頁選，或網址加 `?target=scratch` / `blockly` / `cpp`）。三種的積木操作一樣，但可以用的型別和寫法照那個語言的規則；C++ 的功能最多，見下面「C++ 可以用的功能」。
+學習目標可以選 **Scratch**、**Blockly**、**C++** 或 **Python**（首頁選，或網址加 `?target=scratch` / `blockly` / `cpp` / `python`）。四種的積木操作一樣，但可以用的型別和寫法照那個語言的規則；C++、Python 的功能最多，見下面「C++ 可以用的功能」「Python 可以用的功能」。
 
 流程圖的積木可以點選工具再點畫布，也可以直接從左邊的工具列拖進畫布。
 
@@ -81,6 +81,48 @@
 - **測資大小**：流程圖是在網頁裡一步一步執行，適合上課用的小測資；APCS 正式的大測資要用真的 C++ 跑。
 - **流程圖大小**：第 4 題畫成流程圖會很長，比較適合上課帶學生走一次原理。
 
+## Python 可以用的功能
+
+跟 C++ 一樣索引從 0 開始、變數表要選型別（Python 不用宣告型別，但選了型別，執行時才能檢查，轉程式時也才知道一開始要寫 `a = []` 還是 `d = {}`）。積木裡的算式照 Python 的寫法，第三步「看程式」轉成 Python。
+
+### 型別
+
+| 型別 | 對應 C++ | 可以做的事 |
+| --- | --- | --- |
+| `int`、`float`、`str` | int、float、string | Python 的整數不會溢位，所以沒有 long long |
+| `list` | vector、array、stack | `append`、`insert`、`a[i] = …`、`pop(i)`、`pop()`、`clear()`、`sort()`、建立 n 格（`[0] * n`）；`a[-1]` 是最後一個（當 stack 用就是頂端） |
+| 二維 `list` | 二維 vector | 建立幾列幾行、改一格、某一列 `append`（鄰接串列） |
+| `deque` | queue | `append`、`popleft()`、`q[0]`、`q[-1]` |
+| `heapq` | priority_queue（小的先） | `heappush`、`heappop`、`h[0]`（只能看最小的）；要大的先就放 `-x` |
+| `set` | set | `add`、`discard`、`clear()`、`x in s` |
+| `dict` | map | `d[k] = v`、`del d[k]`、`d.get(k, 0)`、`k in d`；讀還沒有的鍵會出錯（KeyError，跟 Python 一樣）；照放進去的順序 |
+| `tuple` | pair | `(a, b)`、`t[0]`、`t[1]`；比大小先比第一個；不能只改其中一個值 |
+
+struct 先不做（用 tuple 就夠）。
+
+### 算式和積木
+
+| 寫法 | 說明 |
+| --- | --- |
+| `/`、`//`、`%`、`**` | `/` 一定算出小數（`6 / 2` 是 `3.0`），存進 int 變數會提醒改用 `//`；`//`、`%` 照 Python 往小的方向（`-7 // 2` 是 -4） |
+| `and`、`or`、`not`、`True`、`False` | 判斷式；`0 <= x < 10` 可以連著比 |
+| `x in a`、`x not in a` | list、字串、set、dict、deque 都可以 |
+| 函式 | `len`、`int`、`str`、`float`、`max`、`min`、`sum`、`abs`、`ord`、`chr`、`round`（剛好一半取偶數，跟 Python 一樣） |
+| 字串 | `s[i]`、`s[-1]`、切片 `s[a:b]`、`s[::-1]`、`upper`、`lower`、`strip`、`replace`、`split`、`find`、`count`、`isdigit`、`isalpha`、`isupper`、`islower`、`startswith`、`endswith`、`"-" * 10`；文字和數字不能直接 `+`（要先 `str( )`）；字串不能只改其中一個字 |
+| for 迴圈 | `for i in range(n)`、`range(a, b)`、`range(a, b, -1)`、`for x in a`（list、字串、set、dict 的鍵） |
+| 輸入 | **一個輸入積木讀一整行**：數字變數 `int(input())`、文字變數 `input()`、list 一整行 `list(map(int, input().split()))`、二維 list 加一列、「一行讀好幾個變數」`a, b = map(int, input().split())`、list / dict 的一格 |
+| 輸出 | `print`：「輸出 a, b」用空白隔開；整個 list 是 `print(*a)`；float 一定有小數點（`3.0`）；True / False |
+| 模組 | 寫成 `def`；模組看得到主流程的變數，改到時「看程式」會寫 `global`；可以有區域變數 |
+
+錯誤訊息照 Python 的說法（IndexError、KeyError、ZeroDivisionError、ValueError、EOFError），並說明怎麼改。「生活中的演算法（Python）」每一題都畫過流程圖跑過，轉出來的 Python 用真的 Python 執行，結果跟流程圖、題目的答案一樣。
+
+### 還不能做、或有限制的
+
+- **f-string、`print(..., end="")`、list 的字面值 `[1, 2, 3]`、lambda**：還沒有。
+- **tuple 改其中一個值**：Python 本來就不行，要整個換掉。
+- **很大的整數**：網頁裡的數字超過約 9×10¹⁵ 會不準（真的 Python 不會）。
+- **for 的變數**：迴圈裡不能改；迴圈結束後就沒有了（真的 Python 還留著最後的值）。
+
 ## 存檔（尚未完成的作品）
 
 學習單右上角「檔案」選單：
@@ -142,7 +184,9 @@ C++ 的題目可以加 `var_types`，限制變數表能選哪些容器（數字�
 "var_types": ["array"]
 ```
 
-可以寫 `vector`、`2d_vector`、`array`、`stack`、`queue`、`priority_queue`、`priority_queue_min`（小的先）、`set`、`map`、`struct`（含 pair）；沒寫就是都可以。
+可以寫 `vector`、`2d_vector`、`array`、`stack`、`queue`、`priority_queue`、`priority_queue_min`（小的先）、`set`、`map`、`struct`（含 pair）；Python 寫 `list`、`2d_list`、`deque`、`heapq`、`set`、`dict`、`tuple`；沒寫就是都可以。
+
+Python 一次讀一整行：輸入要照行排的題目（例如一行一個），可以在測資加 `py_input`；題目裡寫到 vector、push_back 這些 C++ 說法的，可以加 `py_title`、`py_question`（英文版的 `en` 裡也可以加）。學習目標是 Python 時就改看這些。
 
 ## 程式結構
 
@@ -157,6 +201,7 @@ C++ 的題目可以加 `var_types`，限制變數表能選哪些容器（數字�
 | `src/engine/decoder.ts` | 檢查學生寫的運算式、把流程圖轉成程式並逐步執行 |
 | `src/engine/structure.ts` | 流程圖、運算式整理成結構（看程式、轉 C++ 用） |
 | `src/engine/toCpp.ts` | 流程圖轉成 C++ |
+| `src/engine/toPython.ts` | 流程圖轉成 Python |
 | `src/engine/structs.ts` | struct 的定義、內建的 pair |
 | `src/pdf.ts` | 交作業：列印畫面直接存成 PDF |
 | `src/nodeActions.ts` | 對話框按「確認」後新增或修改積木 |

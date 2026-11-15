@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜queue：用 deque",
+  "question": "跟上一題一樣的三種指令，這次用 Python 的 deque（from collections import deque）：\n1 x：x 排到最後面：q.append(x)\n2：最前面的離開：q.popleft()；如果是空的，輸出 Empty!\n3：輸出最前面的數字 q[0]；如果是空的，輸出 Empty!\ndeque 拿掉最前面的很快，不用像 list 那樣把後面的往前搬。\n第一行輸入 N，接下來 N 行每行一個指令。每個要輸出的結果各輸出一行。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "8\n1 10\n1 20\n3\n2\n3\n2\n2\n3",
+      "output": "10\n20\nEmpty!\nEmpty!",
+      "note": "先排的 10 先離開，所以第二次 front 是 20"
+    },
+    {
+      "input": "6\n1 5\n1 -3\n1 8\n3\n2\n3",
+      "output": "5\n-3",
+      "note": ""
+    },
+    {
+      "input": "5\n3\n2\n1 7\n3\n2",
+      "output": "Empty!\nEmpty!\n7",
+      "note": "一開始就是空的"
+    }
+  ],
+  "en": {
+    "title": "Basics | queue: deque",
+    "question": "The same three commands as the last one. This time use the Python deque (from collections import deque):\n1 x: x joins the back: q.append(x)\n2: the front one leaves: q.popleft(). If it is empty, output Empty!\n3: output the front number q[0]. If it is empty, output Empty!\nA deque removes the front quickly. It does not move every item up like a list.\nThe first line is N. Then N lines, one command each. Output each result on its own line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "8\n1 10\n1 20\n3\n2\n3\n2\n2\n3",
+        "output": "10\n20\nEmpty!\nEmpty!",
+        "note": "10 came first and leaves first, so the second front is 20"
+      },
+      {
+        "input": "6\n1 5\n1 -3\n1 8\n3\n2\n3",
+        "output": "5\n-3",
+        "note": ""
+      },
+      {
+        "input": "5\n3\n2\n1 7\n3\n2",
+        "output": "Empty!\nEmpty!\n7",
+        "note": "Empty at the start"
+      }
+    ]
+  }
+}

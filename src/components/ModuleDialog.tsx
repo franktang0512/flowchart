@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isName, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { canReturn, getTarget } from '../target';
+import { canReturn, getTarget, isCode, isPython } from '../target';
 import { fromTypeValue, TypeOptions, typeValue } from './VarTable';
 
 export interface ModuleRequest {
@@ -44,7 +44,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
   const [name, setName] = useState(request.initial?.name ?? '');
   const [params, setParams] = useState<ParamRow[]>(request.initial?.params.map((p, k) => ({ ...p, orig: k })) ?? []);
   // C++ 回傳 float 時選單的值是 'float'
-  const [returns, setReturns] = useState<'' | '數字' | '文字' | 'float' | 'long'>(request.initial?.returns == '數字' && getTarget() == 'cpp' && (request.initial.returnsFloat || request.initial.returnsLong)
+  const [returns, setReturns] = useState<'' | '數字' | '文字' | 'float' | 'long'>(request.initial?.returns == '數字' && isCode() && (request.initial.returnsFloat || request.initial.returnsLong)
     ? (request.initial.returnsFloat ? 'float' : 'long') : request.initial?.returns ?? '');
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -65,7 +65,7 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
   const save = () => {
     const n = name.trim();
     const rows = params.map(p => ({ ...p, name: p.name.trim() })).filter(p => p.name);
-    const list: ParamInfo[] = rows.map(p => ({ name: p.name, type: p.type, ...(p.float && p.type == '數字' && getTarget() == 'cpp' ? { float: true } : {}), ...(p.long && p.type == '數字' && getTarget() == 'cpp' ? { long: true } : {}), ...(p.desc ? { desc: p.desc } : {}) }));
+    const list: ParamInfo[] = rows.map(p => ({ name: p.name, type: p.type, ...(p.float && p.type == '數字' && isCode() ? { float: true } : {}), ...(p.long && p.type == '數字' && getTarget() == 'cpp' ? { long: true } : {}), ...(p.desc ? { desc: p.desc } : {}) }));
     const bad = (s: string, kind: 'module' | 'param') => {
       if (!isName(s)) return t(`「${s}」不能當名稱：只能用中英文、數字和底線，不能有空白，也不能用數字開頭。`, `"${s}" cannot be a name. Use letters, numbers and _ only, with no spaces, and do not start with a number.`);
       return request.nameProblem(s, kind);
@@ -113,7 +113,13 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
             <p className="module_param">
               <select value={returns} onChange={e => setReturns(e.target.value as typeof returns)}>
                 <option value="">{t('沒有回傳值', 'No return value')}</option>
-                {getTarget() == 'cpp'
+                {isPython()
+                  ? <>
+                      <option value="數字">{t('回傳 int（整數）', 'Returns int')}</option>
+                      <option value="float">{t('回傳 float（小數）', 'Returns float')}</option>
+                      <option value="文字">{t('回傳 str（文字）', 'Returns str')}</option>
+                    </>
+                  : getTarget() == 'cpp'
                   ? <>
                       <option value="數字">{t('回傳 int（整數）', 'Returns int')}</option>
                       <option value="long">{t('回傳 long long（大整數）', 'Returns long long')}</option>

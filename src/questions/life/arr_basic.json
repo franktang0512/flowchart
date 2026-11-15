@@ -1,6 +1,6 @@
 {
-  "title": "基本操作｜陣列：存進去、讀出來、改一格",
-  "question": "陣列（積木叫清單）把很多個資料排成一排，每一格用位置來找。\n請輸入 5 個整數存進陣列。再輸入一個位置 k（1 到 5，第 1 個是最左邊），先輸出第 k 個數字；再把第 k 個改成 0，最後輸出整個陣列。\n提示：第 k 個在陣列的哪一格？想一想陣列是從 0 還是從 1 開始算的。",
+  "title": "基本操作｜清單：存進去、讀出來、改一格",
+  "question": "輸入 5 個數字存進清單，然後：\n1. 再輸入一個數字 k（1 到 5）。\n2. 輸出第 k 個數字（最左邊是第 1 個）。\n3. 把第 k 個改成 0，再輸出整個清單。\n例如：輸入 3 8 6 1 9 和 2，第 2 個是 8，先輸出 8；改成 0 之後輸出 3 0 6 1 9。",
   "array": [],
   "test_case": [
     {
@@ -20,8 +20,8 @@
     }
   ],
   "en": {
-    "title": "Basics | array: store, read, change one item",
-    "question": "An array (a list in blocks) keeps many values in a row. You find each one by its place.\nInput 5 whole numbers into an array. Then input a place k (1 to 5; 1 is the leftmost). Output the k-th number, then change the k-th number to 0, and output the whole array.\nTip: the k-th number is in which slot? Think about whether the array starts at 0 or 1.",
+    "title": "Basics | list: store, read, change one item",
+    "question": "Input 5 numbers into a list. Then:\n1. Input a number k (1 to 5).\n2. Output the k-th number (the leftmost is number 1).\n3. Change the k-th number to 0, then output the whole list.\nExample: input 3 8 6 1 9 and 2. The 2nd number is 8, so output 8. After changing it to 0, output 3 0 6 1 9.",
     "array": [],
     "test_case": [
       {
@@ -39,6 +39,14 @@
         "output": "5\n7 7 7 7 0",
         "note": "Change the last"
       }
-    ]
-  }
+    ],
+    "py_title": "Basics | list: store, read, change one item",
+    "py_question": "The first line has 5 numbers. Put them in a list. Then:\n1. The second line is a number k (1 to 5).\n2. Output the k-th number (the leftmost is number 1).\n3. Change the k-th number to 0, then output the whole list.\nExample: input 3 8 6 1 9 and 2. The 2nd number is 8, so output 8. After changing it to 0, output 3 0 6 1 9.\nThink: a list index starts at 0. What is the index of the k-th number?",
+    "cpp_title": "Basics | array: store, read, change one item",
+    "cpp_question": "Input 5 numbers into an array. Then:\n1. Input a number k (1 to 5).\n2. Output the k-th number (the leftmost is number 1).\n3. Change the k-th number to 0, then output the whole array.\nExample: input 3 8 6 1 9 and 2. The 2nd number is 8, so output 8. After changing it to 0, output 3 0 6 1 9.\nThink: an array index starts at 0. What is the index of the k-th number?"
+  },
+  "py_title": "基本操作｜list：存進去、讀出來、改一格",
+  "py_question": "第一行輸入 5 個數字，存進 list，然後：\n1. 第二行輸入一個數字 k（1 到 5）。\n2. 輸出第 k 個數字（最左邊是第 1 個）。\n3. 把第 k 個改成 0，再輸出整個 list。\n例如：輸入 3 8 6 1 9 和 2，第 2 個是 8，先輸出 8；改成 0 之後輸出 3 0 6 1 9。\n想一想：list 的索引從 0 開始，第 k 個的索引是多少？",
+  "cpp_title": "基本操作｜陣列：存進去、讀出來、改一格",
+  "cpp_question": "輸入 5 個數字存進陣列，然後：\n1. 再輸入一個數字 k（1 到 5）。\n2. 輸出第 k 個數字（最左邊是第 1 個）。\n3. 把第 k 個改成 0，再輸出整個陣列。\n例如：輸入 3 8 6 1 9 和 2，第 2 個是 8，先輸出 8；改成 0 之後輸出 3 0 6 1 9。\n想一想：陣列的索引從 0 開始，第 k 個的索引是多少？"
 }

@@ -1,0 +1,44 @@
+{
+  "title": "賽跑排名",
+  "question": "運動會 100 公尺賽跑，秒數越少名次越前面。第一行輸入有幾位選手，第二行依照座號 1、2、3……輸入每個人的秒數（用空白隔開），最後輸出從第一名到最後一名的座號。秒數一樣的，座號小的排前面。\n提示：可以把每個人存成 tuple (秒數, 座號) 放進 list，再用 sort() 排序——tuple 會先比第一個值，一樣再比第二個。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5\n14.2 13.8 15.0 13.8 14.0",
+      "output": "2 4 5 1 3",
+      "note": "2 號和 4 號都是 13.8，2 號排前面"
+    },
+    {
+      "input": "3\n12.5 12.1 12.9",
+      "output": "2 1 3",
+      "note": ""
+    },
+    {
+      "input": "4\n13.0 13.0 13.0 12.0",
+      "output": "4 1 2 3",
+      "note": ""
+    }
+  ],
+  "en": {
+    "title": "Race Ranking",
+    "question": "In a 100 m race, fewer seconds is better. The first line is how many runners. The second line has each runner's seconds in seat order 1, 2, 3... (split by spaces). Output the seat numbers from first place to last. If the seconds are the same, the smaller seat number goes first.\nTip: put each runner in a list as a tuple (seconds, seat), then sort() it. Tuples compare the first value first, then the second.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5\n14.2 13.8 15.0 13.8 14.0",
+        "output": "2 4 5 1 3",
+        "note": "Runners 2 and 4 both have 13.8. Runner 2 goes first"
+      },
+      {
+        "input": "3\n12.5 12.1 12.9",
+        "output": "2 1 3",
+        "note": ""
+      },
+      {
+        "input": "4\n13.0 13.0 13.0 12.0",
+        "output": "4 1 2 3",
+        "note": ""
+      }
+    ]
+  }
+}

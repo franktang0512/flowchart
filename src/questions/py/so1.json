@@ -1,0 +1,44 @@
+{
+  "title": "整理手上的牌",
+  "question": "玩撲克牌時，每拿到一張牌，就把它插到手上適當的位置，手上的牌一直都是由小到大排好的，這就是插入排序。\n第一行輸入有幾張牌，第二行輸入每張牌的點數（用空白隔開）。一張一張拿：每拿到一張，就把它插到手上適當的位置，輸出一次手上的牌（整個 list）。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5\n7 3 9 1 5",
+      "output": "7\n3 7\n3 7 9\n1 3 7 9\n1 3 5 7 9",
+      "note": ""
+    },
+    {
+      "input": "4\n2 2 1 3",
+      "output": "2\n2 2\n1 2 2\n1 2 2 3",
+      "note": "一樣大的插在後面"
+    },
+    {
+      "input": "3\n1 2 3",
+      "output": "1\n1 2\n1 2 3",
+      "note": "每次都插在最後"
+    }
+  ],
+  "en": {
+    "title": "Sort Your Cards",
+    "question": "When you play cards, you put each new card in the right place, so your hand is always in order, small to large. This is insertion sort.\nThe first line is how many cards. The second line has the points of the cards (split by spaces). Take them one by one: put each card in the right place and output your hand (the whole list) each time.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5\n7 3 9 1 5",
+        "output": "7\n3 7\n3 7 9\n1 3 7 9\n1 3 5 7 9",
+        "note": ""
+      },
+      {
+        "input": "4\n2 2 1 3",
+        "output": "2\n2 2\n1 2 2\n1 2 2 3",
+        "note": "Equal cards go after"
+      },
+      {
+        "input": "3\n1 2 3",
+        "output": "1\n1 2\n1 2 3",
+        "note": "Always at the end"
+      }
+    ]
+  }
+}

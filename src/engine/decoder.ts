@@ -18,12 +18,12 @@
 //   文字（從第 1 個字開始） 名字[i]、長度(名字) → 跟清單一樣用 __at、__len，但不能改其中一個字
 //   判斷式               = and or not 且 或 非 → == && || !
 import { t } from '../i18n';
-import { getTarget, indexBase } from '../target';
+import { getTarget, indexBase, isCode, isPython } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, parseSortKeys, splitRectangle, splitTarget } from './labels';
-import { cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, sheetId, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
+import { cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
-import { exprType, fieldOf, forInit, forLoopVars, forUpdate, parseExpr, parseExprSpans, splitFor, structOf, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
+import { exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 import { allStructs, fieldCppType, fieldInit, findStruct, getStructs } from './structs';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -130,6 +130,11 @@ export function containerKind(vars: VarStore, name: string): 'stack' | 'queue' |
 /** C++ 型別的名稱（給學生看的說明用），例如 stack<int> */
 export function cppContainerName(vars: VarStore, name: string): string {
   const holds = vars.var_list.value[vars.var_list.name.indexOf(name)];
+  if (isPython()) {
+    const type: VarType = vars.type_var_list.map.includes(name) ? '對應表' : vars.type_var_list.set.includes(name) ? '集合' : vars.type_var_list.pq.includes(name) ? '優先佇列小'
+      : vars.type_var_list.queue.includes(name) ? '佇列' : vars.type_var_list.grid.includes(name) ? '二維清單' : '清單';
+    return pyTypeName(type, false, holds);
+  }
   const elem = elemCppType(holds);
   const kind = containerKind(vars, name);
   if (kind == 'array') return `${elem} ${name}[${vars.sizes?.[name] ?? ''}]`;
@@ -217,11 +222,24 @@ const FUNCTIONS: Record<string, string> = {
   // C++ 的字元
   char: '__chr', toupper: '__toupper', tolower: '__tolower', isdigit: '__isdigit', isalpha: '__isalpha', isupper: '__isupper', islower: '__islower',
 };
+/** Python 的函式 → 執行時的小工具 */
+const PY_FUNCTIONS: Record<string, string> = {
+  len: '__len', int: '__stoi', str: '__tostr', float: '__float', max: '__max', min: '__min', abs: '__abs', sum: '__sum', ord: '__ordp', chr: '__chrp', round: '__round',
+};
 /** 只有 C++ 才有的字元函式 */
 const CHAR_FUNCS = ['char', 'toupper', 'tolower', 'isdigit', 'isalpha', 'isupper', 'islower'];
-const isFunc = (name: string) => Object.prototype.hasOwnProperty.call(FUNCTIONS, name);
+const isFunc = (name: string) => Object.prototype.hasOwnProperty.call(isPython() ? PY_CALLS : FUNCTIONS, name);
+/** 要知道是哪個積木的小工具（出錯時才標得出積木） */
+const HELPERS = 'len|find|has|stoi|tostr|max|min|float|abs|sum|ordp|chrp|round';
 /** 第 i 個積木的程式有沒有用到上面的函式 */
-const FUNC_CALL = (i: number) => new RegExp(`__(len|find|has|stoi|tostr|max|min)_${i}\\(`);
+const FUNC_CALL = (i: number) => new RegExp(`__(${HELPERS})_${i}\\(`);
+/** Python 的字串、list、dict 可以用的函式（s.upper()、a.index(x)、d.get(k, 0)…） */
+export const PY_METHODS = {
+  string: ['upper', 'lower', 'strip', 'replace', 'split', 'find', 'count', 'isdigit', 'isalpha', 'isupper', 'islower', 'startswith', 'endswith'],
+  list: ['index', 'count'],
+  dict: ['get'],
+} as const;
+const PY_METHOD_NAMES = new Set<string>([...PY_METHODS.string, ...PY_METHODS.list, ...PY_METHODS.dict]);
 
 /**
  * 二維 vector 某一列的 size()、empty()：g[u].size() → 長度(g[u])、g[u].empty() → (長度(g[u]) == 0)，
@@ -255,7 +273,10 @@ export type Token = { type: 'string' | 'number' | 'name' | 'op'; text: string };
 /** 把運算式切成一個一個的單位：字串、數字、名稱、符號（且、或、非 當成符號） */
 export function tokenize(str: string): Token[] {
   const tokens: Token[] = [];
-  const re = /\s+|("[^"]*"|'[^']*')|(\d+(?:\.\d+)?)|((?:(?![且或非])[\p{L}_$])(?:(?![且或非])[\p{L}\p{N}_$])*)|(.)/gu;
+  // Python：// 和 ** 是一個符號
+  const re = isPython()
+    ? /\s+|("[^"]*"|'[^']*')|(\d+(?:\.\d+)?)|((?:(?![且或非])[\p{L}_$])(?:(?![且或非])[\p{L}\p{N}_$])*)|(\/\/|\*\*|.)/gu
+    : /\s+|("[^"]*"|'[^']*')|(\d+(?:\.\d+)?)|((?:(?![且或非])[\p{L}_$])(?:(?![且或非])[\p{L}\p{N}_$])*)|(.)/gu;
   for (const m of str.matchAll(re)) {
     if (m[1]) tokens.push({ type: 'string', text: m[1] });
     else if (m[2]) tokens.push({ type: 'number', text: m[2] });
@@ -279,7 +300,8 @@ function listItemTarget(str: string): { list: string; index: string } | null {
 export function checkVar(vars: VarStore, str: string | undefined, can_number: boolean): boolean {
   if (!str || !str.trim()) return false;
   const { type_var_list } = vars;
-  const defined = (name: string) => Object.values(type_var_list).some(list => list.includes(name)) || !!vars.loopVars?.includes(name);
+  const defined = (name: string) => Object.values(type_var_list).some(list => list.includes(name)) || !!vars.loopVars?.includes(name)
+    || (isPython() && (name == 'True' || name == 'False'));
 
   if (!can_number) {
     // ::a：全域的數字、文字變數
@@ -304,6 +326,10 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     const item = listItemTarget(str);
     if (item) {
       if (type_var_list.text.includes(item.list) && getTarget() == 'cpp') return checkVar(vars, item.index, true);
+      if (type_var_list.text.includes(item.list) && isPython()) {
+        alert(t(`「${item.list}」是 str（字串）：Python 的字串不能只改其中一個字。可以用切片和 + 接成新的字串，例如 ${item.list} = ${item.list}[:i] + "x" + ${item.list}[i + 1:]。`, `"${item.list}" is a str. In Python you cannot change one letter of a string. Make a new string with slices and +, like ${item.list} = ${item.list}[:i] + "x" + ${item.list}[i + 1:].`));
+        return false;
+      }
       if (type_var_list.text.includes(item.list)) {
         alert(t(`「${item.list}」是文字，不能只改其中一個字：可以用 + 把字接起來，存成新的文字。`, `"${item.list}" is text. You cannot change one letter. Use + to join letters into new text.`));
         return false;
@@ -336,24 +362,43 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
     if (tokens[k - 1]?.text == ':' && tokens[k - 2]?.text == ':') continue;
     // s.top()：點後面的名稱是容器的函式；後面沒有括號的是 struct 的欄位（最後一起檢查）
     if (tk.text == '.' && tk.type == 'op') {
+      if (isPython()) {
+        if (!pyMethodOk(vars, tokens, k)) return false;
+        continue;
+      }
       if (tokens[k + 2]?.text == '(' && !methodOk(vars, tokens, k)) return false;
       continue;
     }
+    // Python 的 int( )、str( )、chr( )…
+    if (isPython() && tk.type == 'name' && tokens[k + 1]?.text == '(' && !defined(tk.text)) {
+      if (tk.text == 'stoi' || tk.text == 'to_string') {
+        alert(t(`${tk.text}( ) 是 C++ 的寫法：Python 把文字變成整數用 int( )，數字變成文字用 str( )。`, `${tk.text}( ) is C++. In Python, use int( ) to turn text into a whole number, and str( ) to turn a number into text.`));
+        return false;
+      }
+      if (CHAR_FUNCS.includes(tk.text)) {
+        alert(t(`${tk.text}( ) 是 C++ 處理字元的寫法：Python 用 c.isdigit()、c.isalpha()、c.upper()、c.lower()、ord(c)、chr(k)。`, `${tk.text}( ) is C++. In Python, use c.isdigit(), c.isalpha(), c.upper(), c.lower(), ord(c), chr(k).`));
+        return false;
+      }
+      if (tk.text == '長度' || tk.text == 'length') {
+        alert(t('Python 的長度用 len( )，例如 len(a)。', 'In Python, use len( ), like len(a).'));
+        return false;
+      }
+    }
     // stoi、to_string 只有 C++ 有
-    if ((tk.text == 'stoi' || tk.text == 'to_string') && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
+    if ((tk.text == 'stoi' || tk.text == 'to_string') && tokens[k + 1]?.text == '(' && !isCode() && !defined(tk.text)) {
       alert(t(`${tk.text}( ) 是 C++ 的寫法：積木裡數字和文字會自己轉換，不用 ${tk.text}。`, `${tk.text}( ) is C++ only. In blocks, numbers and text convert by themselves.`));
       return false;
     }
-    if ((tk.text == 'max' || tk.text == 'min') && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
+    if ((tk.text == 'max' || tk.text == 'min') && tokens[k + 1]?.text == '(' && !isCode() && !defined(tk.text)) {
       alert(t(`${tk.text}( ) 是 C++ 的寫法：積木請用判斷或迴圈找最大、最小的值。`, `${tk.text}( ) is C++ only. In blocks, use a decision or a loop to find the largest or smallest value.`));
       return false;
     }
-    if (CHAR_FUNCS.includes(tk.text) && tokens[k + 1]?.text == '(' && getTarget() != 'cpp' && !defined(tk.text)) {
+    if (CHAR_FUNCS.includes(tk.text) && tokens[k + 1]?.text == '(' && !isCode() && !defined(tk.text)) {
       alert(t(`${tk.text}( ) 是 C++ 處理字元的寫法，積木裡沒有。`, `${tk.text}( ) is C++ only.`));
       return false;
     }
     if (tokens[k - 1]?.text == '.' && tokens[k - 1].type == 'op') continue;
-    if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || isFunc(tk.text) || vars.calls?.includes(tk.text)) continue;
+    if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || (isPython() && tk.text == 'in') || isFunc(tk.text) || vars.calls?.includes(tk.text)) continue;
     alert(t(`「${tk.text}」沒有定義：請先在變數表新增這個變數。如果是文字，要用 "雙引號" 括起來。`, `"${tk.text}" is not a variable yet. Add it to the variable table first. For words, use "quotes".`));
     return false;
   }
@@ -506,6 +551,36 @@ function methodOk(vars: VarStore, tokens: Token[], k: number): boolean {
   return true;
 }
 
+/** Python：tokens[k] 是一個點，後面要是字串、list、dict 有的函式再接 ( )；不行時跳出提示 */
+function pyMethodOk(vars: VarStore, tokens: Token[], k: number): boolean {
+  const method = tokens[k + 1];
+  const obj = tokens[k - 1];
+  const cpp: Record<string, string> = {
+    size: t('Python 的長度用 len( )，例如 len(a)。', 'In Python, use len( ), like len(a).'),
+    length: t('Python 的長度用 len( )，例如 len(s)。', 'In Python, use len( ), like len(s).'),
+    empty: t('Python 判斷是不是空的：len(a) == 0。', 'In Python, check len(a) == 0.'),
+    top: t('Python 的 list 最後一個（stack 的頂端）是 a[-1]；heapq 最小的是 h[0]。', 'In Python, the last item of a list (top of a stack) is a[-1]; the smallest of a heap is h[0].'),
+    front: t('Python 的 deque 最前面的是 q[0]。', 'In Python, the front of a deque is q[0].'),
+    back: t('Python 的 deque 最後面的是 q[-1]。', 'In Python, the back of a deque is q[-1].'),
+    substr: t('Python 取一段文字用切片：s[開始:結束]，例如 s[0:3]。', 'In Python, use a slice: s[start:end], like s[0:3].'),
+  };
+  if (method?.type == 'name' && cpp[method.text]) {
+    alert(t(`.${method.text}() 是 C++ 的寫法。`, `.${method.text}() is C++. `) + cpp[method.text]);
+    return false;
+  }
+  if (method?.type != 'name' || !PY_METHOD_NAMES.has(method.text) || tokens[k + 2]?.text != '(') {
+    // 前面是 tuple：用 t[0]、t[1]
+    if (obj?.type == 'name' && vars.type_var_list.record.includes(obj.text)) {
+      alert(t(`「${obj.text}」是 tuple：用 ${obj.text}[0]、${obj.text}[1] 拿裡面的值。`, `"${obj.text}" is a tuple. Use ${obj.text}[0] and ${obj.text}[1].`));
+      return false;
+    }
+    alert(t(`「.」後面要接字串、list、dict 的函式再加 ( )，可以用：字串 ${PY_METHODS.string.map(m => m + '()').join('、')}；list 的 index()、count()；dict 的 get()。`,
+      `After "." write a function of a string, list or dict with ( ): strings ${PY_METHODS.string.map(m => m + '()').join(', ')}; lists index(), count(); dicts get().`));
+    return false;
+  }
+  return true;
+}
+
 /** 找出文字裡出現了哪些變數 */
 export function getCodeVar(vars: VarStore, str: string): string[] {
   return vars.var_list.name.filter(name => str.includes(name));
@@ -557,7 +632,7 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   catch {
     return true;
   }
-  const cpp = getTarget() == 'cpp';
+  const cpp = isCode();
   const floats = vars.floats ?? [];
   const what = { str: t('文字', 'text'), char: cpp ? t('一個字（char）', 'one letter (char)') : t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct') }[type];
   const v = value.trim();
@@ -591,7 +666,7 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   }
   if (where == 'var') {
     // C++ 的 s[i]：一個字（char），放一個字或數字（字的編號）
-    const letter = cpp ? listItemTarget(target) : null;
+    const letter = getTarget() == 'cpp' ? listItemTarget(target) : null;
     if (letter && vars.type_var_list.text.includes(letter.list)) {
       if (type != 'char' && type != 'num') {
         alert(t(`「${target.trim()}」是一個字（char），只能放一個字，例如 'a'（單引號），但「${v}」是${what}。`, `"${target.trim()}" is one letter (char). Put one letter like 'a' (single quotes), but "${v}" is ${what}.`));
@@ -607,7 +682,17 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
       return false;
     }
     if (vars.type_var_list.text.includes(target) && (type == 'list' || type == 'bool' || type == 'struct')) {
-      alert(t(`變數「${target}」是${cpp ? ' string（文字）' : '文字'}，但「${v}」是${what}，不能存進去。`, `"${target}" holds text, but "${v}" is ${what}. It cannot go in.`));
+      alert(t(`變數「${target}」是${isPython() ? ' str（文字）' : cpp ? ' string（文字）' : '文字'}，但「${v}」是${what}，不能存進去。`, `"${target}" holds text, but "${v}" is ${what}. It cannot go in.`));
+      return false;
+    }
+    // Python：/ 算出來一定是小數，不能存進 int 變數
+    if (isPython() && vars.type_var_list.number.includes(target) && !floats.includes(target) && isFloatExpr(parseExpr(value), varInfoMap(vars), modules)) {
+      alert(pyFloatToInt(target, v));
+      return false;
+    }
+    // Python：數字不能直接存進 str 變數
+    if (isPython() && vars.type_var_list.text.includes(target) && type == 'num') {
+      alert(t(`變數「${target}」是 str（文字），「${v}」是數字：Python 要先用 str( ) 變成文字，例如 str(${v})。`, `"${target}" is a str, but "${v}" is a number. In Python, turn it into text with str( ) first, like str(${v}).`));
       return false;
     }
     return true;
@@ -650,6 +735,11 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   return true;
 }
 
+/** Python：小數存進 int 變數的說明 */
+export const pyFloatToInt = (target: string, v: string) => t(
+  `「${target}」是 int（整數），可是「${v}」算出來是小數（float）：Python 的 / 一定算出小數，例如 6 / 2 是 3.0。要整數請用 //（例如 a // b），或用 int( ) 去掉小數；或到第三步把「${target}」改成 float。`,
+  `"${target}" is an int, but "${v}" gives a decimal (float). In Python, / always gives a float: 6 / 2 is 3.0. For a whole number use // (like a // b) or int( ), or make "${target}" a float in step 3.`);
+
 /** map 的鍵型別要對：鍵是 string 的要放文字，鍵是數字的要放數字；不行時跳出提示 */
 export function checkMapKey(vars: VarStore, modules: ModuleInfo[], map: string, key: string): boolean {
   const kt = mapParts(vars.var_list.value[vars.var_list.name.indexOf(map)]).key;
@@ -681,7 +771,8 @@ export function braceOk(sname: string, n: number, v: string): boolean {
 /** 變數清單 → 名稱對到型別（判斷算式是數字還是文字用） */
 function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   const map = new Map<string, VarInfo>();
-  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '' }));
+  const floats = vars.floats ?? [];
+  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '', ...(floats.includes(name) ? { float: true } : {}) }));
   add(vars.type_var_list.number, '數字');
   add(vars.type_var_list.text, '文字');
   add(vars.type_var_list.array, '清單');
@@ -703,6 +794,11 @@ function varInfoMap(vars: VarStore): Map<string, VarInfo> {
 export const scopedName = (s: string) => (/^\s*::\s*[^\s:]+\s*$/.test(s) ? s.trim().slice(2).trim() : null);
 
 /** 判斷式轉成 JavaScript：= 變 ==、and/or/not（且/或/非）變 && || !，字串裡的字不動 */
+/** Python 的 and、or（不是判斷的運算式裡也可以用，例如 ok = a > 0 and b > 0） */
+function pyLogic(str: string) {
+  return str.split(/("[^"]*"|'[^']*')/).map((part, i) => i % 2 ? part : part.replace(/\band\b/g, '&&').replace(/\bor\b/g, '||')).join('');
+}
+
 function toCondition(str: string) {
   return str.split(/("[^"]*"|'[^']*')/).map((part, i) => i % 2 ? part : part
     .replace(/(?<![<>!=])=(?!=)/g, '==')
@@ -811,12 +907,54 @@ const runtimeMessages = () => ({
   noReturn: t('模組「{name}」要回傳值，可是這次走到「結束」都沒有經過「回傳」：每一條路在「結束」前都要有「回傳」。', 'The module "{name}" must return a value, but it reached "End" without "Return". Every path needs a "Return" before "End".'),
   argCount: t('執行模組「{name}」時給了 {got} 個值，可是它有 {n} 個參數。', 'The module "{name}" got {got} values, but it has {n} parameters.'),
   tooDeep: t('模組一直執行自己（或互相執行）停不下來：檢查模組裡是不是在某個時候就不再執行自己。', 'A module keeps running itself and never stops. Check that it stops at some point.'),
+  ...(isPython() ? PY_MESSAGES() : {}),
+});
+
+/** Python 的錯誤說明（跟 C++ 不一樣的地方；括號裡是 Python 自己會顯示的錯誤名稱） */
+const PY_MESSAGES = () => ({
+  outOfRange: t('list「{name}」有 {len} 項，索引只能是 0 到 {max}（或從後面數 -1 到 -{len}），沒有索引 {k}（IndexError）。', 'The list "{name}" has {len} items. The index must be 0 to {max} (or -1 to -{len} from the end). There is no index {k} (IndexError).'),
+  emptyList: t('list「{name}」是空的，沒有索引 {k}（IndexError）。', 'The list "{name}" is empty. There is no index {k} (IndexError).'),
+  textOutOfRange: t('字串「{name}」有 {len} 個字，索引只能是 0 到 {max}（或 -1 到 -{len}），沒有索引 {k}（IndexError）。', 'The string "{name}" has {len} letters. The index must be 0 to {max} (or -1 to -{len}). There is no index {k} (IndexError).'),
+  emptyText: t('字串「{name}」是空的，沒有索引 {k}（IndexError）。', 'The string "{name}" is empty. There is no index {k} (IndexError).'),
+  textToNumList: t('「{v}」是文字，不能放進「{name}」：它是 {elem}，只能放數字。', '"{v}" is text. It cannot go into "{name}", a {elem} of numbers.'),
+  numToTextList: t('{v} 是數字，不能放進「{name}」：它是 list[str]，只能放文字（數字要先用 str( ) 變成文字）。', '{v} is a number. It cannot go into "{name}", a list[str] of text. Use str( ) first.'),
+  intDivZero: t('除數是 0，不能除（ZeroDivisionError）：請檢查除數。', 'Division by 0 (ZeroDivisionError). Check the number you divide by.'),
+  noInput: t('測資的輸入不夠：執行到「輸入 {name}」時，已經沒有下一行可以讀了（EOFError）。', 'Not enough test input: there is no next line to read at "Input {name}" (EOFError).'),
+  inputNotNum: t('讀到的「{v}」不是整數，int( ) 沒辦法把它變成數字存進「{name}」（ValueError）。如果要存文字，請把「{name}」的型別改成 str。', '"{v}" is not a whole number, so int( ) cannot turn it into a number for "{name}" (ValueError). To keep text, make "{name}" a str.'),
+  stackEmpty: t('list「{name}」是空的，不能 pop()（IndexError）：可以先用 len({name}) > 0 檢查。', 'The list "{name}" is empty, so you cannot pop() (IndexError). Check len({name}) > 0 first.'),
+  queueEmpty: t('deque「{name}」是空的，不能 popleft()（IndexError）：可以先用 len({name}) > 0 檢查。', 'The deque "{name}" is empty, so you cannot popleft() (IndexError). Check len({name}) > 0 first.'),
+  pqEmpty: t('heap「{name}」是空的，不能 heappop、也沒有 {name}[0]（IndexError）：可以先用 len({name}) > 0 檢查。', 'The heap "{name}" is empty, so there is no heappop or {name}[0] (IndexError). Check len({name}) > 0 first.'),
+  maxArgs: t('max( )、min( ) 的括號裡要放兩個以上的值（例如 max(a, b)），或一個 list（例如 max(a)）。', 'Put two or more values in max( ) / min( ) (like max(a, b)), or one list (like max(a)).'),
+  maxEmpty: t('max( )、min( ) 裡的 list 是空的，沒有最大、最小的值（ValueError）。', 'The list in max( ) / min( ) is empty (ValueError).'),
+  maxStruct: t('max( )、min( ) 不能比 tuple：請比 t[0] 這種一個值，或自己用迴圈找。', 'max( ) / min( ) cannot compare tuples here. Compare one value like t[0], or use a loop.'),
+  stoiBad: t('int( ) 要把文字變成整數，可是「{v}」不是整數的寫法（ValueError）。', 'int( ) turns text into a whole number, but "{v}" is not one (ValueError).'),
+  mapKeyText: t('dict「{name}」的鍵是 str，{v} 是數字：要放文字（加引號）。', 'The keys of the dict "{name}" are str, but {v} is a number. Use text (in quotes).'),
+  mapKeyNum: t('dict「{name}」的鍵是 int，「{v}」是文字：要放數字。', 'The keys of the dict "{name}" are int, but "{v}" is text. Use a number.'),
+  insertRange: t('list「{name}」插入的位置不對：{k}。', 'Wrong place to insert into "{name}": {k}.'),
+  sortRange: t('排序「{name}」：要排前 {n} 個，可是只有 {len} 個。', 'Sorting "{name}": you want the first {n}, but there are only {len}.'),
+  pyNotInt: t('「{name}」是 int（整數），可是算出來是 {v}（小數）：Python 的 / 一定算出小數，要整數請用 //，或用 int( ) 去掉小數；或到第三步把「{name}」改成 float。', '"{name}" is an int, but the answer is {v} (a decimal). In Python, / always gives a float. For a whole number use // or int( ), or make "{name}" a float in step 3.'),
+  pyRangeInt: t('range( ) 裡要放整數，可是 {v} 是小數（TypeError）：請用 // 或 int( )。', 'range( ) needs whole numbers, but {v} is a decimal (TypeError). Use // or int( ).'),
+  pyRangeStep: t('range( ) 的第三個值（間隔）不能是 0（ValueError）。', 'The step (third value) of range( ) cannot be 0 (ValueError).'),
+  pyKeyError: t('dict「{name}」沒有「{v}」這個鍵（KeyError）：可以先用「{v} in {name}」檢查，或用 {name}.get({v}, 0) 在沒有時拿到 0。', 'The dict "{name}" has no key {v} (KeyError). Check with "{v} in {name}" first, or use {name}.get({v}, 0) to get 0 when it is missing.'),
+  pyOneValue: t('讀到的這一行「{v}」有好幾個值，可是「{name}」只能存一個：一行有好幾個值時，請用「輸入 a, b」一次讀好幾個，或讀進 list。', 'The line "{v}" has more than one value, but "{name}" holds one. For a line with many values, use "Input a, b" or read it into a list.'),
+  pyLineCount: t('讀到的這一行「{v}」有 {got} 個值，可是「輸入 {name}」要讀 {n} 個（ValueError）。', 'The line "{v}" has {got} values, but "Input {name}" reads {n} (ValueError).'),
+  pyFloatBad: t('讀到的「{v}」不是數字，float( ) 沒辦法把它變成數字（ValueError）。', '"{v}" is not a number, so float( ) cannot turn it into one (ValueError).'),
+  pyNotInList: t('{v} 不在 list 裡，不能用 index( ) 找（ValueError）：可以先用「{v} in 清單」檢查。', '{v} is not in the list, so index( ) cannot find it (ValueError). Check with "in" first.'),
+  pyNoMethod: t('{m}( ) 不能用在這裡：字串才有 upper()、split() 這些，list 才有 index()、count()，dict 才有 get()。', '{m}( ) cannot be used here: strings have upper(), split()..., lists have index(), count(), dicts have get().'),
+  pyInType: t('「in」的右邊要是 list、字串、set、dict 或 deque（TypeError）。', 'The right side of "in" must be a list, string, set, dict or deque (TypeError).'),
+  pyStrIn: t('「in」的右邊是字串時，左邊也要是字串（TypeError），例如 "a" in s。', 'When the right side of "in" is a string, the left side must be a string too (TypeError), like "a" in s.'),
+  pyOrd: t('ord( ) 的括號裡要放一個字，例如 ord("a")（TypeError）。', 'Put one letter in ord( ), like ord("a") (TypeError).'),
+  pyTypeCmp: t('文字和數字不能比大小（TypeError）：數字的文字要先用 int( ) 變成數字。', 'Text and numbers cannot be compared (TypeError). Use int( ) to turn text into a number first.'),
+  pyIterHeap: t('heap 不能用 for 一個一個看（順序不是由小到大）：要由小到大請用 heappop 一個一個拿出來。', 'Do not loop over a heap with for (it is not in order). Use heappop to take them out from small to large.'),
+  pyIterType: t('for … in 後面要放 list、字串、set、dict 或 deque。', 'After for … in, put a list, string, set, dict or deque.'),
+  pyListAssign: t('「{name}」是 list，要整個換掉時，右邊也要是 list（例如 s.split()）。', '"{name}" is a list. To replace the whole list, the right side must be a list too (like s.split()).'),
 });
 
 // 執行時用到的小工具：存值時檢查型別、清單的位置從 __BASE 開始（積木 1、C++ 0）。錯誤會標出是哪個積木（i）
 const runtime = () => `
 var __M = ${JSON.stringify(runtimeMessages())};
 var __BASE = ${indexBase()};
+var __PY = ${isPython()};
 function __err(key, i, vars) {
   var m = __M[key];
   for (var k in vars) m = m.split('{' + k + '}').join(vars[k]);
@@ -851,11 +989,13 @@ function __idiv(a, b, i) {
 function __int(v, i, name) { return Math.trunc(__num(v, i, name)) | 0; }
 function __long(v, i, name) { return Math.trunc(__num(v, i, name)); }
 function __listItem(v, i, name, elem) {
+  // Python：int 的 list 不能放小數（不會自己去掉小數）
+  if (__PY && elem == 'int' && typeof v == 'number' && !Number.isInteger(v)) __err('pyNotInt', i, { name: name, v: __pyrepr(v, true) });
   if (elem == 'string') {
     if (typeof v != 'string') __err('numToTextList', i, { v: v, name: name });
     return v;
   }
-  if (typeof v == 'string') __err('textToNumList', i, { v: v, name: name, elem: elem });
+  if (typeof v == 'string') __err('textToNumList', i, { v: v, name: name, elem: __PY ? (elem == 'float' ? 'list[float]' : 'list[int]') : elem });
   if (!__isNum(v)) __err('nanToNum', i, { name: name });
   return elem == 'int' ? Math.trunc(v) | 0 : elem == 'long long' ? Math.trunc(v) : v;
 }
@@ -864,13 +1004,15 @@ function __text(v, i, name) {
   return String(v);
 }
 function __list(v, i, name) {
-  if (!Array.isArray(v)) __err('wholeList', i, { name: name });
+  if (!Array.isArray(v)) __err(__PY ? 'pyListAssign' : 'wholeList', i, { name: name });
   return v.slice();
 }
 function __index(list, name, i, k) {
   if (list === null && __FLOW[name]) __err('notCreated', i, { name: name });
   var isText = typeof list == 'string';
   if (!Array.isArray(list) && !isText) __err('notList', i, { name: name });
+  // Python 可以從後面數：a[-1] 是最後一個
+  if (__PY && Number.isInteger(k) && k < 0 && k >= -list.length) return k + list.length;
   if (!(Number.isInteger(k) && k >= __BASE && k < list.length + __BASE)) {
     // C++ 的 array（__FIXED 是 array 的名稱）：大小固定，說明不一樣
     var key = isText ? (list.length ? 'textOutOfRange' : 'emptyText') : __FIXED[name] ? 'fixedRange' : (list.length ? 'outOfRange' : 'emptyList');
@@ -904,6 +1046,8 @@ function __push(list, name, i, v) {
 function __insert(list, name, i, k, v) {
   if (!Array.isArray(list)) __err('notListEdit', i, { name: name });
   if (Array.isArray(v)) __err('listInList', i, { name: name });
+  // Python 的 insert 不會出錯：太大就放最後，負的從後面數
+  if (__PY && Number.isInteger(k)) { if (k < 0) k = Math.max(0, list.length + k); list.splice(Math.min(k, list.length), 0, v); return; }
   if (!(Number.isInteger(k) && k >= __BASE && k <= list.length + __BASE)) {
     __err('insertRange', i, { name: name, len: list.length, max: list.length + __BASE, k: k });
   }
@@ -914,6 +1058,7 @@ function __remove(list, name, i, k) {
   list.splice(__index(list, name, i, k), 1);
 }
 function __len(v, i) {
+  if (__PY && v && (v.__map || v.__set)) return (v.__map || v.__set).length;
   if (!Array.isArray(v) && typeof v != 'string') __err('lenNotList', i, {});
   return v.length;
 }
@@ -992,18 +1137,29 @@ function __bs(list, x, isMap) {
 function __key(k, i, name, d) {
   if (d.k == 'string') { if (typeof k != 'string') __err('mapKeyText', i, { name: name, v: k }); return k; }
   if (typeof k == 'string') __err('mapKeyNum', i, { name: name, v: k });
+  if (__PY) return k;
   return d.k == 'int' ? __int(k, i, name) : __long(k, i, name);
 }
 // m[k]：跟 C++ 一樣，沒有這個鍵時先放一個 0（string 是空的）再拿出來
+// Python 的 dict 照放進去的順序（不會排序）：一個一個找
+function __lin(list, x, isMap) {
+  for (var j = 0; j < list.length; j++) if (__cmp(isMap ? list[j][0] : list[j], x) == 0) return [true, j];
+  return [false, list.length];
+}
 function __mget(m, name, i, d, k) {
   k = __key(k, i, name, d);
+  if (__PY) {
+    var p = __lin(m.__map, k, true);
+    if (!p[0]) __err('pyKeyError', i, { name: name, v: __pyrepr(k, false, true) });
+    return m.__map[p[1]][1];
+  }
   var r = __bs(m.__map, k, true);
   if (!r[0]) m.__map.splice(r[1], 0, [k, d.d]);
   return m.__map[r[1]][1];
 }
 function __mset(m, name, i, d, k, v) {
   k = __key(k, i, name, d);
-  var r = __bs(m.__map, k, true);
+  var r = (__PY ? __lin : __bs)(m.__map, k, true);
   if (r[0]) m.__map[r[1]][1] = v; else m.__map.splice(r[1], 0, [k, v]);
 }
 // set 放入：已經有了就不放（不重複），沒有就放在排好的位置
@@ -1014,7 +1170,9 @@ function __sins(s, name, i, v) {
 // map、set 的 erase(鍵)：沒有這個鍵就什麼都不做
 function __erase(c, name, i, d, k) {
   if (c.__map) k = __key(k, i, name, d);
-  var list = c.__map || c.__set, r = __bs(list, k, !!c.__map);
+  var list = c.__map || c.__set, r = (__PY && c.__map ? __lin : __bs)(list, k, !!c.__map);
+  // Python 的 del d[k]：沒有這個鍵會出錯（set 的 discard 不會）
+  if (__PY && c.__map && !r[0]) __err('pyKeyError', i, { name: name, v: __pyrepr(k, false, true) });
   if (r[0]) list.splice(r[1], 1);
 }
 // priority_queue 放入：排好放（最後一個是 top：大的先出來的由小排到大，小的先出來的由大排到小）
@@ -1044,7 +1202,8 @@ function __sort(list, name, i, n, keys, desc) {
   if (n === null) n = list.length;
   if (!(Number.isInteger(n) && n >= 0 && n <= list.length)) __err('sortRange', i, { name: name, n: n, len: list.length });
   var part = list.slice(0, n);
-  var cmp = function (x, y, down) { var c = x < y ? -1 : x > y ? 1 : 0; return down ? -c : c; };
+  // pair（Python 的 tuple）沒選欄位時整筆比：先比第一個，一樣再比第二個
+  var cmp = function (x, y, down) { var c = __cmp(x, y); return down ? -c : c; };
   part.sort(function (p, q) {
     if (!keys) return cmp(p, q, desc);
     for (var k = 0; k < keys.length; k++) {
@@ -1058,6 +1217,7 @@ function __sort(list, name, i, n, keys, desc) {
 // max(a, b, ...)、min(a, b, ...)；只放一個 vector / array 時找裡面最大、最小的（C++ 的 *max_element）
 function __maxmin(args, i, big) {
   var list = args.length == 1 ? args[0] : Array.prototype.slice.call(args);
+  if (__PY && list && list.__set) list = list.__set;
   if (!Array.isArray(list) || (args.length == 1 && list.length && Array.isArray(list[0])) || list.length == 0 && args.length != 1) __err('maxArgs', i, {});
   if (!list.length) __err('maxEmpty', i, { name: '' });
   var best = list[0];
@@ -1069,6 +1229,13 @@ function __maxmin(args, i, big) {
 }
 // stoi：跟 C++ 一樣讀開頭的整數（"12abc" 是 12），開頭不是數字就出錯
 function __stoi(v, i) {
+  // Python 的 int( )：小數去掉小數部分；文字要整個是整數（前後可以有空白）
+  if (__PY) {
+    if (typeof v == 'number') return Math.trunc(v);
+    if (typeof v == 'boolean') return v ? 1 : 0;
+    if (!/^\\s*[+-]?\\d+\\s*$/.test(String(v))) __err('stoiBad', i, { v: v });
+    return parseInt(String(v), 10);
+  }
   var m = /^\\s*[+-]?\\d+/.exec(String(v));
   if (!m) __err('stoiBad', i, { v: v });
   return parseInt(m[0], 10) | 0;
@@ -1089,11 +1256,203 @@ function __setch(s, name, i, k, v) {
   var at = __index(s, name, i, k);
   return s.slice(0, at) + __chr(v) + s.slice(at + 1);
 }
-function __tostr(v) { return typeof v == 'number' && !Number.isInteger(v) ? v.toFixed(6) : String(v); }
+function __tostr(v, fl) { if (__PY) return __pyrepr(v, fl); return typeof v == 'number' && !Number.isInteger(v) ? v.toFixed(6) : String(v); }
 function __pop(c, name, i, kind) {
   if (!c.length) __err(kind == 'stack' ? 'stackEmpty' : kind == 'pq' ? 'pqEmpty' : 'queueEmpty', i, { name: name, m: 'pop' });
   if (kind == 'stack' || kind == 'pq') c.pop(); else c.shift();
 }
+// ---------- Python ----------
+// print、str( ) 印出來的樣子：True / False、小數一定有小數點（3.0）、tuple 是 (1, 2)；quote 是文字要加引號（tuple、錯誤訊息裡）
+function __pyrepr(v, fl, quote) {
+  if (typeof v == 'boolean') return v ? 'True' : 'False';
+  if (v === null || v === undefined) return 'None';
+  if (typeof v == 'string') return quote ? "'" + v + "'" : v;
+  if (typeof v == 'number') {
+    if (!isFinite(v)) return isNaN(v) ? 'nan' : v > 0 ? 'inf' : '-inf';
+    if (!fl && Number.isInteger(v)) return String(v);
+    var a = Math.abs(v);
+    if (a != 0 && (a >= 1e16 || a < 1e-4)) return v.toExponential().replace(/e([+-])(\\d)$/, 'e$10$2');
+    return Number.isInteger(v) ? v.toFixed(1) : String(v);
+  }
+  if (Array.isArray(v)) return '[' + v.map(function (x) { return __pyrepr(x, false, true); }).join(', ') + ']';
+  if (v && typeof v == 'object') {
+    var ks = Object.keys(v);
+    return '(' + ks.map(function (k) { return __pyrepr(v[k], false, true); }).join(', ') + (ks.length == 1 ? ',)' : ')');
+  }
+  return String(v);
+}
+// print(*a)：一項一項用空白隔開；二維 list 一列一行；dict 一行一個「鍵 值」；set 由小到大；fl 是裡面裝的是不是 float
+function __pyshow(v, fl) {
+  var r = function (x) { return __pyrepr(x, fl, false); };
+  if (v && v.__map) return v.__map.map(function (p) { return __pyrepr(p[0]) + ' ' + r(p[1]); }).join('\\n');
+  if (v && v.__set) return v.__set.map(r).join(' ');
+  if (Array.isArray(v)) {
+    if (v.length && Array.isArray(v[0])) return v.map(function (row) { return row.map(r).join(' '); }).join('\\n');
+    return v.map(r).join(' ');
+  }
+  return r(v);
+}
+function __pyint(v, i, name) {
+  v = __num(v, i, name);
+  if (!Number.isInteger(v)) __err('pyNotInt', i, { name: name, v: __pyrepr(v, true) });
+  return v;
+}
+// 讀一整行（input()）
+function __line(input, i, name) {
+  if (!input.length) __err('noInput', i, { name: name });
+  return input.shift();
+}
+// int(input())：這一行要剛好是一個整數
+function __pyInInt(s, i, name) {
+  var w = s.trim();
+  if (/\\s/.test(w)) __err('pyOneValue', i, { v: s, name: name });
+  if (!/^[+-]?\\d+$/.test(w)) __err('inputNotNum', i, { v: s, name: name });
+  return Number(w);
+}
+function __pyInFloat(s, i, name) {
+  var w = s.trim();
+  if (/\\s/.test(w)) __err('pyOneValue', i, { v: s, name: name });
+  if (!/^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?$/.test(w)) __err('pyFloatBad', i, { v: s, name: name });
+  return Number(w);
+}
+// a, b = input().split()：個數要剛好
+function __words(s, i, name, n) {
+  var w = s.trim() == '' ? [] : s.trim().split(/\\s+/);
+  if (w.length != n) __err('pyLineCount', i, { v: s, name: name, got: w.length, n: n });
+  return w;
+}
+// list(map(int, input().split()))
+function __pyInList(s, i, name, kind) {
+  var w = s.trim() == '' ? [] : s.trim().split(/\\s+/);
+  return w.map(function (x) { return kind == 'str' ? x : kind == 'float' ? __pyInFloat(x, i, name) : __pyInInt(x, i, name); });
+}
+function __pydiv(a, b, i) {
+  if (b == 0) __err('intDivZero', i, {});
+  return a / b;
+}
+// // 是無條件捨去到整數（往小的方向：-7 // 2 是 -4）
+function __fdiv(a, b, i) {
+  if (b == 0) __err('intDivZero', i, {});
+  return Math.floor(a / b);
+}
+// % 的結果跟除數同號（-7 % 2 是 1）
+function __pymod(a, b, i) {
+  if (b == 0) __err('intDivZero', i, {});
+  var r = a % b;
+  return r != 0 && (r < 0) != (b < 0) ? r + b : r;
+}
+function __pow(a, b) { return Math.pow(a, b); }
+// "-" * 10
+function __smul(a, b) { return typeof a == 'string' ? a.repeat(Math.max(0, b)) : b.repeat(Math.max(0, a)); }
+// 比較（== 會比 list、tuple 裡面的值；0 <= x < 10 每一段都要成立）
+function __eq(a, b) {
+  if (a && b && typeof a == 'object' && typeof b == 'object') return __cmp(a.__set || a.__map || a, b.__set || b.__map || b) == 0 && Object.keys(a).length == Object.keys(b).length;
+  return a == b && (typeof a == 'string') == (typeof b == 'string');
+}
+function __cmpop(x, op, y, i) {
+  if (op == 'in') return __in(x, y, i);
+  if (op == 'notin') return !__in(x, y, i);
+  if (op == '==') return __eq(x, y);
+  if (op == '!=') return !__eq(x, y);
+  if ((typeof x == 'string') != (typeof y == 'string')) __err('pyTypeCmp', i, {});
+  var c = __cmp(x, y);
+  return op == '<' ? c < 0 : op == '<=' ? c <= 0 : op == '>' ? c > 0 : c >= 0;
+}
+function __chain(i) {
+  for (var k = 1; k + 2 < arguments.length; k += 2) if (!__cmpop(arguments[k], arguments[k + 1], arguments[k + 2], i)) return false;
+  return true;
+}
+function __in(x, c, i) {
+  if (typeof c == 'string') { if (typeof x != 'string') __err('pyStrIn', i, {}); return c.indexOf(x) >= 0; }
+  if (c && c.__map) return __lin(c.__map, x, true)[0];
+  if (c && c.__set) return __lin(c.__set, x, false)[0];
+  if (Array.isArray(c)) return __lin(c, x, false)[0];
+  __err('pyInType', i, {});
+}
+// heapq 的 h[0]：最小的（存的時候最後一個是最小的）
+function __pqtop(h, name, i) {
+  if (!h.length) __err('pqEmpty', i, { name: name, m: '' });
+  return h[h.length - 1];
+}
+// s[a:b:c]
+function __slice(v, i, a, b, c) {
+  var n = v.length, step = c == null ? 1 : c;
+  if (step == 0) __err('pyRangeStep', i, {});
+  var fix = function (x, d) { if (x == null) return d; if (x < 0) x += n; return step > 0 ? Math.min(Math.max(x, 0), n) : Math.min(Math.max(x, -1), n - 1); };
+  var s = fix(a, step > 0 ? 0 : n - 1), e = fix(b, step > 0 ? n : -1), out = [];
+  for (var k = s; step > 0 ? k < e : k > e; k += step) out.push(v[k]);
+  return typeof v == 'string' ? out.join('') : out;
+}
+// for x in …：先複製一份（字串是一個一個字、dict 是鍵）
+function __iter(v, i, heap) {
+  if (heap) __err('pyIterHeap', i, {});
+  if (typeof v == 'string') return Array.from(v);
+  if (v && v.__map) return v.__map.map(function (p) { return p[0]; });
+  if (v && v.__set) return v.__set.slice();
+  if (Array.isArray(v)) return v.slice();
+  __err('pyIterType', i, {});
+}
+// 字串、list、dict 的函式
+function __pm(o, m, i, a, b) {
+  if (typeof o == 'string') {
+    switch (m) {
+      case 'upper': return o.toUpperCase();
+      case 'lower': return o.toLowerCase();
+      case 'strip': return o.trim();
+      case 'replace': return o.split(String(a)).join(String(b));
+      case 'split': return a === undefined ? (o.trim() == '' ? [] : o.trim().split(/\\s+/)) : o.split(String(a));
+      case 'find': return o.indexOf(String(a));
+      case 'count': return a === '' ? o.length + 1 : o.split(String(a)).length - 1;
+      case 'isdigit': return /^[0-9]+$/.test(o);
+      case 'isalpha': return /^\\p{L}+$/u.test(o);
+      case 'isupper': return /\\p{Lu}/u.test(o) && !/\\p{Ll}/u.test(o);
+      case 'islower': return /\\p{Ll}/u.test(o) && !/\\p{Lu}/u.test(o);
+      case 'startswith': return o.indexOf(String(a)) == 0;
+      case 'endswith': return o.length >= String(a).length && o.slice(o.length - String(a).length) == String(a);
+    }
+  }
+  else if (o && o.__map) {
+    if (m == 'get') { var p = __lin(o.__map, a, true); return p[0] ? o.__map[p[1]][1] : b === undefined ? null : b; }
+  }
+  else if (Array.isArray(o)) {
+    if (m == 'index') { var q = __lin(o, a, false); if (!q[0]) __err('pyNotInList', i, { v: __pyrepr(a, false, true) }); return q[1]; }
+    if (m == 'count') return o.filter(function (x) { return __cmp(x, a) == 0; }).length;
+  }
+  __err('pyNoMethod', i, { m: m });
+}
+function __float(v, i) {
+  if (typeof v == 'number') return v;
+  if (typeof v == 'boolean') return v ? 1 : 0;
+  var w = String(v).trim();
+  if (!/^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?$/.test(w)) __err('pyFloatBad', i, { v: v });
+  return Number(w);
+}
+function __abs(v, i) { return Math.abs(__num(v, i, 'abs')); }
+function __sum(v, i) {
+  var list = v && v.__set ? v.__set : v;
+  if (!Array.isArray(list)) __err('maxArgs', i, {});
+  return list.reduce(function (s, x) { return s + x; }, 0);
+}
+function __ordp(c, i) {
+  if (typeof c != 'string' || Array.from(c).length != 1) __err('pyOrd', i, {});
+  return c.codePointAt(0);
+}
+function __chrp(k, i) { return String.fromCodePoint(__pyint(k, i, 'chr')); }
+// round：剛好一半時取偶數（round(2.5) 是 2，跟 Python 一樣）
+function __round(x, i, nd) {
+  x = __num(x, i, 'round');
+  if (nd !== undefined) { var p = Math.pow(10, nd); return Math.round(x * p) / p; }
+  var f = Math.floor(x), d = x - f;
+  return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 == 0 ? f : f + 1);
+}
+// [0] * n：建立 n 格的 list（二維用 __grid）
+function __pyfill(name, i, n, fill, sname) {
+  n = __pyint(n, i, name);
+  var a = [];
+  for (var k = 0; k < n; k++) a.push(sname ? __new(sname) : fill);
+  return a;
+}
+
 // 輸出清單：一項一項用空白隔開；二維清單一列一行
 function __show(v) {
   // C++ 的 cout 印 true / false 是 1 / 0（例如 s.empty()）
@@ -1146,13 +1505,18 @@ class CodeGenerator {
   /** 在幾層判斷裡面（建立 array 要在最外層） */
   private ifDepth = 0;
 
-  /** 在 for 迴圈裡面：計數變數當成 int 變數（算式、整數除法才認得它） */
-  private withLoopVar<T>(name: string, f: () => T): T {
+  /**
+   * 在 for 迴圈裡面：計數變數當成 int 變數（算式、整數除法才認得它）；
+   * Python 的 for x in …：照裡面放的東西決定型別（字串的每個字是 str、list[float] 的每項是 float、二維 list 的每一列是 list…）
+   */
+  private withLoopVar<T>(name: string, f: () => T, as: { type: VarType; init: string; float?: boolean } = { type: '數字', init: '0' }): T {
     const saved = this.vars;
+    const key = ({ 數字: 'number', 文字: 'text', 清單: 'array', 結構: 'record' } as Record<string, keyof VarStore['type_var_list']>)[as.type] ?? 'number';
     this.vars = {
       ...saved,
-      var_list: { name: [...saved.var_list.name, name], value: [...saved.var_list.value, '0'] },
-      type_var_list: { ...saved.type_var_list, number: [...saved.type_var_list.number, name] },
+      var_list: { name: [...saved.var_list.name, name], value: [...saved.var_list.value, as.init] },
+      type_var_list: { ...saved.type_var_list, [key]: [...saved.type_var_list[key], name] },
+      floats: as.float ? [...(saved.floats ?? []), name] : saved.floats,
     };
     this.loopStack.push(name);
     try {
@@ -1181,10 +1545,14 @@ class CodeGenerator {
     this.params = params;
     this.locals = locals.filter(v => v.name.trim() != '');
     this.globalRefs = sheet > 0 && getTarget() == 'scratch';
+    this.py = isPython();
     // 每一步都把所有變數的值記下來。全域變數用 __globals()（寫在最外層，模組裡同名的參數蓋不到它）；
     // 正在執行的模組（一層一層）的參數和區域變數在 __frames，Update_output 時一起記下來（見 frameGetter）
     this.varStr = '__globals()';
   }
+
+  /** 學習目標是 Python */
+  private readonly py: boolean;
 
   /** 積木在這張流程圖裡的 index（找箭頭用） */
   private idx(node: FlowNode) {
@@ -1253,7 +1621,7 @@ class CodeGenerator {
 
   /** C++ 的 int 變數（或參數）：存進去的值小數會被去掉 */
   private isIntVar(name: string) {
-    return getTarget() == 'cpp' && this.vars.type_var_list.number.includes(name) && !(this.vars.floats ?? []).includes(name);
+    return isCode() && this.vars.type_var_list.number.includes(name) && !(this.vars.floats ?? []).includes(name);
   }
 
   /** C++ 的 long long：不會溢位 */
@@ -1263,6 +1631,7 @@ class CodeGenerator {
 
   /** 存進數字變數用的檢查：int（會溢位）、long long、float */
   private numConv(name: string) {
+    if (this.py) return this.isIntVar(name) ? '__pyint' : '__num';
     return this.isLongVar(name) ? '__long' : this.isIntVar(name) ? '__int' : '__num';
   }
 
@@ -1271,7 +1640,7 @@ class CodeGenerator {
    * Scratch、Blockly 的清單什麼都能放，照原樣
    */
   private item(list: string, value: string, i: number) {
-    if (getTarget() != 'cpp' || !(this.isList(list) || this.isGrid(list) || this.containerKind(list) || this.isMap(list))) return value;
+    if (!isCode() || !(this.isList(list) || this.isGrid(list) || this.containerKind(list) || this.isMap(list))) return value;
     let holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
     // map：放的是值
     if (this.isMap(list)) holds = mapParts(holds).value;
@@ -1283,7 +1652,7 @@ class CodeGenerator {
 
   /** 輸入到清單：C++ 裝 string 的清單讀成文字（"5" 也是文字），其他照 Scratch（看起來是數字就當數字） */
   private listReader(list: string) {
-    return getTarget() == 'cpp' && this.vars.var_list.value[this.vars.var_list.name.indexOf(list)] == '文字' ? '__inText' : '__inList';
+    return isCode() && this.vars.var_list.value[this.vars.var_list.name.indexOf(list)] == '文字' ? '__inText' : '__inList';
   }
 
   /** 二維清單的一格「表[a][b]」：名稱後面的 [ 是第 k 個，配對的 ] 後面緊接著另一個 [ */
@@ -1346,7 +1715,12 @@ class CodeGenerator {
   private rewrites(text: string, i: number) {
     const pre = new Map<number, { len: number; s: string }[]>();
     const post = new Map<number, { len: number; s: string }[]>();
-    const ops = new Set<number>();
+    /** 換成別的字的 token（例如 / 換成逗號） */
+    const ops = new Map<number, string>();
+    if (this.py) {
+      this.pyRewrites(text, i, pre, post, ops);
+      return { pre, post, ops };
+    }
     if (getTarget() != 'cpp') return { pre, post, ops };
     const { e: root, spans } = parseExprSpans(text);
     const map = varInfoMap(this.vars);
@@ -1369,7 +1743,7 @@ class CodeGenerator {
           if (e.op == '/' && e.span && this.isIntExpr(e.a) && this.isIntExpr(e.b)) {
             const [from, at, to] = e.span;
             wrap(from, to, '__idiv(', `, ${i})`);
-            ops.add(at);
+            ops.set(at, ', ');
           }
           const ta = type(e.a), tb = type(e.b);
           // 字拿來算：'a' + 1、s[i] - '0'（文字接起來的 + 不算）
@@ -1397,8 +1771,150 @@ class CodeGenerator {
     return { pre, post, ops };
   }
 
+  /**
+   * Python 要換掉的地方（JavaScript 沒有、或意思不一樣的寫法）：
+   * / // % ** → __pydiv、__fdiv、__pymod、__pow（除以 0 要出錯；// 和 % 照 Python 往小的方向）；比較（含 in、not in、連著比）→ __chain；
+   * not → !( )；True/False；(a, b) → 一整筆 tuple；t[0] → 欄位；h[0] → heap 最小的；s[a:b] → __slice；s.upper() → __pm
+   */
+  private pyRewrites(text: string, i: number, pre: Map<number, { len: number; s: string }[]>, post: Map<number, { len: number; s: string }[]>, ops: Map<number, string>) {
+    const { e: root, spans, marks } = parseExprSpans(text);
+    const map = varInfoMap(this.vars);
+    const add = (m: typeof pre, k: number, x: { len: number; s: string }) => { if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); };
+    const wrap = (from: number, to: number, open: string, close: string) => {
+      add(pre, from, { len: to - from, s: open });
+      add(post, to - 1, { len: to - from, s: close });
+    };
+    const type = (x: Expr) => exprType(x, map, this.modules);
+    const span = (x: Expr) => spans.get(x) ?? [0, 0];
+    const fail = (message: string) => { throw new FlowError(this.where(message), i); };
+    const visit = (e: Expr) => {
+      switch (e.t) {
+        case 'bool': ops.set(marks.get(e)![0], e.v ? 'true' : 'false'); break;
+        case 'bin': {
+          visit(e.a);
+          visit(e.b);
+          const at = marks.get(e) ?? [];
+          const [from, to] = span(e);
+          const ta = type(e.a), tb = type(e.b);
+          if (e.op == '+' && ((ta == 'str' && tb == 'num') || (ta == 'num' && tb == 'str'))) {
+            fail(t(`「${text.trim()}」：Python 不能把文字和數字直接用 + 接起來（TypeError），數字要先用 str( ) 變成文字，例如 "答案：" + str(x)。`, `"${text.trim()}": Python cannot join text and a number with + (TypeError). Turn the number into text with str( ) first, like "Answer: " + str(x).`));
+          }
+          if (e.op == '*' && (ta == 'str' || tb == 'str')) {
+            wrap(from, to, '__smul(', ')');
+            ops.set(at[0], ', ');
+            break;
+          }
+          if (['==', '!=', '<', '<=', '>', '>=', 'in', 'notin'].includes(e.op)) {
+            wrap(from, to, `__chain(${i}, `, ')');
+            at.forEach((k, j) => ops.set(k, j == 0 ? `, ${JSON.stringify(e.op)}, ` : ''));
+            break;
+          }
+          const helper = ({ '/': '__pydiv', '//': '__fdiv', '%': '__pymod' } as Record<string, string>)[e.op];
+          if (helper) {
+            wrap(from, to, helper + '(', `, ${i})`);
+            ops.set(at[0], ', ');
+          }
+          if (e.op == '**') {
+            wrap(from, to, '__pow(', ')');
+            ops.set(at[0], ', ');
+          }
+          break;
+        }
+        case 'chain': {
+          e.items.forEach(visit);
+          const [from, to] = span(e);
+          wrap(from, to, `__chain(${i}, `, ')');
+          // 符號的 token：每個符號 1 個（in、<、>）或 2 個（<=、not in）
+          const at = marks.get(e) ?? [];
+          let k = 0;
+          e.ops.forEach(op => {
+            const n = op == 'notin' || op.length == 2 ? 2 : 1;
+            for (let j = 0; j < n; j++) ops.set(at[k + j], j == 0 ? `, ${JSON.stringify(op)}, ` : '');
+            k += n;
+          });
+          break;
+        }
+        case 'not': {
+          visit(e.a);
+          const [, to] = span(e);
+          ops.set(marks.get(e)![0], '!(');
+          add(post, to - 1, { len: 0, s: ')' });
+          break;
+        }
+        case 'brace': {
+          e.items.forEach(visit);
+          const at = marks.get(e);
+          if (at) {
+            ops.set(at[0], '{__brace: [');
+            ops.set(at[1], ']}');
+          }
+          break;
+        }
+        case 'idx': {
+          visit(e.obj);
+          visit(e.index);
+          const [open, close] = marks.get(e) ?? [];
+          if (open == null) break;
+          const blank = () => { for (let k = open + 1; k <= close; k++) ops.set(k, ''); };
+          // tuple 的 t[0]、t[1]：一筆 pair 的 first、second
+          const tf = tupleField(e, map);
+          if (tf) {
+            if (e.obj.t == 'var') ops.set(span(e.obj)[0], e.obj.name);
+            ops.set(open, '.' + tf.name);
+            blank();
+            break;
+          }
+          if (e.obj.t == 'var' && structOf(e.obj, map) && e.index.t == 'num') fail(t(`「${text.trim()}」：tuple 只有 [0]、[1] 兩個。`, `"${text.trim()}": a tuple has only [0] and [1].`));
+          // heapq：只能看 h[0]（最小的）
+          if (e.obj.t == 'var' && this.vars.type_var_list.pq.includes(e.obj.name)) {
+            if (!(e.index.t == 'num' && Number(e.index.v) == 0)) fail(t(`「${text.trim()}」：heapq 只能看 ${e.obj.name}[0]（最小的那一個），其他位置的順序是亂的。`, `"${text.trim()}": with heapq you can only look at ${e.obj.name}[0] (the smallest).`));
+            ops.set(span(e.obj)[0], `__pqtop(${e.obj.name}, ${JSON.stringify(e.obj.name)}, ${i})`);
+            ops.set(open, '');
+            blank();
+          }
+          break;
+        }
+        case 'slice': {
+          visit(e.obj);
+          [e.start, e.stop, e.step].forEach(x => x && visit(x));
+          const at = marks.get(e)!;
+          const [from] = span(e.obj);
+          const close = at[at.length - 1];
+          if (e.obj.t == 'var') ops.set(from, e.obj.name);
+          add(pre, from, { len: close + 1 - from, s: '__slice(' });
+          const parts = [e.start, e.stop, e.step];
+          ops.set(at[0], `, ${i}, ${parts[0] ? '' : 'null'}`);
+          for (let j = 1; j < at.length - 1; j++) ops.set(at[j], `, ${parts[j] ? '' : 'null'}`);
+          ops.set(close, ')');
+          break;
+        }
+        case 'method': {
+          visit(e.obj);
+          e.args.forEach(visit);
+          const [dot, nm, lp, rp] = marks.get(e)!;
+          const [from] = span(e.obj);
+          add(pre, from, { len: rp + 1 - from, s: '__pm(' });
+          ops.set(dot, ', ');
+          ops.set(nm, JSON.stringify(e.name));
+          ops.set(lp, `, ${i}${e.args.length ? ', ' : ''}`);
+          break;
+        }
+        case 'call': {
+          e.args.forEach(visit);
+          // str(6 / 2) 是 "3.0"：小數要讓 __tostr 知道
+          if (e.fn == 'tostr' && e.args[0] && isFloatExpr(e.args[0], map, this.modules)) ops.set(span(e)[1] - 1, ', true)');
+          break;
+        }
+        case 'fcall': e.args.forEach(visit); break;
+        case 'field': visit(e.obj); break;
+        case 'neg': visit(e.a); break;
+      }
+    };
+    visit(root);
+  }
+
   private expr(text: string, i: number, condition = false): string {
-    text = rowMethods(text);
+    if (!this.py) text = rowMethods(text);
     const tokens = tokenize(text);
     /** m.count(k) 的 )：要補上鍵的型別 */
     const mapCountClose = new Map<number, string>();
@@ -1422,7 +1938,7 @@ class CodeGenerator {
         skip = 2;
       }
       else
-      if (t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '.' && method?.type == 'name' && tokens[k + 3]?.text == '(') {
+      if (!this.py && t.type == 'name' && this.isVar(t.text) && tokens[k + 1]?.text == '.' && method?.type == 'name' && tokens[k + 3]?.text == '(') {
         const ty = this.vars.type_var_list;
         const kind = ty.stack.includes(t.text) ? 'stack' : ty.queue.includes(t.text) ? 'queue' : ty.text.includes(t.text) ? 'string'
           : ty.map.includes(t.text) ? 'map' : ty.set.includes(t.text) ? 'set' : ty.pq.includes(t.text) ? 'pq' : 'vector';
@@ -1458,7 +1974,7 @@ class CodeGenerator {
           : `__at(${t.text}, ${JSON.stringify(t.text)}, ${i}, `;
       }
       else if (t.type == 'name' && isFunc(t.text) && !this.isVar(t.text) && tokens[k + 1]?.text == '(') {
-        piece = FUNCTIONS[t.text];
+        piece = this.py ? PY_FUNCTIONS[t.text] : FUNCTIONS[t.text];
       }
       // 有回傳值的模組寫在算式裡：找最大(x, y) → __mod2(x, y)
       else if (t.type == 'name' && !this.isVar(t.text) && tokens[k + 1]?.text == '(' && this.modules.some(m => m.name == t.text && m.returns)) {
@@ -1485,8 +2001,8 @@ class CodeGenerator {
         piece = kind == 'cell1' ? '), (' : kind == 'raw' || kind == null ? ']' : '))';
         if (kind == 'cell1') secondBracket = true;
       }
-      // C++ 的整數除法：a / b → __idiv(a, b, 積木編號)
-      if (div.ops.has(k)) piece = ', ';
+      // C++ 的整數除法：a / b → __idiv(a, b, 積木編號)；Python 換掉的 token
+      if (div.ops.has(k)) piece = div.ops.get(k)!;
       // 包起來的開頭（外層的先寫）；用掉的 token 上如果有結尾，也要補上（裡層的先寫）
       const opens = (div.pre.get(k) ?? []).sort((a, b) => b.len - a.len).map(x => x.s).join('');
       let closes = '';
@@ -1497,7 +2013,10 @@ class CodeGenerator {
       k += skip;
     }
     // 長度( )、項目編號( )、包含( ) 要把積木編號傳進去，錯誤時才能標出積木
-    out = out.replace(/__(len|find|has|stoi|tostr|max|min)\(/g, `__$1_${i}(`);
+    out = out.replace(new RegExp(`__(${HELPERS})\\(`, 'g'), `__$1_${i}(`);
+    if (this.py) out = pyLogic(out);
+    // 用到 長度( ) 這些函式：這個積木要有自己的一份（見 program）
+    if (FUNC_CALL(i).test(out)) this.funcHelpers.add(i);
     return condition ? toCondition(out) : out;
   }
 
@@ -1532,6 +2051,9 @@ class CodeGenerator {
       return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${this.item(cell.name, value, i)});\n`;
     }
     const item = listItemTarget(target);
+    if (item && this.py && this.vars.type_var_list.text.includes(item.list)) {
+      throw new FlowError(this.where(t(`「${target.trim()}」：Python 的字串（str）不能只改其中一個字，可以用切片和 + 接成新的字串。`, `"${target.trim()}": in Python you cannot change one letter of a str. Make a new string with slices and +.`)), i);
+    }
     // C++ 的 s[i] = 'x'：換掉文字裡的一個字
     if (item && getTarget() == 'cpp' && this.vars.type_var_list.text.includes(item.list)) {
       return `${item.list} = __setch(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${value});\n`;
@@ -1558,7 +2080,7 @@ class CodeGenerator {
     const f = fieldOf(parseExpr(target) as Expr & { t: 'field' }, varInfoMap(this.vars));
     const name = JSON.stringify(target.trim());
     if (f?.type == '文字') return `__text(${value}, ${i}, ${name})`;
-    return `${getTarget() == 'cpp' && f && !f.float ? '__int' : '__num'}(${value}, ${i}, ${name})`;
+    return `${isCode() && f && !f.float ? (this.py ? '__pyint' : '__int') : '__num'}(${value}, ${i}, ${name})`;
   }
 
   /** 用到 長度( )、項目編號( )、包含( ) 的積木編號 */
@@ -1622,7 +2144,15 @@ class CodeGenerator {
       case 'Parallelogram': {
         const parts = node.text.split(' ');
         let code: string;
-        if (parts[0].includes('輸入')) {
+        if (parts[0].includes('輸入') && this.py) {
+          const v = parts.slice(1).join(' ').trim();
+          if (!v) this.fail(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), node);
+          code = this.pyInput(node, v, i);
+        }
+        else if (!parts[0].includes('輸入') && this.py) {
+          code = this.pyOutput(parts.slice(1).join(' ').trim(), i);
+        }
+        else if (parts[0].includes('輸入')) {
           const v = parts.slice(1).join(' ').trim();
           if (!v) this.fail(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), node);
           this.checkLoopVarChange(node, v);
@@ -1708,6 +2238,12 @@ class CodeGenerator {
         return { code: code + 'total_step ++;\n', next, jumps: !next && ie.jumps && el.jumps };
       }
       case 'For_Loop': {
+        // Python 的 for i in range(n)、for x in a
+        const py = this.py ? pyFor(node.text) : null;
+        if (py) return this.pyForLoop(node, py, i, update);
+        if (this.py && !node.text.trim().endsWith('次')) {
+          this.fail(t(`${label(node)} 的寫法看不懂：Python 的 for 迴圈寫成「for i in range(n)」「for i in range(1, n + 1)」或「for x in a」。`, `${label(node)} cannot be read. A Python for loop looks like "for i in range(n)", "for i in range(1, n + 1)" or "for x in a".`), node);
+        }
         // C++ 的 for (int i = 0; i < n; i++)
         const header = splitFor(node.text);
         if (header) return this.forLoop(node, header, i, update);
@@ -1740,6 +2276,18 @@ class CodeGenerator {
           return { code: 'total_step ++;\n' + update + (action == '跳出' ? 'break;\n' : 'continue;\n'), next: undefined, jumps: true };
         }
         this.checkLoopVarChange(node, splitTarget(target)?.name ?? target);
+        // Python：[0] * n 建立 n 格的 list（可以建立很多次）
+        if (this.py && action == '建立' && !index2) {
+          if (!this.isList(target)) this.fail(t(`${label(node)}：「${target}」不是 list。`, `${label(node)}: "${target}" is not a list.`), node);
+          const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(target)];
+          const code = `${target} = __pyfill(${JSON.stringify(target)}, ${i}, (${expr(index)}), ${holds == '文字' ? '""' : holds == '小數' ? '0.0' : '0'}, ${JSON.stringify(structNameOf(this.vars, target) ?? null)});\n`;
+          this.checkSyntax(node, code);
+          return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
+        }
+        // Python：小數存進 int 變數（6 / 2 是 3.0，不是 3）
+        if (this.py && action == '設為' && !node.data && this.isIntVar(target) && isFloatExpr(parseExpr(rest), varInfoMap(this.vars), this.modules)) {
+          this.fail(pyFloatToInt(target, rest.trim()), node);
+        }
         // 建立 array：要在最外層（C++ 在大括號裡宣告的 array，出了大括號就不能用）
         if (action == '建立' && !index2) {
           if (!this.isFixed(target) || !(this.vars.flowSized ?? []).includes(target)) {
@@ -1758,7 +2306,8 @@ class CodeGenerator {
           if (next && !(next.figure == 'Circle' && next.text == '結束')) {
             this.fail(t(`${label(node)} 後面要直接接「結束」：回傳之後就離開模組，後面的積木不會做。`, `${label(node)} must go straight to "End". After returning, the module stops.`), node);
           }
-          const code = `__ret = ${m.returns == '文字' ? '__text' : getTarget() == 'cpp' && m.returnsLong ? '__long' : getTarget() == 'cpp' && !m.returnsFloat ? '__int' : '__num'}(${value}, ${i}, ${JSON.stringify(t('回傳值', 'return value'))});\n`;
+          const conv = m.returns == '文字' ? '__text' : this.py ? (m.returnsFloat ? '__num' : '__pyint') : getTarget() == 'cpp' && m.returnsLong ? '__long' : getTarget() == 'cpp' && !m.returnsFloat ? '__int' : '__num';
+          const code = `__ret = ${conv}(${value}, ${i}, ${JSON.stringify(t('回傳值', 'return value'))});\n`;
           this.checkSyntax(node, code);
           return { code: code + 'total_step ++;' + update, next };
         }
@@ -1775,6 +2324,11 @@ class CodeGenerator {
         }
         if (this.isMap(target) && !['替換', '刪除', '清空'].includes(action)) {
           this.fail(t(`${label(node)}：「${target}」是 map，只能設定某個鍵的值、刪除某個鍵、全部清空。請雙擊積木重新選。`, `${label(node)}: "${target}" is a map. You can set the value of a key, erase a key, or clear it. Double-click the block to choose again.`), node);
+        }
+        // Python 的 list 就是 stack：a.pop() 拿掉最後一個
+        if (this.py && !kind && action == '取出' && this.isList(target)) {
+          const code = `__pop(${target}, ${name}, ${i}, "stack");\n`;
+          return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
         }
         if (!kind && (action == '放入' || action == '取出')) {
           this.fail(t(`${label(node)}：「${target}」不是 stack 或 queue，不能 push、pop。請雙擊積木重新選。`, `${label(node)}: "${target}" is not a stack or queue, so it cannot push or pop. Double-click the block to choose again.`), node);
@@ -1816,6 +2370,142 @@ class CodeGenerator {
 
   private linksInto(node: FlowNode | undefined) {
     return this.diagram.links.filter(l => l && node && l.to == this.idx(node)).length;
+  }
+
+  /** 變數的型別（Python 的 input、print 用）：變數表選的型別 */
+  private kindOf(name: string): VarType | null {
+    const ty = this.vars.type_var_list;
+    return ty.number.includes(name) ? '數字' : ty.text.includes(name) ? '文字' : ty.grid.includes(name) ? '二維清單' : ty.array.includes(name) ? '清單'
+      : ty.map.includes(name) ? '對應表' : ty.set.includes(name) ? '集合' : ty.pq.includes(name) ? '優先佇列小' : ty.queue.includes(name) ? '佇列'
+      : ty.record.includes(name) ? '結構' : null;
+  }
+
+  /** 容器裡裝的東西（Python 的 input 用）：int、float、str；裝 tuple 的回傳 null */
+  private pyElem(name: string): 'int' | 'float' | 'str' | null {
+    const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(name)];
+    if (findStruct(holds)) return null;
+    return holds == '文字' ? 'str' : holds == '小數' ? 'float' : 'int';
+  }
+
+  /**
+   * Python 的輸入：一個積木讀一整行（input()）。
+   * 數字變數 n = int(input())；文字變數 s = input()；list a = list(map(int, input().split()))；
+   * 二維 list 加一列 g.append(list(map(int, input().split())))；「輸入 a, b」一行讀好幾個 a, b = map(int, input().split())；
+   * list 的一格、dict 的一格：a[k] = int(input())
+   */
+  private pyInput(node: FlowNode, v: string, i: number): string {
+    const name = JSON.stringify(v);
+    const line = `__line(input_list, ${i}, ${name})`;
+    const conv = (target: string, s: string) => {
+      const k = this.kindOf(target);
+      const nm = JSON.stringify(target);
+      if (k == '文字') return s;
+      if (k == '數字') return (this.vars.floats ?? []).includes(target) ? `__pyInFloat(${s}, ${i}, ${nm})` : `__pyInInt(${s}, ${i}, ${nm})`;
+      return null;
+    };
+    /** 容器的一格要讀成什麼（照裡面裝的東西） */
+    const convElem = (list: string, s: string) => {
+      let holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(list)];
+      if (this.isMap(list)) holds = mapParts(holds).value;
+      const nm = JSON.stringify(list);
+      return holds == '文字' ? s : holds == '小數' ? `__pyInFloat(${s}, ${i}, ${nm})` : `__pyInInt(${s}, ${i}, ${nm})`;
+    };
+    const many = splitArgs(v);
+    if (many.length > 1) {
+      for (const n of many) {
+        this.checkLoopVarChange(node, n);
+        if (!conv(n, '')) this.fail(t(`${label(node)}：一次讀好幾個值時，每個都要是數字或文字變數（「${n}」不是）。list 請用一個輸入積木讀一整行。`, `${label(node)}: when reading many values, each one must be a number or text variable ("${n}" is not). Read a list with its own input block.`), node);
+      }
+      const w = `__w${i}`;
+      return `var ${w} = __words(${line}, ${i}, ${name}, ${many.length});\n` + many.map((n, k) => `${n} = ${conv(n, `${w}[${k}]`)};\n`).join('');
+    }
+    this.checkLoopVarChange(node, v);
+    const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
+    const cell = splitTarget(v);
+    if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
+      return `__set2(${cell.name}, ${JSON.stringify(cell.name)}, ${i}, (${this.expr(cell.indexes[0], i)}), (${this.expr(cell.indexes[1], i)}), ${this.item(cell.name, convElem(cell.name, line), i)});\n`;
+    }
+    if (insert) {
+      const list = insert[1].trim();
+      return `__insert(${list}, ${JSON.stringify(list)}, ${i}, (${this.expr(insert[2], i)}), ${this.item(list, convElem(list, line), i)});\n`;
+    }
+    const item = listItemTarget(v);
+    if (item && this.isMap(item.list)) return this.assign(v, convElem(item.list, line), i);
+    if (item && this.isList(item.list)) {
+      return `__set(${item.list}, ${JSON.stringify(item.list)}, ${i}, (${this.expr(item.index, i)}), ${this.item(item.list, convElem(item.list, line), i)});\n`;
+    }
+    const kind = this.kindOf(v);
+    if (kind == '清單' || kind == '二維清單') {
+      const elem = this.pyElem(v);
+      if (!elem) this.fail(t(`${label(node)}：裝 tuple 的 list 不能直接輸入，請先輸入到變數，再把 (a, b) 放進去。`, `${label(node)}: a list of tuples cannot be input directly. Input into variables, then add (a, b).`), node);
+      const read = `__pyInList(${line}, ${i}, ${name}, ${JSON.stringify(elem)})`;
+      return kind == '清單' ? `${v} = ${read};\n` : `${v}.push(${read});\n`;
+    }
+    if (kind && kind != '數字' && kind != '文字') {
+      this.fail(t(`${label(node)}：「${v}」是 ${cppContainerName(this.vars, v)}，不能直接輸入。請先輸入到變數，再放進去。`, `${label(node)}: "${v}" cannot be input directly. Input into a variable first, then put it in.`), node);
+    }
+    const c = conv(v, line);
+    if (!c) this.fail(t(`${label(node)}：「${v}」不是變數表裡的變數。`, `${label(node)}: "${v}" is not in the variable table.`), node);
+    return `${v} = ${c};\n`;
+  }
+
+  /** Python 的 print：「輸出 a, b」用空白隔開；整個 list、set、dict 是 print(*a) 這樣一項一項印 */
+  private pyOutput(what: string, i: number): string {
+    const map = varInfoMap(this.vars);
+    const parts = splitArgs(what).map(p => {
+      const e = parseExpr(p);
+      const k = e.t == 'var' ? this.kindOf(e.name) : null;
+      if (e.t == 'var' && k && k != '數字' && k != '文字' && k != '結構') {
+        let holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(e.name)];
+        if (k == '對應表') holds = mapParts(holds).value;
+        // heapq：由小到大（存的時候最後一個是最小的）
+        const shown = k == '優先佇列小' ? `${e.name}.slice().reverse()` : e.name;
+        return `__pyshow(${shown}, ${holds == '小數'})`;
+      }
+      return `__pyrepr(${this.expr(p, i)}, ${isFloatExpr(e, map, this.modules)})`;
+    });
+    return `output_result += ([${parts.join(', ')}].join(' ') + "\\n");\n`;
+  }
+
+  /** Python 的 for 迴圈：for i in range(start, stop, step)、for x in 清單 */
+  private pyForLoop(node: FlowNode, py: NonNullable<ReturnType<typeof pyFor>>, i: number, update: string): CodeResult {
+    const name = py.name;
+    if (this.isVar(name)) {
+      this.fail(t(`${label(node)}：迴圈的變數「${name}」跟變數表（或參數、區域變數）的「${name}」同名。for 的變數不用在變數表宣告，請換一個名字，或刪掉變數表裡的「${name}」。`, `${label(node)}: the loop variable "${name}" has the same name as a variable in the table. Rename it, or delete "${name}" from the table.`), node);
+    }
+    if (this.loopStack.includes(name)) {
+      this.fail(t(`${label(node)} 在另一個也用「${name}」的 for 迴圈裡面：裡面的迴圈請換一個名字，例如 j。`, `${label(node)} is inside another for loop that uses "${name}". Use another name for the inner loop, like j.`), node);
+    }
+    let head: string;
+    let as: { type: VarType; init: string; float?: boolean } = { type: '數字', init: '0' };
+    if (py.range) {
+      const r = py.range;
+      const num = (x: string) => `__pyint((${this.expr(x, i)}), ${i}, "range")`;
+      head = `var __e${i} = ${num(r.stop)}, __s${i} = ${num(r.step)};\nif (__s${i} == 0) __err('pyRangeStep', ${i}, {});\n`
+        + `for (var ${name} = ${num(r.start)}; __s${i} > 0 ? ${name} < __e${i} : ${name} > __e${i}; ${name} += __s${i}) {\n`;
+    }
+    else {
+      const e = parseExpr(py.iter!);
+      const map = varInfoMap(this.vars);
+      const ty = exprType(e, map, this.modules);
+      const owner = e.t == 'var' ? this.kindOf(e.name) : null;
+      let holds = e.t == 'var' ? this.vars.var_list.value[this.vars.var_list.name.indexOf(e.name)] : '';
+      if (owner == '對應表') holds = mapParts(holds).key;
+      // 每一個拿出來的是什麼：字串的字是 str；list 裡裝什麼就是什麼；二維 list 的每一列是 list；dict 是鍵
+      as = ty == 'str' ? { type: '文字', init: '' }
+        : owner == '二維清單' ? { type: '清單', init: holds }
+        : findStruct(holds) ? { type: '結構', init: holds }
+        : holds == '文字' ? { type: '文字', init: '' } : { type: '數字', init: '0', float: holds == '小數' };
+      head = `var __it${i} = __iter((${this.expr(py.iter!, i)}), ${i}, ${owner == '優先佇列小'});\n`
+        + `for (var __k${i} = 0; __k${i} < __it${i}.length; __k${i}++) {\nvar ${name} = __it${i}[__k${i}];\n`;
+    }
+    this.checkSyntax(node, head + '}');
+    return this.withLoopVar(name, () => {
+      const l = this.loop(node, '進入迴圈', '離開迴圈');
+      const code = head + 'total_step ++;' + update + `if(--__loopTrap < 0) __err('tooManyLoops', ${i}, {});\n` + l.code + '\n}\n'
+        + `${name} = undefined;\n` + 'total_step ++;' + update;
+      return { code, next: l.next };
+    }, as);
   }
 
   /** C++ 的 for 迴圈：計數變數只在迴圈裡面有（離開後拿掉，第四步就不會再列出來） */
@@ -1921,7 +2611,13 @@ class CodeGenerator {
       + `function __find_${i}(l, v) { return __find(l, v, ${i}); }\n`
       + `function __has_${i}(l, v) { return __has(l, v, ${i}); }\n`
       + `function __stoi_${i}(v) { return __stoi(v, ${i}); }\n`
-      + `function __tostr_${i}(v) { return __tostr(v); }\n`
+      + `function __tostr_${i}(v, fl) { return __tostr(v, fl); }\n`
+      + `function __float_${i}(v) { return __float(v, ${i}); }\n`
+      + `function __abs_${i}(v) { return __abs(v, ${i}); }\n`
+      + `function __sum_${i}(v) { return __sum(v, ${i}); }\n`
+      + `function __ordp_${i}(v) { return __ordp(v, ${i}); }\n`
+      + `function __chrp_${i}(v) { return __chrp(v, ${i}); }\n`
+      + `function __round_${i}(v, nd) { return __round(v, ${i}, nd); }\n`
       + `function __max_${i}() { return __maxmin(arguments, ${i}, true); }\n`
       + `function __min_${i}() { return __maxmin(arguments, ${i}, false); }\n`).join('')
       // 算式裡執行有回傳值的模組
@@ -1970,7 +2666,7 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
       if (!v) return [];
       if (f.type == '文字') return [`${JSON.stringify(f.name)}: ${/^(".*"|'.*')$/.test(v) ? JSON.stringify(v.slice(1, -1)) : JSON.stringify(v)}`];
       if (!isNumeric(v)) throw new FlowError(t(`變數「${name}」的欄位 ${f.name} 是數字，但初始值「${v}」不是數字：請到第三步的變數表修改。`, `The field ${f.name} of "${name}" is a number, but its start value "${v}" is not. Change it in the variable table (step 3).`));
-      if (getTarget() == 'cpp' && !f.float && !Number.isInteger(Number(v))) {
+      if (isCode() && !f.float && !Number.isInteger(Number(v))) {
         throw new FlowError(t(`變數「${name}」的欄位 ${f.name} 是 int（整數），但初始值「${v}」有小數：請到第三步的變數表改成整數。`, `The field ${f.name} of "${name}" is an int, but its start value "${v}" has a decimal part. Change it in step 3.`));
       }
       return [`${JSON.stringify(f.name)}: ${Number(v)}`];
@@ -1996,7 +2692,7 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
   }
   if (value == '') return '0';
   if (!isNumeric(value)) throw new FlowError(t(`變數「${name}」是數字，但初始值「${value}」不是數字：請到第三步的變數表修改。`, `"${name}" is a number variable, but its start value "${value}" is not a number. Change it in the variable table (step 3).`));
-  if (getTarget() == 'cpp' && !(vars.floats ?? []).includes(name) && !Number.isInteger(Number(value))) {
+  if (isCode() && !(vars.floats ?? []).includes(name) && !Number.isInteger(Number(value))) {
     throw new FlowError(t(`變數「${name}」是 int（整數），但初始值「${value}」有小數：請到第三步的變數表改成整數，或把型別改成 float（小數）。`, `"${name}" is an int, but its start value "${value}" has a decimal part. Change it to a whole number, or make the type float (step 3).`));
   }
   return value;
@@ -2005,7 +2701,10 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
 /** 用某一組測資執行流程圖，記錄每一步；沒辦法執行時丟出 FlowError（附上給學生看的說明） */
 export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, modules: ModuleSource[] = []): RunResult {
   // 測資的輸入用空白、換行或逗號分開，每一項先當文字，存進變數時再依型別轉換
-  const input_list = inputText.split(/[\n\s,]+/g).filter(s => s != '');
+  // Python：一次讀一整行，所以照行分開（最後的空行不算）
+  const input_list = isPython()
+    ? inputText.replace(/\r/g, '').replace(/\n+$/, '').split('\n')
+    : inputText.split(/[\n\s,]+/g).filter(s => s != '');
 
   // 變數表裡沒填名稱的列不算
   const names = vars.var_list.name.filter(n => n.trim() != '');

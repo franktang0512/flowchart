@@ -64,6 +64,10 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       case 'str': return literal(e.v, false);
       // {a, b} 只有 C++ 有（「看程式」會先擋下來）
       case 'brace': return literal('', false);
+      // 只有 Python 有的寫法（「看程式」只有 Python 會用到，這裡只是寫完整）
+      case 'bool': return { type: 'logic_boolean', fields: { BOOL: e.v ? 'TRUE' : 'FALSE' } };
+      case 'slice': return expr(e.obj);
+      case 'chain': return e.items.slice(1).map((b, k) => expr({ t: 'bin', op: e.ops[k], a: e.items[k], b })).reduce((a, b) => ({ type: 'logic_operation', fields: { OP: 'AND' }, inputs: { A: input(a), B: input(b) } }));
       case 'raw': return literal(e.text, false);
       case 'var':
         if (scratch && params.has(e.name)) return { type: 'scratch_proc_arg', fields: { NAME: e.name } };
@@ -210,6 +214,12 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       case 'repeat': {
         const body = chain(s.body);
         return [{ type: scratch ? 'scratch_repeat_ext' : 'controls_repeat_ext', inputs: { TIMES: input(expr(s.times)), ...(body ? { DO: input(body) } : {}) } }];
+      }
+      // Python 的 for（積木用不到，只是寫完整）：當成重複幾次
+      case 'range':
+      case 'each': {
+        const body = chain(s.body);
+        return [{ type: scratch ? 'scratch_repeat_ext' : 'controls_repeat_ext', inputs: { TIMES: input(literal('', true)), ...(body ? { DO: input(body) } : {}) } }];
       }
       case 'until': {
         const body = chain(s.body);

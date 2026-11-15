@@ -1,0 +1,44 @@
+{
+  "title": "社團博覽會",
+  "question": "社團博覽會有很多場體驗活動，時間重疊的不能同時參加（一場結束的時間剛好是下一場開始也可以）。你想參加越多場越好。\n第一行輸入有幾場，接下來每一行輸入一場的開始和結束時間（已經照結束時間由早到晚排好）。輸出最多可以參加幾場。\n想想看：如果改成每次挑「最早開始」的，還會是最多場嗎？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5\n9 10\n9 11\n10 12\n11 13\n12 14",
+      "output": "3",
+      "note": "可以參加第 1、3、5 場"
+    },
+    {
+      "input": "4\n9 10\n8 12\n11 13\n13 15",
+      "output": "3",
+      "note": "第 3 場結束 13 點，第 4 場 13 點開始，可以接著參加"
+    },
+    {
+      "input": "3\n8 18\n9 19\n10 20",
+      "output": "1",
+      "note": "三場都重疊，只能選一場"
+    }
+  ],
+  "en": {
+    "title": "Club Fair",
+    "question": "The club fair has many activities. You cannot join two at the same time (if one ends just when the next starts, that is OK). You want to join as many as you can.\nThe first line is how many activities. Then each line has the start and end time of one activity (already in order of end time). Output the most you can join.\nThink: if you always pick the one that starts first, is it still the most?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5\n9 10\n9 11\n10 12\n11 13\n12 14",
+        "output": "3",
+        "note": "Join no. 1, 3, 5"
+      },
+      {
+        "input": "4\n9 10\n8 12\n11 13\n13 15",
+        "output": "3",
+        "note": "No. 3 ends at 13 and no. 4 starts at 13: OK"
+      },
+      {
+        "input": "3\n8 18\n9 19\n10 20",
+        "output": "1",
+        "note": "All three clash, so only one"
+      }
+    ]
+  }
+}

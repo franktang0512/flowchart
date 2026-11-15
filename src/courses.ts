@@ -2,13 +2,18 @@
 // 題目寫成 "資料夾/檔名"，對應 src/questions/資料夾/檔名.json，網址是 ?w=資料夾&h=檔名。
 // 要調整課程名稱、單元、題目順序、隱藏某題，都只要改這個檔案。
 import { link } from './i18n';
-import { isBlocks, type Target } from './target';
+import { getTarget, isBlocks, type Target } from './target';
 
 export interface Unit {
   name: string;
   nameEn: string;
+  /** 依學習目標換名稱（例如積木叫「清單」、C++ 叫「陣列與 vector」、Python 叫「list」）；沒寫的用 name、nameEn */
+  byTarget?: Partial<Record<Target, { name: string; nameEn: string }>>;
   questions: string[];
 }
+
+/** 單元在目前的學習目標下叫什麼 */
+export const unitName = (u: Unit) => u.byTarget?.[getTarget()] ?? u;
 
 export interface Course {
   /** 網址用的代號：?course=<id> */
@@ -38,7 +43,11 @@ export const COURSES: Course[] = [
       { name: '巢狀迴圈', nameEn: 'Loop inside a loop', questions: ['life/n1', 'life/n2'] },
       // 每個單元先放「基本操作｜」的題目（看標題就知道在練什麼），後面才是有情境的題目；
       // 基本操作先用原生的做法（例如用 array 自己做 stack），再用函式庫
-      { name: '陣列與 vector（清單）', nameEn: 'Arrays and vectors (lists)', questions: ['life/arr_basic', 'life/vec_basic', 'life/arr1', 'life/arr2'] },
+      // 每種語言只用自己的說法
+      {
+        name: '清單', nameEn: 'Lists',
+        byTarget: { cpp: { name: '陣列與 vector', nameEn: 'Arrays and vectors' }, python: { name: 'list（清單）', nameEn: 'Lists' } },
+        questions: ['life/arr_basic', 'life/vec_basic', 'life/arr1', 'life/arr2'] },
       { name: '陣列搭配迴圈', nameEn: 'Arrays with loops', questions: ['life/arr3', 'life/arr4', 'life/arr5'] },
       { name: '排序：泡泡排序', nameEn: 'Sorting: bubble sort', questions: ['life/sort1'] },
       { name: '搜尋：一個一個找、二分搜尋', nameEn: 'Searching: one by one, binary search', questions: ['life/find1', 'life/find2'] },
@@ -60,6 +69,25 @@ export const COURSES: Course[] = [
       { name: '動態規劃', nameEn: 'Dynamic programming', questions: ['adv/d1', 'adv/d2'] },
       { name: '樹', nameEn: 'Trees', questions: ['adv/t1'] },
       { name: '圖', nameEn: 'Graphs', questions: ['adv/gr1'] },
+    ],
+  },
+  {
+    // Python 版：單元跟 C++ 一樣，題目改成 Python 的說法、輸入照「一次讀一行」排（py/ 的題目）；
+    // 說法本來就不分語言、輸入也是一行一行的題目直接用 adv/ 的
+    id: 'py',
+    name: '生活中的演算法（Python）', nameEn: 'Algorithms in Everyday Life (Python)',
+    target: 'python',
+    units: [
+      // Python 的 list 本身就是 stack（append、pop），沒有另外的函式庫，所以只有一題基本操作
+      { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['py/st_basic', 'py/st1', 'adv/st2'] },
+      { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['py/q_array', 'py/q_basic', 'py/q1', 'adv/q2'] },
+      { name: '排序', nameEn: 'Sorting', questions: ['py/so1', 'py/so2'] },
+      { name: '搜尋', nameEn: 'Searching', questions: ['py/se1'] },
+      { name: '窮舉', nameEn: 'Brute force', questions: ['py/b1', 'adv/b2'] },
+      { name: '貪心', nameEn: 'Greedy', questions: ['adv/g1', 'py/g2'] },
+      { name: '動態規劃', nameEn: 'Dynamic programming', questions: ['adv/d1', 'adv/d2'] },
+      { name: '樹', nameEn: 'Trees', questions: ['py/t1'] },
+      { name: '圖', nameEn: 'Graphs', questions: ['py/gr1'] },
     ],
   },
   {

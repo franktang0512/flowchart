@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
 import { isContainerType, type VarType } from '../engine/structure';
 import { findStruct, getStructs, isPair, PAIR_TYPES } from '../engine/structs';
-import { mapParts } from '../engine/modules';
+import { mapParts, pyElemName } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { getTarget } from '../target';
+import { getTarget, isCode, isPython } from '../target';
 import { useCommit } from '../useCommit';
 
 export interface VarRow {
@@ -45,6 +45,18 @@ const CPP_CONTAINERS: [VarType, () => string, () => string][] = [
   ['集合', () => 'set', () => t('set：不重複，自動由小到大排好', 'set: no repeats, kept in order')],
   ['對應表', () => 'map', () => t('map：用「鍵」找「值」，例如 名字 → 分數', 'map: find a value by its key, like name → score')],
 ];
+
+/** Python 的容器在型別選單裡的名字 */
+const PY_CONTAINERS: [VarType, () => string, () => string][] = [
+  ['清單', () => 'list', () => t('list：可以變長變短的清單（也可以當 stack 用：append、pop）', 'list: a list that can grow (also a stack: append, pop)')],
+  ['二維清單', () => t('二維 list', '2D list'), () => t('二維 list：list 裡面放 list（表格、鄰接串列）', '2D list: lists in a list (a table, an adjacency list)')],
+  ['佇列', () => 'deque', () => t('deque：先放進去的先拿出來（append、popleft）', 'deque: first in, first out (append, popleft)')],
+  ['優先佇列小', () => 'heapq', () => t('heapq：最小的先拿出來（heappush、heappop）', 'heapq: the smallest comes out first (heappush, heappop)')],
+  ['集合', () => 'set', () => t('set：不重複（add、discard、x in s）', 'set: no repeats (add, discard, x in s)')],
+  ['對應表', () => 'dict', () => t('dict：用「鍵」找「值」，例如 名字 → 分數', 'dict: find a value by its key, like name → score')],
+];
+/** Python 的 tuple（內建的 pair）：存的時候還是用 pair 的名字 */
+const PY_TUPLES: [string, string][] = [['pair<int,int>', 'tuple[int, int]'], ['pair<int,string>', 'tuple[int, str]'], ['pair<string,int>', 'tuple[str, int]'], ['pair<float,int>', 'tuple[float, int]']];
 
 /** set、priority_queue 只能裝比得出大小的：數字、文字、pair（自己定義的 struct 不行） */
 const sortedType = (type: VarType) => type == '集合' || type == '優先佇列' || type == '優先佇列小';
@@ -91,7 +103,7 @@ export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDele
     </tr>
   );
   return (
-    <div id="step3" className={getTarget() == 'cpp' ? 'card cpp_types' : 'card'}>
+    <div id="step3" className={isCode() ? 'card cpp_types' : 'card'}>
       <h5 className="card_title"><span className="step_badge">3</span>{t('定義變數', 'Variables')}</h5>
       {module && (
         // 模組的參數：名稱、型別可以在這裡改，但不能在這裡刪（要刪請到模組上方的「修改名稱、參數」）
@@ -127,13 +139,17 @@ export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDele
           {module.params.length > 0 && (
             <p className="muted param_rule">{getTarget() == 'scratch'
               ? t('參數在模組裡只能拿來算，不能改（Scratch 的規定）。', 'Inside the module you can use a parameter but not change it (a Scratch rule).')
+              : isPython()
+              ? t('參數的值由「執行模組」傳進來。參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'The value is passed in by "Run module". A parameter is a variable too; changing it only changes the module\'s own copy.')
               : getTarget() == 'cpp'
               ? t('參數的值由「執行模組」傳進來。C++ 其實可以替參數設預設值，這裡先專心練習傳參數。參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'The value is passed in by "Run module". C++ can give a parameter a default value, but here we practice passing values. You can change a parameter in the flow; only the module\'s own copy changes.')
               : t('參數也是變數：流程裡可以改它的值，但只改到模組自己的那一份。', 'A parameter is a variable too. You can change it in the flow, but only the module\'s own copy changes.')}</p>
           )}
           {module.locals && <LocalTable module={module.name} rows={module.locals} allowed={allowed} onLocals={module.onLocals} problem={module.localProblem} onProblem={module.onProblem} head={head} />}
           {/* 全域變數只在主流程顯示；模組這裡只列這個模組自己的 */}
-          <p className="muted global_note">{getTarget() == 'cpp'
+          <p className="muted global_note">{isPython()
+            ? t('主流程的變數模組也看得到（Python 的全域變數）；模組裡要改主流程的變數時，「看程式」會寫 global。區域變數只有這個模組用得到，每次執行都重新開始。', 'Modules can see the main-flow variables (Python globals). When a module changes one, "See code" writes global. Local variables belong only to this module and start over each run.')
+            : getTarget() == 'cpp'
             ? t('C++ 的主流程變數寫在 main 裡面，模組用不到：要用的值請加參數傳進來，要把結果帶回主流程請用回傳。主流程的變數勾了「全域」的話，每個模組都用得到（例如遞迴要用的陣列、圖）。', 'In C++ the main-flow variables are inside main, so a module cannot use them. Pass values in as parameters, and use a return value to bring a result back. Main-flow variables marked "Global" can be used by every module (like an array or graph for recursion).')
             : getTarget() == 'scratch'
             ? t('Scratch 沒有只屬於函式的變數：要用變數，請回到「主流程」新增，模組裡也能用。主流程的變數跟參數同名時，選單裡會寫成「主流程的a」，指的是主流程的那個 a。', 'Scratch has no variables that belong only to a function. Add them in the main flow; modules can use them too. If one has the same name as a parameter, the menu shows it as "主流程的a".')
@@ -152,6 +168,13 @@ export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDele
             </tbody>
           </table>
           <button id="createRow" onClick={onCreate}>＋ {t('新增變數', 'Add a variable')}</button>
+          {/* Python 可以用中文當名稱，但官方的風格指南（PEP 8）建議用英文 */}
+          {isPython() && (
+            <p className="muted name_tip">
+              {t('命名建議：Python 可以用中文當變數名稱，但官方的風格指南（PEP 8）建議用英文，全部小寫、單字之間用底線（_）連接，例如 total_score、max_speed；名字要看得出用途，不要只用 a、b。',
+                'Naming tip: Python allows Chinese names, but the official style guide (PEP 8) suggests English words, all lowercase, joined with _ (like total_score, max_speed). Choose names that say what they are for, not just a or b.')}
+            </p>
+          )}
         </>
       )}
     </div>
@@ -162,21 +185,22 @@ export function VarTable({ rows, structArea, allowed, onChange, onCommit, onDele
  * 型別下拉選單的值：C++ 的數字分 int（'數字'）、float（'float'）；文字是 string。
  * Scratch、Blockly 只有數字、文字
  */
-/** struct 變數收起來時顯示的初始值，照 C++ 的寫法：{1, 2, "Amy"}；全部沒填是 {} */
+/** struct 變數收起來時顯示的初始值，照 C++ 的寫法：{1, 2, "Amy"}；全部沒填是 {}（Python 的 tuple 寫成 (1, 2)） */
 function structInitText(row: VarRow): string {
   const fields = findStruct(row.init)?.fields ?? [];
-  if (!fields.some(f => (row.fieldInit?.[f.name] ?? '').trim())) return '{}';
-  return '{' + fields.map(f => {
+  const [open, close] = isPython() ? ['(', ')'] : ['{', '}'];
+  if (!isPython() && !fields.some(f => (row.fieldInit?.[f.name] ?? '').trim())) return '{}';
+  return open + fields.map(f => {
     const v = (row.fieldInit?.[f.name] ?? '').trim();
     if (f.type != '文字') return v || '0';
     return /^(".*"|'.*')$/.test(v) ? v : JSON.stringify(v);
-  }).join(', ') + '}';
+  }).join(', ') + close;
 }
 
 /** 型別選單裡 struct 的值：「struct:Edge」 */
 const STRUCT_PREFIX = 'struct:';
 
-export const typeValue =(type: string, float?: boolean, long?: boolean) => (type == '數字' && getTarget() == 'cpp' ? (float ? 'float' : long ? 'long' : type) : type);
+export const typeValue =(type: string, float?: boolean, long?: boolean) => (type == '數字' && isCode() ? (float ? 'float' : long && !isPython() ? 'long' : type) : type);
 export const fromTypeValue = (value: string) => (value == 'float'
   ? { type: '數字' as const, float: true, long: undefined }
   : value == 'long'
@@ -185,6 +209,16 @@ export const fromTypeValue = (value: string) => (value == 'float'
 
 /** 數字、文字的選項（C++ 寫成 int、float、string）；beforeString 放在 float 和 string 中間（變數表的 array） */
 export function TypeOptions({ beforeString }: { beforeString?: React.ReactNode } = {}) {
+  // Python 的整數不會溢位，所以沒有 long long
+  if (isPython()) {
+    return (
+      <>
+        <option value="數字">{t('int（整數）', 'int')}</option>
+        <option value="float">{t('float（小數）', 'float')}</option>
+        <option value="文字">{t('str（文字）', 'str')}</option>
+      </>
+    );
+  }
   if (getTarget() == 'cpp') {
     return (
       <>
@@ -302,6 +336,7 @@ function LocalTable({ module, rows, allowed, onLocals, problem, onProblem, head 
 function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDelete, className }: { row: VarRow; allowed?: VarType[]; canGlobal?: boolean; className?: string } & Pick<Props, 'onChange' | 'onCommit' | 'onDelete'>) {
   const commit = useCommit<HTMLInputElement>(onCommit);
   const cpp = getTarget() == 'cpp';
+  const py = isPython();
   /**
    * C++ 容器的選項（照 types 的順序）。題目可以限制能用哪些容器
    * （例如「用 array 自己做 stack」的題目就不給 stack）；已經選了的照樣列出來
@@ -309,7 +344,7 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
   const containerOptions = (types: VarType[]) => types
     .filter(type => !allowed || allowed.includes(type) || row.type == type)
     .map(type => {
-      const [, short, long] = CPP_CONTAINERS.find(c => c[0] == type)!;
+      const [, short, long] = (py ? PY_CONTAINERS : CPP_CONTAINERS).find(c => c[0] == type)!;
       return <option key={type} value={type} title={long()}>{short()}</option>;
     });
   const text = (field: 'name' | 'init' | 'desc' | 'size') => ({
@@ -358,7 +393,19 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
         >
           {/* C++：array 放在 float 和 string 中間，其他容器放在後面 */}
           <TypeOptions beforeString={cpp && containerOptions(['陣列'])} />
-          {cpp
+          {py
+            ? <>
+                {containerOptions(['清單', '二維清單', '佇列', '優先佇列小', '集合', '對應表'])}
+                {/* tuple：用 t[0]、t[1] 拿裡面的值 */}
+                {(!allowed || allowed.includes('結構') || row.type == '結構') && (
+                  <optgroup label="tuple">
+                    {PY_TUPLES.map(([p, label]) => <option key={p} value={STRUCT_PREFIX + p}>{label}</option>)}
+                  </optgroup>
+                )}
+                {/* 從 C++ 換過來的舊作品：Python 沒有的型別照樣列出來，才不會被悄悄改掉 */}
+                {CPP_CONTAINERS.filter(([type]) => !PY_CONTAINERS.some(c => c[0] == type) && row.type == type).map(([type, short]) => <option key={type} value={type}>{short()}</option>)}
+              </>
+            : cpp
             ? <>
                 {containerOptions(['清單', '二維清單', '堆疊', '佇列', '優先佇列', '優先佇列小', '集合', '對應表'])}
                 {/* 內建的 pair：跟 struct 一樣用 p.first、p.second */}
@@ -384,7 +431,7 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
         </select>
       </td>
       <td>
-        {row.type == '清單' && getTarget() != 'cpp'
+        {row.type == '清單' && !isCode()
           // 積木（Scratch / Blockly）的清單跟 Scratch 一樣，數字、文字都能放，不用先決定型別（C++ 才要選）
           ? <span className="muted list_any" title={t('清單一開始是空的，數字和文字都可以放', 'The list starts empty. It can hold numbers and text.')}>{t('數字、文字都可以', 'Numbers or text')}</span>
           : row.type == '結構'
@@ -397,9 +444,9 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
                 <code>{structInitText(row)}</code>
               </summary>
               <span className="struct_init_fields">
-                {(findStruct(row.init)?.fields ?? []).map(f => (
+                {(findStruct(row.init)?.fields ?? []).map((f, k) => (
                   <label key={f.name}>
-                    <span className="muted">{f.name}</span>
+                    <span className="muted">{py ? `[${k}]` : f.name}</span>
                     <input
                       className="var_input" value={row.fieldInit?.[f.name] ?? ''} placeholder={f.type == '文字' ? '""' : '0'}
                       onChange={e => onChange(row.id, { fieldInit: { ...row.fieldInit, [f.name]: e.target.value } })}
@@ -416,17 +463,17 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
             <span className="map_types">
               <select className="var_input" aria-label={t('鍵', 'Key')} title={t('鍵：用來找的（例如名字）', 'Key: what you look up by (like a name)')} value={mapParts(row.init).key}
                 onChange={e => { onChange(row.id, { init: `${e.target.value}→${mapParts(row.init).value}` }); onCommit(); }}>
-                <option value="文字">{t('鍵 string', 'key string')}</option>
+                <option value="文字">{py ? t('鍵 str', 'key str') : t('鍵 string', 'key string')}</option>
                 <option value="數字">{t('鍵 int', 'key int')}</option>
-                <option value="長整數">{t('鍵 long long', 'key long long')}</option>
+                {!py && <option value="長整數">{t('鍵 long long', 'key long long')}</option>}
               </select>
               <span className="muted">→</span>
               <select className="var_input" aria-label={t('值', 'Value')} title={t('值：找到的東西（例如分數）', 'Value: what you find (like a score)')} value={mapParts(row.init).value}
                 onChange={e => { onChange(row.id, { init: `${mapParts(row.init).key}→${e.target.value}` }); onCommit(); }}>
                 <option value="數字">{t('值 int', 'value int')}</option>
-                <option value="長整數">{t('值 long long', 'value long long')}</option>
+                {!py && <option value="長整數">{t('值 long long', 'value long long')}</option>}
                 <option value="小數">{t('值 float', 'value float')}</option>
-                <option value="文字">{t('值 string', 'value string')}</option>
+                <option value="文字">{py ? t('值 str', 'value str') : t('值 string', 'value string')}</option>
               </select>
             </span>
           )
@@ -442,7 +489,14 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
                 : t('一開始是空的，這裡選裡面要裝什麼', 'It starts empty. Choose what it holds.')}
               onChange={e => { onChange(row.id, { init: e.target.value }); onCommit(); }}
             >
-              {getTarget() == 'cpp'
+              {py
+                ? <>
+                    <option value="數字">{t('裝 int', 'int')}</option>
+                    <option value="小數">{t('裝 float', 'float')}</option>
+                    <option value="文字">{t('裝 str', 'str')}</option>
+                    {PY_TUPLES.map(([p]) => <option key={p} value={p}>{t(`裝 ${pyElemName(p)}`, pyElemName(p))}</option>)}
+                  </>
+                : getTarget() == 'cpp'
                 ? <>
                     <option value="數字">{t('裝 int', 'int')}</option>
                     <option value="長整數">{t('裝 long long', 'long long')}</option>

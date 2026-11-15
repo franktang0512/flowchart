@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MAX_STEPS, type RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
-import { indexBase } from '../target';
+import { indexBase, isPython } from '../target';
 import type { RunView } from '../engine/diagram';
 
 /** 第四步的一張流程圖：主流程、一層一層執行進來的模組，最後一張是正在執行的 */
@@ -282,10 +282,16 @@ function GridValue({ rows, prev }: { rows: unknown[][]; prev: unknown }) {
  * struct 的值：表格，上面是欄位名稱；indexed（vector、array 裡的 struct）時每一列一筆、左邊標索引。
  * 這一步改到的格子標出來
  */
-function RecordTable({ rows, prev, indexed = false, kind }: { rows: Record<string, unknown>[]; prev: unknown[] | null; indexed?: boolean; kind?: string }) {
+function RecordTable({ rows: raw, prev: rawPrev, indexed = false, kind }: { rows: Record<string, unknown>[]; prev: unknown[] | null; indexed?: boolean; kind?: string }) {
+  // Python 的 heapq：最小的（h[0]）放最前面
+  const heap = isPython() && (kind == '優先佇列' || kind == '優先佇列小');
+  const rows = heap ? raw.slice().reverse() : raw;
+  const prev = heap && rawPrev ? rawPrev.slice().reverse() : rawPrev;
   /** 左邊那一欄：索引；stack 只標 top，queue 標 front、back（中間的拿不到） */
   const tag = (r: number) => {
     const last = r == rows.length - 1;
+    if (heap) return r == 0 ? '[0]' : '';
+    if (isPython() && kind == '佇列') return [r == 0 ? '[0]' : '', last ? '[-1]' : ''].filter(Boolean).join(' / ');
     if (kind == '堆疊' || kind == '優先佇列' || kind == '優先佇列小') return last ? 'top' : '';
     if (kind == '佇列') return [r == 0 ? 'front' : '', last ? 'back' : ''].filter(Boolean).join(' / ');
     if (kind == '集合') return '';
@@ -300,7 +306,8 @@ function RecordTable({ rows, prev, indexed = false, kind }: { rows: Record<strin
     <span className="grid_value">
       <table>
         <thead>
-          <tr>{indexed && <th></th>}{fields.map(f => <th key={f}>{f}</th>)}</tr>
+          {/* Python 的 tuple 用 t[0]、t[1] 拿，不是 first、second */}
+          <tr>{indexed && <th></th>}{fields.map((f, k) => <th key={f}>{isPython() && (f == 'first' || f == 'second') ? `[${k}]` : f}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, r) => (
@@ -317,7 +324,7 @@ function RecordTable({ rows, prev, indexed = false, kind }: { rows: Record<strin
 
 /** map 的值：一列一個鍵和值（由小到大）；這一步改到的值標出來 */
 function MapValue({ pairs, prev }: { pairs: [unknown, unknown][]; prev: unknown }) {
-  if (!pairs.length) return <span className="muted">{t('（空的 map）', '(empty map)')}</span>;
+  if (!pairs.length) return <span className="muted">{isPython() ? t('（空的 dict）', '(empty dict)') : t('（空的 map）', '(empty map)')}</span>;
   const old = prev && typeof prev == 'object' && Array.isArray((prev as { __map?: unknown }).__map) ? (prev as { __map: [unknown, unknown][] }).__map : null;
   const before = new Map((old ?? []).map(([k, v]) => [JSON.stringify(k), JSON.stringify(v)]));
   return (
@@ -340,7 +347,11 @@ function MapValue({ pairs, prev }: { pairs: [unknown, unknown][]; prev: unknown 
 }
 
 /** 清單的值：一列排開，每一項標上位置（積木從 1、C++ 從 0 開始）；太長可以左右捲，改到的格子會標出來並捲到看得到的地方 */
-function ListValue({ items, prev, kind }: { items: unknown[]; prev: unknown; kind?: string }) {
+function ListValue({ items: raw, prev: rawPrev, kind }: { items: unknown[]; prev: unknown; kind?: string }) {
+  // Python 的 heapq：最小的（h[0]）放最前面
+  const heap = isPython() && (kind == '優先佇列' || kind == '優先佇列小');
+  const items = heap ? raw.slice().reverse() : raw;
+  const prev = heap && Array.isArray(rawPrev) ? rawPrev.slice().reverse() : rawPrev;
   const scrollerRef = useRef<HTMLSpanElement>(null);
   const changedRef = useRef<HTMLSpanElement>(null);
   const changed = changedIndex(items, prev);
@@ -357,15 +368,17 @@ function ListValue({ items, prev, kind }: { items: unknown[]; prev: unknown; kin
     }
   });
 
-  if (!items.length) return <span className="muted">{kind == '堆疊' ? t('（空的 stack）', '(empty stack)') : kind == '佇列' ? t('（空的 queue）', '(empty queue)')
-    : kind == '集合' ? t('（空的 set）', '(empty set)') : kind == '優先佇列' || kind == '優先佇列小' ? t('（空的 priority_queue）', '(empty priority_queue)') : t('（空清單）', '(empty list)')}</span>;
+  if (!items.length) return <span className="muted">{kind == '堆疊' ? t('（空的 stack）', '(empty stack)') : kind == '佇列' ? (isPython() ? t('（空的 deque）', '(empty deque)') : t('（空的 queue）', '(empty queue)'))
+    : kind == '集合' ? t('（空的 set）', '(empty set)') : kind == '優先佇列' || kind == '優先佇列小' ? (isPython() ? t('（空的 heap）', '(empty heap)') : t('（空的 priority_queue）', '(empty priority_queue)')) : t('（空清單）', '(empty list)')}</span>;
   /**
    * 每一格上面的小字：清單、array 是索引；stack 只看得到頂端（top），queue 只看得到最前面（front）和最後面（back）——
    * C++ 的 stack、queue 不能用索引拿中間的東西
    */
   const tag = (k: number) => {
     const last = k == items.length - 1;
-    // priority_queue 只看得到 top；set 沒有索引
+    // priority_queue 只看得到 top；set 沒有索引；Python 的 heapq 只看得到 h[0]、deque 用 q[0]、q[-1]
+    if (heap) return k == 0 ? '[0]' : '';
+    if (isPython() && kind == '佇列') return [k == 0 ? '[0]' : '', last ? '[-1]' : ''].filter(Boolean).join(' / ');
     if (kind == '堆疊' || kind == '優先佇列' || kind == '優先佇列小') return last ? 'top' : '';
     if (kind == '佇列') return [k == 0 ? 'front' : '', last ? 'back' : ''].filter(Boolean).join(' / ');
     if (kind == '集合') return '';

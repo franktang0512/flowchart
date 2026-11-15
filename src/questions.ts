@@ -1,7 +1,10 @@
 // 題目資料：src/questions/<w>/<h>.json，網址 ?w=114&h=3 就載入 questions/114/3.json（跟舊版的網址一樣）
 import type { VarType } from './engine/structure';
+import { getTarget, isPython } from './target';
 export interface TestCase {
   input: string;
+  /** Python 一次讀一整行：輸入要照行排的時候（例如一行一個），學習目標是 Python 時改看這個 */
+  py_input?: string;
   output: string;
   note: string;
 }
@@ -13,6 +16,12 @@ export interface QuestionText {
   array: string[][];
   /** 範例輸入輸出 */
   test_case: TestCase[];
+  /** 學習目標是 Python 時換成這個（題目裡寫到 vector、push_back 這些 C++ 說法的時候用） */
+  py_title?: string;
+  py_question?: string;
+  /** 學習目標是 C++ 時換成這個（例如積木說「清單」，C++ 說「陣列」「vector」） */
+  cpp_title?: string;
+  cpp_question?: string;
 }
 
 export interface Question extends QuestionText {
@@ -20,12 +29,16 @@ export interface Question extends QuestionText {
   en?: QuestionText;
   /**
    * C++：第三步變數表可以選哪些容器，例如 ["array"]（用 array 自己做 stack 的題目）、["stack", "queue"]。
-   * 可以寫 "vector"、"2d_vector"、"array"、"stack"、"queue"、"struct"；沒寫就是都可以。數字、文字一定可以選
+   * 可以寫 "vector"、"2d_vector"、"array"、"stack"、"queue"、"struct"；Python 寫 "list"、"2d_list"、"deque"、"heapq"、"set"、"dict"、"tuple"；沒寫就是都可以。數字、文字一定可以選
    */
   var_types?: string[];
 }
 
-const VAR_TYPE_KEYS: Record<string, VarType> = { vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列', struct: '結構', set: '集合', map: '對應表', priority_queue: '優先佇列', priority_queue_min: '優先佇列小' };
+const VAR_TYPE_KEYS: Record<string, VarType> = {
+  vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列', struct: '結構', set: '集合', map: '對應表', priority_queue: '優先佇列', priority_queue_min: '優先佇列小',
+  // Python 的名稱
+  list: '清單', '2d_list': '二維清單', deque: '佇列', heapq: '優先佇列小', dict: '對應表', tuple: '結構',
+};
 
 /** 這一題變數表可以選的容器；undefined 是都可以 */
 export function allowedVarTypes(q: Question): VarType[] | undefined {
@@ -34,7 +47,18 @@ export function allowedVarTypes(q: Question): VarType[] | undefined {
 }
 
 /** 依語言取題目內容，沒有英文就用中文 */
-export const questionIn = (q: Question, lang: 'zh' | 'en'): QuestionText => (lang == 'en' && q.en ? q.en : q);
+export function questionIn(q: Question, lang: 'zh' | 'en'): QuestionText {
+  const text = lang == 'en' && q.en ? q.en : q;
+  if (getTarget() == 'cpp') return { ...text, title: text.cpp_title ?? text.title, question: text.cpp_question ?? text.question };
+  if (!isPython()) return text;
+  return {
+    ...text,
+    title: text.py_title ?? text.title,
+    question: text.py_question ?? text.question,
+    // 英文版沒寫 py_input 的話，用中文版那一組的
+    test_case: text.test_case.map((c, k) => ({ ...c, input: c.py_input ?? q.test_case[k]?.py_input ?? c.input })),
+  };
+}
 
 const files = import.meta.glob<Question>('./questions/**/*.json', { import: 'default' });
 

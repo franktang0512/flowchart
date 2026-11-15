@@ -1,27 +1,30 @@
 {
-  "title": "基本操作｜vector（清單）：一直加到最後面",
-  "question": "不知道會有幾個資料時，用 vector（積木叫清單）：拿到一個就加到最後面（C++ 是 push_back）。\n請一直輸入貼紙編號，輸入 0 代表結束（0 不算貼紙）。先輸出一共拿到幾張（vector 的大小），再把所有編號照拿到的順序輸出在同一行（輸出整個 vector）。",
+  "title": "基本操作｜清單：一直加到最後面",
+  "question": "不知道會有幾個資料時，用清單：拿到一個就加到清單的最後面。\n請一直輸入貼紙編號，輸入 0 代表結束（0 不算貼紙）。先輸出一共拿到幾張（清單的長度），再把所有編號照拿到的順序輸出在同一行（輸出整個清單）。",
   "array": [],
   "test_case": [
     {
       "input": "5 12 7 0",
       "output": "3\n5 12 7",
-      "note": ""
+      "note": "",
+      "py_input": "5\n12\n7\n0"
     },
     {
       "input": "8 8 3 9 1 0",
       "output": "5\n8 8 3 9 1",
-      "note": "一樣的貼紙也算"
+      "note": "一樣的貼紙也算",
+      "py_input": "8\n8\n3\n9\n1\n0"
     },
     {
       "input": "42 0",
       "output": "1\n42",
-      "note": "只拿到一張"
+      "note": "只拿到一張",
+      "py_input": "42\n0"
     }
   ],
   "en": {
-    "title": "Basics | vector (list): add to the end",
-    "question": "When you do not know how many items there will be, use a vector (a list in blocks): add each new item to the end (push_back in C++).\nKeep inputting sticker numbers. 0 means stop (0 is not a sticker). Output how many stickers you got (the size of the vector), then all the numbers in order on one line (output the whole vector).",
+    "title": "Basics | list: add to the end",
+    "question": "When you do not know how many items there will be, use a list: add each new item to the end of the list.\nKeep inputting sticker numbers. 0 means stop (0 is not a sticker). Output how many stickers you got (the length of the list), then all the numbers in order on one line (output the whole list).",
     "array": [],
     "test_case": [
       {
@@ -39,6 +42,14 @@
         "output": "1\n42",
         "note": "Only one sticker"
       }
-    ]
-  }
+    ],
+    "py_title": "Basics | list: add to the end",
+    "py_question": "When you do not know how many items there will be, use a list: add each new item to the end with append.\nKeep inputting sticker numbers (one per line). 0 means stop (0 is not a sticker). Output how many stickers you got (len of the list), then all the numbers in order on one line (output the whole list).",
+    "cpp_title": "Basics | vector: add to the end",
+    "cpp_question": "When you do not know how many items there will be, use a vector: add each new item to the end with push_back.\nKeep inputting sticker numbers. 0 means stop (0 is not a sticker). Output how many stickers you got (size() of the vector), then all the numbers in order on one line (output the whole vector)."
+  },
+  "py_title": "基本操作｜list：一直加到最後面",
+  "py_question": "不知道會有幾個資料時，用 list：拿到一個就用 append 加到最後面。\n請一直輸入貼紙編號（一行一個），輸入 0 代表結束（0 不算貼紙）。先輸出一共拿到幾張（list 的長度 len），再把所有編號照拿到的順序輸出在同一行（輸出整個 list）。",
+  "cpp_title": "基本操作｜vector：一直加到最後面",
+  "cpp_question": "不知道會有幾個資料時，用 vector：拿到一個就用 push_back 加到最後面。\n請一直輸入貼紙編號，輸入 0 代表結束（0 不算貼紙）。先輸出一共拿到幾張（vector 的 size()），再把所有編號照拿到的順序輸出在同一行（輸出整個 vector）。"
 }

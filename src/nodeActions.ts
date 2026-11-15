@@ -4,7 +4,9 @@ import { createConnectors } from './engine/connector';
 import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
 import { parseSortKeys, sortKeysText, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
-import { forInit, forUpdate, parseExpr, splitFor } from './engine/structure';
+import { forInit, forUpdate, parseExpr, pyFor, splitFor } from './engine/structure';
+import { isPython } from './target';
+import { splitArgs } from './engine/modules';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
 import { t } from './i18n';
@@ -39,7 +41,8 @@ function rectangleText(vars: VarStore, f: DialogForm) {
     : f.rectAction == '刪除' ? `${target} 刪除第 ${f.rectIndex} 項`
     : f.rectAction == '清空' ? `${target} 刪除所有項目`
     : f.rectAction == '取出' ? `${target} 取出`
-    : f.rectAction == '建立' && f.rectKind == '陣列' ? `${target} 建立大小 ${f.rectIndex.trim()}`
+    // array 在流程圖中建立、Python 的 list 建立 n 格：「 a 建立大小 n」
+    : f.rectAction == '建立' && (f.rectKind == '陣列' || f.rectKind == '清單') ? `${target} 建立大小 ${f.rectIndex.trim()}`
     : f.rectAction == '建立' ? `${target} 建立 ${f.rectIndex.trim()} 列 ${f.rectIndex2.trim()} 行`
     : f.rectAction == '回傳' ? ` 回傳 ${f.code}`
     : `${target} ${f.rectAction} ${f.code}`;
@@ -141,6 +144,10 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   }
   const letter = letterTarget(vars, f);
   if (letter) return checkVar(vars, letter, false) && checkVar(vars, f.code, true) && checkValueType(vars, modules, letter, f.code, 'var');
+  // Python 的 tuple 變數：整個換掉，要放同一種 tuple
+  if (f.rectAction == '設為' && isPython() && vars.type_var_list.record.includes(f.varSelect.trim())) {
+    return checkVar(vars, f.code, true) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'item');
+  }
   if (f.rectAction == '設為') return checkVar(vars, f.code, true) && checkVar(vars, f.varSelect, false) && checkValueType(vars, modules, f.varSelect.trim(), f.code, 'var');
   if (f.rectAction == '回傳') return checkVar(vars, f.code, true);
   const list = f.varSelect.trim();
@@ -152,6 +159,8 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     }
     if (isStructContainer(vars, list)) {
       const fields = sortKeysOf(vars, f).map(k => k.field);
+      // Python 的 tuple 沒選欄位：整個 tuple 比（先比第一個，一樣再比第二個）
+      if (!fields.length && isPython()) return !f.rectIndex.trim() || checkVar(vars, f.rectIndex, true);
       if (!fields.length) {
         alert(t('裡面裝的是 struct：請選要依哪個欄位排序。', 'It holds structs. Choose the field to sort by.'));
         return false;
@@ -174,6 +183,18 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     if (!checkVar(vars, f.rectIndex, true) || !checkVar(vars, f.rectIndex2, true)) return false;
     return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
   }
+  // Python：list 建立 n 格（a = [0] * n）
+  if (f.rectAction == '建立' && f.rectKind == '清單' && isPython()) {
+    if (!vars.type_var_list.array.includes(list)) {
+      alert(t('請選一個 list。', 'Choose a list.'));
+      return false;
+    }
+    if (!f.rectIndex.trim()) {
+      alert(t('請填要建立幾格。', 'Enter how many items.'));
+      return false;
+    }
+    return checkVar(vars, f.rectIndex, true);
+  }
   if (f.rectAction == '建立' && f.rectKind != '陣列') {
     alert(t('請選一個二維清單。', 'Choose a 2D list.'));
     return false;
@@ -182,7 +203,8 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (f.rectKind == '堆疊' || f.rectKind == '佇列') {
     const kind = f.rectKind == '堆疊' ? 'stack' : 'queue';
     if (!vars.type_var_list[kind].includes(list)) {
-      alert(t(`請選一個 ${kind}。`, `Choose a ${kind}.`));
+      const name = isPython() ? 'deque' : kind;
+      alert(t(`請選一個 ${name}。`, `Choose a ${name}.`));
       return false;
     }
     return !hasValue(f) || (checkVar(vars, f.code, true) && checkValueType(vars, modules, list, f.code, 'item'));
@@ -191,7 +213,8 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (f.rectKind == '集合' || f.rectKind == '優先佇列' || f.rectKind == '對應表') {
     const kind = f.rectKind == '集合' ? 'set' : f.rectKind == '優先佇列' ? 'pq' : 'map';
     if (!vars.type_var_list[kind].includes(list)) {
-      alert(t(`請選一個 ${kind == 'pq' ? 'priority_queue' : kind}。`, `Choose a ${kind == 'pq' ? 'priority_queue' : kind}.`));
+      const name = isPython() ? ({ pq: 'heapq', map: 'dict', set: 'set' } as const)[kind] : kind == 'pq' ? 'priority_queue' : kind;
+      alert(t(`請選一個 ${name}。`, `Choose a ${name}.`));
       return false;
     }
     if (f.rectAction == '清空' || f.rectAction == '取出') return true;
@@ -233,6 +256,24 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
  */
 function ioText(vars: VarStore, f: DialogForm, modules: ModuleInfo[] = []): string | null {
   if (f.radio == '輸入') {
+    // Python：一行讀好幾個變數「輸入 a, b」
+    if (f.ioTarget == '多個') {
+      const names = f.ioMany.map(n => n.trim()).filter(Boolean);
+      if (names.length < 2) {
+        alert(t('一行讀好幾個：請至少選兩個變數。', 'Choose at least two variables.'));
+        return null;
+      }
+      const twice = names.find((n, k) => names.indexOf(n) != k);
+      if (twice) {
+        alert(t(`「${twice}」選了兩次：每個變數只能選一次。`, `"${twice}" is chosen twice.`));
+        return null;
+      }
+      return names.every(n => checkVar(vars, n, false)) ? '輸入 ' + names.join(', ') : null;
+    }
+    // Python：二維 list 讀一整行變成新的一列「輸入 g」
+    if (f.ioTarget == '二維清單' && isPython() && f.ioPlace == '加入') {
+      return checkVar(vars, f.varSelect, false) ? '輸入 ' + f.varSelect.trim() : null;
+    }
     // 二維清單的一格：輸入 表[列][行]；裝 struct 的要選欄位：輸入 g[u][k].w
     if (f.ioTarget == '二維清單') {
       const holds = vars.var_list.value[vars.var_list.name.indexOf(f.varSelect.trim())];
@@ -332,6 +373,22 @@ function forText(vars: VarStore, f: DialogForm): string | null {
   return `for (${a}; ${b}; ${c})`;
 }
 
+/** Python 的 for 迴圈積木的字「for i in range(n)」「for x in a」；檢查沒過回傳 null */
+function pyForText(vars: VarStore, f: DialogForm): string | null {
+  const text = f.pyFor.trim().replace(/:\s*$/, '');
+  const py = pyFor(text);
+  if (!py) {
+    alert(t('for 迴圈要寫成「for i in range(n)」「for i in range(1, n + 1)」或「for x in a」：點下面的寫法，再改成你要的。', 'Write the loop like "for i in range(n)", "for i in range(1, n + 1)" or "for x in a". Pick one below and change it.'));
+    return null;
+  }
+  if (vars.var_list.name.includes(py.name)) {
+    alert(t(`變數表（或參數、區域變數）已經有「${py.name}」了：for 的變數不用在變數表宣告，請換一個名字，或刪掉變數表裡的「${py.name}」。`, `"${py.name}" is already in the variable table. A for variable needs no declaration. Rename it, or delete "${py.name}" from the table.`));
+    return null;
+  }
+  const parts = py.range ? [py.range.start, py.range.stop, py.range.step] : [py.iter!];
+  return parts.every(p => checkVar(vars, p, true)) ? text : null;
+}
+
 /** 執行模組積木的文字「模組名稱(引數, …)」；檢查沒過回傳 null */
 function callNodeText(vars: VarStore, modules: ModuleInfo[], f: DialogForm): string | null {
   const m = modules.find(x => x.name == f.moduleName);
@@ -359,8 +416,8 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
     case 'Diamond':
       return checkVar(vars, f.code, true) && add(f.code, 'Diamond', getCodeVar(vars, f.code));
     case 'Loop':
-      if (f.radio == 'cfor') {
-        const text = forText(vars, f);
+      if (f.radio == 'cfor' || f.radio == 'pyfor') {
+        const text = f.radio == 'pyfor' ? pyForText(vars, f) : forText(vars, f);
         return text != null && add(text, 'For_Loop', getCodeVar(vars, text));
       }
       if (checkVar(vars, f.forNumber, true) || checkVar(vars, f.code, true)) {
@@ -410,8 +467,8 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
       return done();
     case 'For_Loop':
     case 'While_Loop': {
-      if (f.radio == 'cfor') {
-        const text = forText(vars, f);
+      if (f.radio == 'cfor' || f.radio == 'pyfor') {
+        const text = f.radio == 'pyfor' ? pyForText(vars, f) : forText(vars, f);
         if (text == null) return false;
         node.figure = 'For_Loop';
         node.text = text;
@@ -480,6 +537,9 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
             : { radio, ioText: '變數或字串：' },
         };
       }
+      // Python：一行讀好幾個「輸入 a, b」
+      const many = isPython() ? splitArgs(rest) : [];
+      if (many.length > 1) return { kind: 'Parallelogram', initial: { radio, ioTarget: '多個', ioMany: many, varSelectDisplay: 'inline-block', varSelectOutputDisplay: 'none' } };
       // 輸入到清單的某一項：拆出清單和第幾項（存到變數還是清單，對話框再依變數表判斷）
       const insert = /^(.*?) 插入第 (.*) 項$/s.exec(rest);
       const item = splitTarget(rest);
@@ -492,7 +552,7 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           ? { varSelect: fieldItem.name, ioTarget: vars?.type_var_list.fixed.includes(fieldItem.name) ? '陣列' : '清單', ioPlace: '替換', rectIndex: fieldItem.indexes[0], rectField: field.field }
           : { varSelect: field.base.trim(), ioTarget: '結構', rectField: field.field })
         : insert ? { varSelect: insert[1].trim(), ioPlace: '插入', rectIndex: insert[2].trim() }
-        : item?.indexes.length == 2 ? { varSelect: item.name, ioTarget: '二維清單', rectIndex: item.indexes[0], rectIndex2: item.indexes[1] }
+        : item?.indexes.length == 2 ? { varSelect: item.name, ioTarget: '二維清單', ioPlace: '替換', rectIndex: item.indexes[0], rectIndex2: item.indexes[1] }
         : item ? { varSelect: item.name, ioPlace: '替換', rectIndex: item.indexes[0] }
         : { varSelect: rest };
       return {
@@ -507,6 +567,8 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       return { kind: 'Function', initial: call ? { moduleName: call.name, moduleArgs: call.args } : {} };
     }
     case 'For_Loop': {
+      // Python 的 for i in range(n)、for x in a
+      if (isPython() && pyFor(text)) return { kind: 'For_Loop', initial: { radio: 'pyfor', pyFor: text, showWhile: false } };
       // C++ 的 for (int i = 0; i < n; i++)
       const h = splitFor(text);
       if (h) return { kind: 'For_Loop', initial: { radio: 'cfor', forInit: h.init, forCond: h.cond, forUpdate: h.update, showWhile: false } };
@@ -558,7 +620,10 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
           ...(action == '排序' ? { sortKeys: index2 ? parseSortKeys(index2) : [], sortDesc: expr == '由大到小' } : {}),
           // 先選的那一層：變數、清單、二維清單（建立，或替換一格 表[列][行]）、回傳、array、stack、queue
           rectKind: vars?.type_var_list.map.includes(target) ? '對應表' : vars?.type_var_list.set.includes(target) ? '集合' : vars?.type_var_list.pq.includes(target) ? '優先佇列'
-            : action == '設為' ? '變數' : action == '回傳' ? '回傳' : action == '建立' && !index2 ? '陣列' : action == '建立' || (action == '替換' && index2) ? '二維清單'
+            : action == '設為' ? '變數' : action == '回傳' ? '回傳'
+            // Python 的 list 建立 n 格、pop()
+            : (action == '建立' || action == '取出') && !index2 && isPython() && vars?.type_var_list.array.includes(target) ? '清單'
+            : action == '建立' && !index2 ? '陣列' : action == '建立' || (action == '替換' && index2) ? '二維清單'
             : action == '放入' || action == '取出' ? (vars?.type_var_list.queue.includes(target) ? '佇列' : '堆疊')
             // 二維 vector 某一列 push_back：「 g[u] 加入 v」
             : action == '加入' && splitTarget(target) ? '二維清單'

@@ -1,7 +1,7 @@
 // 積木和箭頭上的字：存起來的一律是中文（程式靠它判斷怎麼執行），英文模式只在畫的時候換成英文。
 // 計算積木的清單操作，中英文都在畫的時候換成 Scratch 積木的說法。
 import { getLang } from '../i18n';
-import { itemWord } from '../target';
+import { isPython, itemWord } from '../target';
 import type { FigureName } from './figures';
 
 const ROUNDING: [string, string][] = [
@@ -104,8 +104,10 @@ export function splitRectangle(text: string): { target: string; action: RectActi
 }
 
 /** C++ 的 map、set 的名稱（積木上的字照 C++ 的寫法：m[k] = v、s.insert(x)、erase）；App 依變數表更新 */
-let cppKinds: Record<string, 'map' | 'set' | 'string'> = {};
-export const setCppKinds = (kinds: Record<string, 'map' | 'set' | 'string'>) => { cppKinds = kinds; };
+/** Python 還有 list、deque、heapq、二維 list（積木上的字照 Python 的寫法：a.append(x)、q.popleft()、heappush(h, x)） */
+export type LabelKind = 'map' | 'set' | 'string' | 'list' | 'deque' | 'heap' | 'grid';
+let cppKinds: Record<string, LabelKind> = {};
+export const setCppKinds = (kinds: Record<string, LabelKind>) => { cppKinds = kinds; };
 
 /** 計算積木上顯示的字：清單的操作照 Scratch 積木的說法，下一堂改用 Scratch 時看得懂 */
 function rectangleLabel(text: string, en: boolean): string {
@@ -119,6 +121,10 @@ function rectangleLabel(text: string, en: boolean): string {
   }
   const { target, action, index, index2, expr } = splitRectangle(rest);
   const value = expr.trim() + round;
+  if (isPython()) {
+    const py = pyRectLabel(target, action, index, index2, value);
+    if (py) return py;
+  }
   // map、set：照 C++ 的寫法
   const ck = cppKinds[target];
   // map 的一格、C++ 的 string 改其中一個字：m[k] = v、s[i] = 'a'
@@ -158,8 +164,50 @@ function rectangleLabel(text: string, en: boolean): string {
   }
 }
 
+/** Python 的容器操作照 Python 的寫法；不是容器的操作回傳 null（照一般的說法） */
+function pyRectLabel(target: string, action: RectAction, index: string, index2: string, value: string): string | null {
+  const row = splitTarget(target);
+  const k = cppKinds[row ? row.name : target];
+  if (!k || k == 'string') return null;
+  if (action == '替換') return `${target}[${index}]${index2 ? `[${index2}]` : ''} = ${value}`;
+  if (action == '清空') return `${target}.clear()`;
+  switch (k) {
+    case 'list':
+      if (action == '加入') return `${target}.append(${value})`;
+      if (action == '插入') return `${target}.insert(${index}, ${value})`;
+      if (action == '刪除') return `${target}.pop(${index})`;
+      if (action == '取出') return `${target}.pop()`;
+      if (action == '建立') return `${target} = [0] * ${index}`;
+      return null;
+    case 'grid':
+      if (action == '加入') return `${target}.append(${value})`;
+      if (action == '建立') return `${target} 建立 ${index} 列 × ${index2} 行`;
+      return null;
+    case 'deque':
+      if (action == '放入') return `${target}.append(${value})`;
+      if (action == '取出') return `${target}.popleft()`;
+      return null;
+    case 'heap':
+      if (action == '放入') return `heappush(${target}, ${value})`;
+      if (action == '取出') return `heappop(${target})`;
+      return null;
+    case 'set':
+      if (action == '放入') return `${target}.add(${value})`;
+      if (action == '刪除') return `${target}.discard(${index})`;
+      return null;
+    case 'map':
+      if (action == '刪除') return `del ${target}[${index}]`;
+      return null;
+  }
+}
+
 /** 輸入積木上顯示的字：輸入到清單某一項時，照 Scratch 的說法寫出插入/替換 */
 function ioLabel(text: string, en: boolean): string {
+  // Python：整行切開存進 list、加到二維 list 的最後一列
+  const whole = /^輸入 (\S+)$/.exec(text);
+  const wk = whole && isPython() ? cppKinds[whole[1]] : undefined;
+  if (wk == 'list') return en ? `Input a line, split into ${whole![1]}` : `輸入一行，切開存進 ${whole![1]}`;
+  if (wk == 'grid') return en ? `Input a line, split as a new row of ${whole![1]}` : `輸入一行，切開加到 ${whole![1]} 的最後一列`;
   // 輸入到二維清單的一格：照 C++ 的寫法
   if (text.startsWith('輸入') && (splitTarget(text.substring(3))?.indexes.length ?? 0) > 1) return en ? text.replace(/^輸入/, 'Input') : text;
   const insert = /^輸入 (.*?) 插入第 (.*) 項$/s.exec(text);

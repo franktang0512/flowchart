@@ -1,7 +1,7 @@
 // 首頁：選學習目標（積木或 C++）→ 選課程 → 看這門課的題目 → 點題目進入學習單
 import { useEffect, useState } from 'react';
 import { LangToggle } from '../components/LangToggle';
-import { COURSES, courseFits, questionHref, type Course } from '../courses';
+import { COURSES, courseFits, questionHref, unitName, type Course } from '../courses';
 import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
 import { setTarget, targetName, useTarget, type Target } from '../target';
@@ -61,9 +61,10 @@ const TARGET_CHOICES: { key: string; target?: Target; name: () => string; desc: 
   },
   {
     key: 'python',
-    name: () => 'Python',
-    desc: () => t('串列（list）等 Python 寫法', 'Python lists'),
-    index: () => t('準備中', 'Coming soon'),
+    target: 'python',
+    name: () => targetName('python'),
+    desc: () => t('list、dict 等 Python 寫法（輸入一次讀一行）', 'Python lists and dicts (input reads a line)'),
+    index: () => t('索引從 0 開始', 'Index starts at 0'),
   },
 ];
 
@@ -161,7 +162,7 @@ export function QuestionList({ courseId }: { courseId: string }) {
       <h4 className="home_heading">{courseName(course)}</h4>
       {course.units.map(unit => (
         <div key={unit.name} className="home_unit">
-          <h5>{courseName(unit)}</h5>
+          <h5>{courseName(unitName(unit))}</h5>
           <ol className="home_questions">
             {unit.questions.map(p => {
               no++;

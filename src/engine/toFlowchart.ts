@@ -41,6 +41,10 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     case 'str': return e.ch ? `'${e.v}'` : e.v.includes('"') ? `'${e.v}'` : `"${e.v}"`;
     case 'var': return e.name;
     case 'brace': return `{${e.items.map(a => exprText(a, cond)).join(', ')}}`;
+    // 下面三種只有 Python 有（積木改回流程圖時用不到，只是寫完整）
+    case 'bool': return e.v ? 'True' : 'False';
+    case 'slice': return `${exprText(e.obj, cond, 9)}[${e.start ? exprText(e.start, cond) : ''}:${e.stop ? exprText(e.stop, cond) : ''}${e.step ? ':' + exprText(e.step, cond) : ''}]`;
+    case 'chain': return e.items.map(a => exprText(a, cond, 4)).reduce((acc, x, k) => `${acc} ${e.ops[k - 1]} ${x}`);
     case 'raw': return e.text;
     case 'idx': return `${exprText(e.obj, cond, 9)}[${exprText(e.index, cond)}]`;
     case 'method': return `${exprText(e.obj, cond, 9)}.${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
@@ -50,7 +54,7 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
     case 'not': return wrap(`not ${exprText(e.a, cond, 7)}`, 2.5, parent);
     case 'call': {
-      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min', chr: 'char', toupper: 'toupper', tolower: 'tolower', isdigit: 'isdigit', isalpha: 'isalpha', isupper: 'isupper', islower: 'islower' }[e.fn];
+      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min', chr: 'char', toupper: 'toupper', tolower: 'tolower', isdigit: 'isdigit', isalpha: 'isalpha', isupper: 'isupper', islower: 'islower', float: 'float', abs: 'abs', sum: 'sum', ord: 'ord', round: 'round' }[e.fn];
       return `${name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     }
     case 'bin': {
@@ -135,6 +139,11 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
       // C++ 的 for 迴圈、break、continue（積木改回流程圖時用不到，只是寫完整）
       case 'for':
         return { kind: 'loop', loop: node(`for (int ${s.name} = ${exprText(s.start)}; ${exprText(s.cond)}; ${s.update})`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
+      // Python 的 for（積木改回流程圖時用不到，只是寫完整）
+      case 'range':
+        return { kind: 'loop', loop: node(`for ${s.name} in range(${exprText(s.start)}, ${exprText(s.stop)}, ${exprText(s.step)})`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
+      case 'each':
+        return { kind: 'loop', loop: node(`for ${s.name} in ${exprText(s.iter)}`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
       case 'break':
         return { kind: 'node', node: node(' break', 'Rectangle') };
       case 'continue':
