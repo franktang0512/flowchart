@@ -1,7 +1,8 @@
 // 節點上下左右的連接點（拉箭頭用）
 
 // 舊版的全域 connector_r：只有選了箭頭工具時連接點才有半徑（才看得到、點得到）
-export const connectorState = { r: 0 };
+// hit：點得到的範圍是 r 的幾倍（縮小畫面時連接點變小，點得到的範圍維持在螢幕上差不多大）
+export const connectorState = { r: 0, hit: 1 };
 
 export interface ConnectorDecoration {
   fillStyle: string;
@@ -69,7 +70,8 @@ export class Connector {
   }
 
   isInside(x: number, y: number, originX: number, originY: number, width: number, height: number) {
-    return this.distance(x, y, originX, originY, width, height) <= connectorState.r * connectorState.r;
+    const r = connectorState.r * connectorState.hit;
+    return this.distance(x, y, originX, originY, width, height) <= r * r;
   }
 }
 

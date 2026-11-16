@@ -455,7 +455,18 @@ export class Diagram {
 
   private mouseCoords(ev: MouseEvent): Point {
     const p = canvasPoint(this.myCanvas, ev);
+    // 縮小時連接點畫得比較小，點得到的範圍放大回來，才不會很難抓；
+    // 瀏覽器縮小（Ctrl −，例如 67%）時 devicePixelRatio 會變小，也一起算進去
+    connectorState.hit = Math.max(1, 1 / (this.zoom * Math.min(1, window.devicePixelRatio || 1)));
     return { x: p.x / this.zoom, y: p.y / this.zoom };
+  }
+
+  /** 在 draw() 之外直接畫在畫布上的東西（滑鼠移過去的紅圈）也要照縮放比例畫，位置才對得上 */
+  private zoomed(paint: () => void) {
+    this.ctx.save();
+    this.ctx.scale(this.zoom, this.zoom);
+    paint();
+    this.ctx.restore();
   }
 
   /** 畫布座標 → 螢幕座標（反向換算，給浮在畫布上的文字框定位用） */
@@ -648,7 +659,7 @@ export class Diagram {
             if (element.connectors[i].options.dropAllowed && (element.connectors[i].mode != src.mode || element.connectors[i].mode == 'mixed')) {
               this.linkDestNode = j;
               this.linkDestConnector = i;
-              element.connectors[i].highlight(this.ctx, element.x, element.y, element.w, element.h);
+              this.zoomed(() => element.connectors[i].highlight(this.ctx, element.x, element.y, element.w, element.h));
             }
             break;
           }
@@ -698,7 +709,7 @@ export class Diagram {
           if (i != null) {
             this.selAnchor = i;
             this.myCanvas.style.cursor = element.anchors[i].cursorClass;
-            element.anchors[i].highlight(this.ctx, element.x, element.y, element.w, element.h);
+            this.zoomed(() => element.anchors[i].highlight(this.ctx, element.x, element.y, element.w, element.h));
           }
           else {
             if (this.selAnchor != null) this.draw();
@@ -730,7 +741,7 @@ export class Diagram {
       if (i != null && element.connectors[i].options.dragAllowed) {
         this.selConnector = i;
         this.selConnectorNode = j;
-        element.connectors[i].highlight(this.ctx, element.x, element.y, element.w, element.h);
+        this.zoomed(() => element.connectors[i].highlight(this.ctx, element.x, element.y, element.w, element.h));
         return;
       }
     }
