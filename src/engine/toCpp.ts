@@ -350,15 +350,24 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         }
         break;
       }
-      case 'if':
+      case 'if': {
         emit(depth, `if (${cond(s.cond)}) {`);
         stmts(s.yes, depth + 1);
-        if (s.no.length) {
+        // 否則裡面只有另一個判斷：寫成 else if
+        let no = s.no;
+        while (no.length == 1 && no[0].kind == 'if') {
+          const inner: Extract<Stmt, { kind: 'if' }> = no[0];
+          emit(depth, `} else if (${cond(inner.cond)}) {`);
+          stmts(inner.yes, depth + 1);
+          no = inner.no;
+        }
+        if (no.length) {
           emit(depth, '} else {');
-          stmts(s.no, depth + 1);
+          stmts(no, depth + 1);
         }
         emit(depth, '}');
         break;
+      }
       case 'repeat': {
         const c = counterName();
         emit(depth, `for (int ${c} = 0; ${c} < ${expr(s.times, 4)}; ${c}++) {`);
