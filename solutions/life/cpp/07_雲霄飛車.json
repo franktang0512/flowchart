@@ -1,0 +1,225 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/if3",
+  "questionTitle": "雲霄飛車",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "身高 120 以上而且 7 歲以上才能搭",
+    "hint": "height：身高；age：年齡",
+    "hint2": "可以搭或不能搭"
+  },
+  "variables": [
+    {
+      "desc": "身高（公分）",
+      "name": "height",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "年齡",
+      "name": "age",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 175,
+        "y": 160,
+        "w": 140,
+        "h": 80,
+        "text": "輸入 height",
+        "figure": "Parallelogram",
+        "variables": [
+          "height"
+        ]
+      },
+      {
+        "x": 185,
+        "y": 290,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 age",
+        "figure": "Parallelogram",
+        "variables": [
+          "age"
+        ]
+      },
+      {
+        "x": 135,
+        "y": 420,
+        "w": 220,
+        "h": 90,
+        "text": "height >= 120 and age >= 7",
+        "figure": "Diamond",
+        "variables": [
+          "height",
+          "age"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 560,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"可以搭\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 300,
+        "y": 560,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"不能搭\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 185,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 185,
+        "y": 690,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 115,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 375,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 115,
+            "y": 665
+          },
+          {
+            "x": 245,
+            "y": 665
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 375,
+            "y": 665
+          },
+          {
+            "x": 245,
+            "y": 665
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "130 10",
+      "可以搭",
+      "兩個都符合"
+    ],
+    [
+      "125 6",
+      "不能搭",
+      "身高夠，年齡不夠"
+    ],
+    [
+      "110 9",
+      "不能搭",
+      "年齡夠，身高不夠"
+    ]
+  ]
+}

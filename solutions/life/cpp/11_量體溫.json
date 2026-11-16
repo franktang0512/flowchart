@@ -1,0 +1,248 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/f2",
+  "questionTitle": "量體溫",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "5 位同學，每位量完就判斷發燒還是正常",
+    "hint": "temp：一位同學的體溫",
+    "hint2": "每位一行：發燒或正常"
+  },
+  "variables": [
+    {
+      "desc": "一位同學的體溫",
+      "name": "temp",
+      "type": "數字",
+      "init": "0",
+      "float": true
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 150,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 5; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 175,
+        "y": 290,
+        "w": 130,
+        "h": 80,
+        "text": "輸入 temp",
+        "figure": "Parallelogram",
+        "variables": [
+          "temp"
+        ]
+      },
+      {
+        "x": 175,
+        "y": 420,
+        "w": 130,
+        "h": 90,
+        "text": "temp >= 37.5",
+        "figure": "Diamond",
+        "variables": [
+          "temp"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 560,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 \"發燒\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 270,
+        "y": 560,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 \"正常\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 740,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 145,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 335,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 145,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 335,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 0,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 430,
+            "y": 200
+          },
+          {
+            "x": 430,
+            "y": 715
+          },
+          {
+            "x": 240,
+            "y": 715
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "36.5 37.8 36.9 37.5 36.2",
+      "正常\n發燒\n正常\n發燒\n正常",
+      "37.5 剛好也算發燒"
+    ],
+    [
+      "36.4 36.6 36.8 36.5 36.7",
+      "正常\n正常\n正常\n正常\n正常",
+      ""
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

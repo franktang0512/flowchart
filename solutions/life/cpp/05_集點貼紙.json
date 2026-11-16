@@ -1,0 +1,196 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/if1",
+  "questionTitle": "集點貼紙",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "滿 100 元送貼紙，最後都說謝謝光臨",
+    "hint": "money：消費金額",
+    "hint2": "送貼紙（滿 100）、謝謝光臨"
+  },
+  "variables": [
+    {
+      "desc": "消費金額",
+      "name": "money",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 150,
+        "y": 160,
+        "w": 140,
+        "h": 80,
+        "text": "輸入 money",
+        "figure": "Parallelogram",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 160,
+        "y": 290,
+        "w": 120,
+        "h": 90,
+        "text": "money >= 100",
+        "figure": "Diamond",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 430,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"送你一張集點貼紙\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 135,
+        "y": 560,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"謝謝光臨\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 160,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 160,
+        "y": 690,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 115,
+            "y": 335
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 115,
+            "y": 535
+          },
+          {
+            "x": 220,
+            "y": 535
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 300,
+            "y": 335
+          },
+          {
+            "x": 300,
+            "y": 535
+          },
+          {
+            "x": 220,
+            "y": 535
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "150",
+      "送你一張集點貼紙\n謝謝光臨",
+      "有滿 100"
+    ],
+    [
+      "100",
+      "送你一張集點貼紙\n謝謝光臨",
+      "剛好 100 也算"
+    ],
+    [
+      "85",
+      "謝謝光臨",
+      "沒滿 100，只說謝謝光臨"
+    ]
+  ]
+}

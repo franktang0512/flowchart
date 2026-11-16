@@ -1,0 +1,207 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/arr1",
+  "questionTitle": "查詢步數紀錄",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "七天的步數存進陣列，查星期 n",
+    "hint": "steps：七天的步數；n：星期幾",
+    "hint2": "那一天的步數"
+  },
+  "variables": [
+    {
+      "desc": "星期一到星期日的步數",
+      "name": "steps",
+      "type": "陣列",
+      "init": "數字",
+      "size": "7"
+    },
+    {
+      "desc": "要查星期幾",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 80,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 7; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 90,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "輸入 steps[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "steps"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 470,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 600,
+        "w": 180,
+        "h": 80,
+        "text": "輸出 steps[n - 1]",
+        "figure": "Parallelogram",
+        "variables": [
+          "steps",
+          "n"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 110,
+        "y": 730,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 200
+          },
+          {
+            "x": 290,
+            "y": 445
+          },
+          {
+            "x": 170,
+            "y": 445
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "5000 7200 8300 9100 7800 6400 10000\n4",
+      "9100",
+      "星期四是第 4 天"
+    ],
+    [
+      "3000 4500 6000 5200 8800 12000 9500\n1",
+      "3000",
+      "查第一天"
+    ],
+    [
+      "6600 7100 5900 8000 7300 15000 11200\n7",
+      "11200",
+      "查最後一天"
+    ]
+  ]
+}

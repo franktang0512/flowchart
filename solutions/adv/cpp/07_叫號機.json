@@ -1,0 +1,384 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/q1",
+  "questionTitle": "叫號機",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "來排隊就 push；叫號就輸出 front() 再 pop",
+    "hint": "n：幾個操作；x：號碼（0 是叫號）",
+    "hint2": "叫到的號碼或沒有人在排隊"
+  },
+  "variables": [
+    {
+      "desc": "排隊的號碼",
+      "name": "q",
+      "type": "佇列",
+      "init": "數字"
+    },
+    {
+      "desc": "幾個操作",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "號碼，0 是叫號",
+      "name": "x",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 410,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 380,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 410,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 x",
+        "figure": "Parallelogram",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 410,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "x > 0",
+        "figure": "Diamond",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 320,
+        "y": 680,
+        "w": 120,
+        "h": 80,
+        "text": " q 放入 x",
+        "figure": "Rectangle",
+        "variables": [
+          "q",
+          "x"
+        ],
+        "data": ""
+      },
+      {
+        "x": 600,
+        "y": 680,
+        "w": 160,
+        "h": 80,
+        "text": "q.empty()",
+        "figure": "Diamond",
+        "variables": [
+          "q"
+        ]
+      },
+      {
+        "x": 510,
+        "y": 810,
+        "w": 140,
+        "h": 80,
+        "text": "輸出 \"沒有人在排隊\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 710,
+        "y": 810,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 q.front()",
+        "figure": "Parallelogram",
+        "variables": [
+          "q",
+          "n"
+        ]
+      },
+      {
+        "x": 725,
+        "y": 940,
+        "w": 120,
+        "h": 80,
+        "text": " q 取出",
+        "figure": "Rectangle",
+        "variables": [
+          "q"
+        ],
+        "data": ""
+      },
+      {
+        "x": 410,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 410,
+        "y": 1120,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 380,
+            "y": 590
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 580,
+            "y": 720
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 785,
+            "y": 720
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 680,
+            "y": 590
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 380,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 580,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 785,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 10,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 890,
+            "y": 330
+          },
+          {
+            "x": 890,
+            "y": 1095
+          },
+          {
+            "x": 470,
+            "y": 1095
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "6 101 102 0 103 0 0",
+      "101\n102\n103",
+      ""
+    ],
+    [
+      "4 0 7 0 0",
+      "沒有人在排隊\n7\n沒有人在排隊",
+      "一開始和最後都沒有人"
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

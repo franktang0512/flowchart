@@ -1,0 +1,522 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/bag1",
+  "questionTitle": "夜市怎麼買最開心",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "3 樣東西各買或不買（0 或 1），試完 8 種，留下最開心的",
+    "hint": "money：帶了多少錢；price、like：每樣的價格和喜歡程度",
+    "hint2": "best：最多的喜歡程度"
+  },
+  "variables": [
+    {
+      "desc": "帶了多少錢",
+      "name": "money",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "價格",
+      "name": "price",
+      "type": "陣列",
+      "init": "數字",
+      "size": "3"
+    },
+    {
+      "desc": "喜歡程度",
+      "name": "like",
+      "type": "陣列",
+      "init": "數字",
+      "size": "3"
+    },
+    {
+      "desc": "這樣買要花多少",
+      "name": "cost",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "這樣買多開心",
+      "name": "joy",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "最開心的",
+      "name": "best",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 300,
+        "y": 160,
+        "w": 140,
+        "h": 80,
+        "text": "輸入 money",
+        "figure": "Parallelogram",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 280,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 3; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 295,
+        "y": 420,
+        "w": 150,
+        "h": 80,
+        "text": "輸入 price[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "price"
+        ]
+      },
+      {
+        "x": 295,
+        "y": 550,
+        "w": 150,
+        "h": 80,
+        "text": "輸入 like[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "like"
+        ]
+      },
+      {
+        "x": 275,
+        "y": 730,
+        "w": 190,
+        "h": 80,
+        "text": "for (int a = 0; a <= 1; a++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 275,
+        "y": 860,
+        "w": 190,
+        "h": 80,
+        "text": "for (int b = 0; b <= 1; b++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 275,
+        "y": 990,
+        "w": 190,
+        "h": 80,
+        "text": "for (int c = 0; c <= 1; c++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 255,
+        "y": 1120,
+        "w": 230,
+        "h": 80,
+        "text": " cost 設為 a * price[0] + b * price[1] + c * price[2]",
+        "figure": "Rectangle",
+        "variables": [
+          "price",
+          "cost"
+        ],
+        "data": ""
+      },
+      {
+        "x": 265,
+        "y": 1250,
+        "w": 210,
+        "h": 80,
+        "text": " joy 設為 a * like[0] + b * like[1] + c * like[2]",
+        "figure": "Rectangle",
+        "variables": [
+          "like",
+          "joy"
+        ],
+        "data": ""
+      },
+      {
+        "x": 250,
+        "y": 1380,
+        "w": 240,
+        "h": 90,
+        "text": "cost <= money and joy > best",
+        "figure": "Diamond",
+        "variables": [
+          "money",
+          "cost",
+          "joy",
+          "best"
+        ]
+      },
+      {
+        "x": 160,
+        "y": 1520,
+        "w": 140,
+        "h": 80,
+        "text": " best 設為 joy",
+        "figure": "Rectangle",
+        "variables": [
+          "joy",
+          "best"
+        ],
+        "data": ""
+      },
+      {
+        "x": 310,
+        "y": 1800,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 best",
+        "figure": "Parallelogram",
+        "variables": [
+          "best"
+        ]
+      },
+      {
+        "x": 310,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 310,
+        "y": 1930,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 370,
+            "y": 655
+          },
+          {
+            "x": 250,
+            "y": 655
+          },
+          {
+            "x": 250,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 10,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 230,
+            "y": 1425
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 10,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 230,
+            "y": 1625
+          },
+          {
+            "x": 130,
+            "y": 1625
+          },
+          {
+            "x": 130,
+            "y": 1030
+          }
+        ]
+      },
+      {
+        "from": 9,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 510,
+            "y": 1425
+          },
+          {
+            "x": 510,
+            "y": 1625
+          },
+          {
+            "x": 130,
+            "y": 1625
+          },
+          {
+            "x": 130,
+            "y": 1030
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 610,
+            "y": 1030
+          },
+          {
+            "x": 610,
+            "y": 1675
+          },
+          {
+            "x": 90,
+            "y": 1675
+          },
+          {
+            "x": 90,
+            "y": 900
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 650,
+            "y": 900
+          },
+          {
+            "x": 650,
+            "y": 1725
+          },
+          {
+            "x": 50,
+            "y": 1725
+          },
+          {
+            "x": 50,
+            "y": 770
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 490,
+            "y": 330
+          },
+          {
+            "x": 490,
+            "y": 705
+          },
+          {
+            "x": 370,
+            "y": 705
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 11,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 690,
+            "y": 770
+          },
+          {
+            "x": 690,
+            "y": 1775
+          },
+          {
+            "x": 370,
+            "y": 1775
+          }
+        ]
+      },
+      {
+        "from": 12,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 11,
+        "to": 13,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "100 60 8 45 6 50 7",
+      "13",
+      "雞排 60 元喜歡 8；奶茶 45 元喜歡 6；臭豆腐 50 元喜歡 7。買奶茶加臭豆腐 95 元，喜歡 13"
+    ],
+    [
+      "100 70 9 50 6 50 6",
+      "12",
+      "先買最喜歡的雞排（70 元）就只剩 30 元；其實買兩樣 50 元的，加起來 12 比較多"
+    ],
+    [
+      "40 60 8 45 6 50 7",
+      "0",
+      "錢不夠，一樣都買不了"
+    ]
+  ]
+}

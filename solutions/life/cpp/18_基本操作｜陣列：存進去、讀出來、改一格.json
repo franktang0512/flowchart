@@ -1,0 +1,249 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/arr_basic",
+  "questionTitle": "基本操作｜陣列：存進去、讀出來、改一格",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "存 5 個數字，輸出第 k 個，再把它改成 0 輸出整個陣列",
+    "hint": "a：5 個數字；k：第幾個",
+    "hint2": "第 k 個數字、改完的陣列"
+  },
+  "variables": [
+    {
+      "desc": "5 個數字",
+      "name": "a",
+      "type": "陣列",
+      "init": "數字",
+      "size": "5"
+    },
+    {
+      "desc": "第幾個（1 到 5）",
+      "name": "k",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 80,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 5; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 95,
+        "y": 290,
+        "w": 150,
+        "h": 80,
+        "text": "輸入 a[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "a"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 470,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 k",
+        "figure": "Parallelogram",
+        "variables": [
+          "k"
+        ]
+      },
+      {
+        "x": 100,
+        "y": 600,
+        "w": 140,
+        "h": 80,
+        "text": "輸出 a[k - 1]",
+        "figure": "Parallelogram",
+        "variables": [
+          "a",
+          "k"
+        ]
+      },
+      {
+        "x": 100,
+        "y": 730,
+        "w": 140,
+        "h": 80,
+        "text": " a[k - 1] 設為 0",
+        "figure": "Rectangle",
+        "variables": [
+          "a",
+          "k"
+        ],
+        "data": ""
+      },
+      {
+        "x": 110,
+        "y": 860,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 a",
+        "figure": "Parallelogram",
+        "variables": [
+          "a"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 110,
+        "y": 990,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 200
+          },
+          {
+            "x": 290,
+            "y": 445
+          },
+          {
+            "x": 170,
+            "y": 445
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "3 8 6 1 9\n2",
+      "8\n3 0 6 1 9",
+      "第 2 個是 8"
+    ],
+    [
+      "10 20 30 40 50\n1",
+      "10\n0 20 30 40 50",
+      "改第一個"
+    ],
+    [
+      "7 7 7 7 5\n5",
+      "5\n7 7 7 7 0",
+      "改最後一個"
+    ]
+  ]
+}

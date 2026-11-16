@@ -1,0 +1,229 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/io3",
+  "questionTitle": "分披薩",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "輸入片數和人數，算每人幾片、剩幾片",
+    "hint": "slices：披薩片數；people：人數",
+    "hint2": "each：每人分到幾片；left：剩下幾片"
+  },
+  "variables": [
+    {
+      "desc": "披薩有幾片",
+      "name": "slices",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "有幾個人",
+      "name": "people",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "每人分到幾片",
+      "name": "each",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "剩下幾片",
+      "name": "left",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 50,
+        "y": 160,
+        "w": 130,
+        "h": 80,
+        "text": "輸入 slices",
+        "figure": "Parallelogram",
+        "variables": [
+          "slices"
+        ]
+      },
+      {
+        "x": 45,
+        "y": 290,
+        "w": 140,
+        "h": 80,
+        "text": "輸入 people",
+        "figure": "Parallelogram",
+        "variables": [
+          "people"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 420,
+        "w": 150,
+        "h": 80,
+        "text": " each 設為 slices / people",
+        "figure": "Rectangle",
+        "variables": [
+          "slices",
+          "people",
+          "each"
+        ],
+        "data": ""
+      },
+      {
+        "x": 40,
+        "y": 550,
+        "w": 150,
+        "h": 80,
+        "text": " left 設為 slices % people",
+        "figure": "Rectangle",
+        "variables": [
+          "slices",
+          "people",
+          "left"
+        ],
+        "data": ""
+      },
+      {
+        "x": 55,
+        "y": 680,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 each",
+        "figure": "Parallelogram",
+        "variables": [
+          "each"
+        ]
+      },
+      {
+        "x": 55,
+        "y": 810,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 left",
+        "figure": "Parallelogram",
+        "variables": [
+          "left"
+        ]
+      },
+      {
+        "x": 55,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 55,
+        "y": 940,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "16 5",
+      "3\n1",
+      "16 ÷ 5 = 3 餘 1"
+    ],
+    [
+      "24 6",
+      "4\n0",
+      "剛好分完"
+    ],
+    [
+      "8 10",
+      "0\n8",
+      "人比披薩多，每人 0 片，剩 8 片"
+    ]
+  ]
+}

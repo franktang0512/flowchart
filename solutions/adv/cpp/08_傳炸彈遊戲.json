@@ -1,0 +1,438 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/q2",
+  "questionTitle": "傳炸彈遊戲",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "傳一次＝把最前面的人移到最後面；傳 k 次後最前面的人出局",
+    "hint": "n：幾個人；k：傳幾次",
+    "hint2": "出局的順序、最後留下的人"
+  },
+  "variables": [
+    {
+      "desc": "圍成一圈的人，最前面拿著炸彈",
+      "name": "q",
+      "type": "佇列",
+      "init": "數字"
+    },
+    {
+      "desc": "幾個人",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "傳幾次",
+      "name": "k",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 150,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 150,
+        "y": 290,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 k",
+        "figure": "Parallelogram",
+        "variables": [
+          "k"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 420,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 1; i <= n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 150,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": " q 放入 i",
+        "figure": "Rectangle",
+        "variables": [
+          "q"
+        ],
+        "data": ""
+      },
+      {
+        "x": 125,
+        "y": 730,
+        "w": 170,
+        "h": 80,
+        "text": "q.size() = 1",
+        "figure": "While_Loop",
+        "variables": [
+          "q"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 860,
+        "w": 180,
+        "h": 80,
+        "text": "for (int j = 0; j < k; j++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n",
+          "k"
+        ]
+      },
+      {
+        "x": 130,
+        "y": 990,
+        "w": 160,
+        "h": 80,
+        "text": " q 放入 q.front()",
+        "figure": "Rectangle",
+        "variables": [
+          "q",
+          "n"
+        ],
+        "data": ""
+      },
+      {
+        "x": 150,
+        "y": 1120,
+        "w": 120,
+        "h": 80,
+        "text": " q 取出",
+        "figure": "Rectangle",
+        "variables": [
+          "q"
+        ],
+        "data": ""
+      },
+      {
+        "x": 135,
+        "y": 1300,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 q.front()",
+        "figure": "Parallelogram",
+        "variables": [
+          "q",
+          "n"
+        ]
+      },
+      {
+        "x": 150,
+        "y": 1430,
+        "w": 120,
+        "h": 80,
+        "text": " q 取出",
+        "figure": "Rectangle",
+        "variables": [
+          "q"
+        ],
+        "data": ""
+      },
+      {
+        "x": 110,
+        "y": 1610,
+        "w": 200,
+        "h": 80,
+        "text": "輸出 \"最後留下 \" + to_string(q.front())",
+        "figure": "Parallelogram",
+        "variables": [
+          "q",
+          "n"
+        ]
+      },
+      {
+        "x": 150,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 150,
+        "y": 1740,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 210,
+            "y": 655
+          },
+          {
+            "x": 90,
+            "y": 655
+          },
+          {
+            "x": 90,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 210,
+            "y": 1225
+          },
+          {
+            "x": 90,
+            "y": 1225
+          },
+          {
+            "x": 90,
+            "y": 900
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 8,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 330,
+            "y": 900
+          },
+          {
+            "x": 330,
+            "y": 1275
+          },
+          {
+            "x": 210,
+            "y": 1275
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 210,
+            "y": 1535
+          },
+          {
+            "x": 50,
+            "y": 1535
+          },
+          {
+            "x": 50,
+            "y": 770
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 330,
+            "y": 460
+          },
+          {
+            "x": 330,
+            "y": 705
+          },
+          {
+            "x": 210,
+            "y": 705
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 10,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 370,
+            "y": 770
+          },
+          {
+            "x": 370,
+            "y": 1585
+          },
+          {
+            "x": 210,
+            "y": 1585
+          }
+        ]
+      },
+      {
+        "from": 11,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 10,
+        "to": 12,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "5 2",
+      "3\n1\n5\n2\n最後留下 4",
+      ""
+    ],
+    [
+      "4 1",
+      "2\n4\n3\n最後留下 1",
+      ""
+    ],
+    [
+      "6 3",
+      "4\n2\n1\n3\n6\n最後留下 5",
+      ""
+    ]
+  ]
+}

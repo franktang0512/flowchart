@@ -1,0 +1,110 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/o1",
+  "questionTitle": "歡迎光臨",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "輸出兩行固定的字",
+    "hint": "沒有輸入",
+    "hint2": "兩行歡迎的字"
+  },
+  "variables": [],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 40,
+        "y": 160,
+        "w": 190,
+        "h": 80,
+        "text": "輸出 \"歡迎光臨！\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 55,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "輸出 \"今天飲料第二杯半價\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 75,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 75,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "",
+      "歡迎光臨！\n今天飲料第二杯半價",
+      ""
+    ],
+    [
+      "",
+      "",
+      ""
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

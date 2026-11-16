@@ -1,0 +1,263 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/w1",
+  "questionTitle": "存錢買遊戲機",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "一週一週存，存到夠買為止，數存了幾週",
+    "hint": "price：遊戲機價格；save：每週存多少",
+    "hint2": "weeks：存了幾週"
+  },
+  "variables": [
+    {
+      "desc": "遊戲機價格",
+      "name": "price",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "每週存多少元",
+      "name": "save",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "目前存了多少",
+      "name": "total",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "存了幾週",
+      "name": "weeks",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 115,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 price",
+        "figure": "Parallelogram",
+        "variables": [
+          "price"
+        ]
+      },
+      {
+        "x": 115,
+        "y": 290,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 save",
+        "figure": "Parallelogram",
+        "variables": [
+          "save"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 420,
+        "w": 190,
+        "h": 80,
+        "text": "total >= price",
+        "figure": "While_Loop",
+        "variables": [
+          "price",
+          "total"
+        ]
+      },
+      {
+        "x": 115,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": " total 設為 total + save",
+        "figure": "Rectangle",
+        "variables": [
+          "save",
+          "total"
+        ],
+        "data": ""
+      },
+      {
+        "x": 115,
+        "y": 680,
+        "w": 120,
+        "h": 80,
+        "text": " weeks 設為 weeks + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "weeks"
+        ],
+        "data": ""
+      },
+      {
+        "x": 105,
+        "y": 860,
+        "w": 140,
+        "h": 80,
+        "text": "輸出 weeks",
+        "figure": "Parallelogram",
+        "variables": [
+          "weeks"
+        ]
+      },
+      {
+        "x": 115,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 115,
+        "y": 990,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 175,
+            "y": 785
+          },
+          {
+            "x": 50,
+            "y": 785
+          },
+          {
+            "x": 50,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 300,
+            "y": 460
+          },
+          {
+            "x": 300,
+            "y": 835
+          },
+          {
+            "x": 175,
+            "y": 835
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "9000 500",
+      "18",
+      "存 18 週剛好 9000"
+    ],
+    [
+      "1000 300",
+      "4",
+      "存 3 週 900 不夠，第 4 週 1200 才夠"
+    ],
+    [
+      "200 500",
+      "1",
+      "存 1 週就夠了"
+    ]
+  ]
+}

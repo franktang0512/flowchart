@@ -1,0 +1,195 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/f1",
+  "questionTitle": "跑操場",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "跑幾圈就輸出幾行「第 i 圈」，最後輸出完成",
+    "hint": "laps：要跑幾圈",
+    "hint2": "每一圈、完成！"
+  },
+  "variables": [
+    {
+      "desc": "要跑幾圈",
+      "name": "laps",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 115,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 laps",
+        "figure": "Parallelogram",
+        "variables": [
+          "laps"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 290,
+        "w": 190,
+        "h": 80,
+        "text": "for (int i = 1; i <= laps; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "laps"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 420,
+        "w": 190,
+        "h": 80,
+        "text": "輸出 \"第 \" + to_string(i) + \" 圈\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 100,
+        "y": 600,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"完成！\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 115,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 115,
+        "y": 730,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 175,
+            "y": 525
+          },
+          {
+            "x": 50,
+            "y": 525
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 300,
+            "y": 330
+          },
+          {
+            "x": 300,
+            "y": 575
+          },
+          {
+            "x": 175,
+            "y": 575
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "3",
+      "第 1 圈\n第 2 圈\n第 3 圈\n完成！",
+      ""
+    ],
+    [
+      "1",
+      "第 1 圈\n完成！",
+      ""
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

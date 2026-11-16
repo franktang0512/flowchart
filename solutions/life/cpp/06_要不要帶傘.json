@@ -1,0 +1,197 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/if2",
+  "questionTitle": "要不要帶傘",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "降雨機率 50 以上要帶傘",
+    "hint": "rain：降雨機率（%）",
+    "hint2": "記得帶傘或不用帶傘"
+  },
+  "variables": [
+    {
+      "desc": "降雨機率（%）",
+      "name": "rain",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 180,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 rain",
+        "figure": "Parallelogram",
+        "variables": [
+          "rain"
+        ]
+      },
+      {
+        "x": 155,
+        "y": 290,
+        "w": 170,
+        "h": 80,
+        "text": "rain >= 50",
+        "figure": "Diamond",
+        "variables": [
+          "rain"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 420,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"記得帶傘\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 270,
+        "y": 420,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"不用帶傘\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 125,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 355,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 125,
+            "y": 525
+          },
+          {
+            "x": 240,
+            "y": 525
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 355,
+            "y": 525
+          },
+          {
+            "x": 240,
+            "y": 525
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "70",
+      "記得帶傘",
+      ""
+    ],
+    [
+      "50",
+      "記得帶傘",
+      "剛好 50 也要帶"
+    ],
+    [
+      "20",
+      "不用帶傘",
+      ""
+    ]
+  ]
+}

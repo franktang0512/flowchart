@@ -1,0 +1,197 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/if4",
+  "questionTitle": "電影票",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "12 歲以下或 65 歲以上 150 元，其他 300 元",
+    "hint": "age：年齡",
+    "hint2": "票價"
+  },
+  "variables": [
+    {
+      "desc": "年齡",
+      "name": "age",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 165,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 age",
+        "figure": "Parallelogram",
+        "variables": [
+          "age"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 290,
+        "w": 210,
+        "h": 90,
+        "text": "age <= 12 or age >= 65",
+        "figure": "Diamond",
+        "variables": [
+          "age"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 430,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 150",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 290,
+        "y": 430,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 300",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 165,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 165,
+        "y": 560,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 100,
+            "y": 335
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 350,
+            "y": 335
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 100,
+            "y": 535
+          },
+          {
+            "x": 225,
+            "y": 535
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 350,
+            "y": 535
+          },
+          {
+            "x": 225,
+            "y": 535
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "8",
+      "150",
+      "12 歲以下"
+    ],
+    [
+      "70",
+      "150",
+      "65 歲以上"
+    ],
+    [
+      "30",
+      "300",
+      ""
+    ]
+  ]
+}

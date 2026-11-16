@@ -1,0 +1,329 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/if5",
+  "questionTitle": "外送運費",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "先看訂單金額，再看距離，決定運費",
+    "hint": "money：訂單金額；km：距離（公里）",
+    "hint2": "fee：運費"
+  },
+  "variables": [
+    {
+      "desc": "訂單金額",
+      "name": "money",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "距離（公里）",
+      "name": "km",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "運費",
+      "name": "fee",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 300,
+        "y": 160,
+        "w": 140,
+        "h": 80,
+        "text": "輸入 money",
+        "figure": "Parallelogram",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 310,
+        "y": 290,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 km",
+        "figure": "Parallelogram",
+        "variables": [
+          "km"
+        ]
+      },
+      {
+        "x": 310,
+        "y": 420,
+        "w": 120,
+        "h": 90,
+        "text": "money >= 500",
+        "figure": "Diamond",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 220,
+        "y": 560,
+        "w": 120,
+        "h": 80,
+        "text": " fee 設為 0",
+        "figure": "Rectangle",
+        "variables": [
+          "fee"
+        ],
+        "data": ""
+      },
+      {
+        "x": 480,
+        "y": 560,
+        "w": 140,
+        "h": 80,
+        "text": "km <= 3",
+        "figure": "Diamond",
+        "variables": [
+          "km"
+        ]
+      },
+      {
+        "x": 400,
+        "y": 690,
+        "w": 120,
+        "h": 80,
+        "text": " fee 設為 30",
+        "figure": "Rectangle",
+        "variables": [
+          "fee"
+        ],
+        "data": ""
+      },
+      {
+        "x": 580,
+        "y": 690,
+        "w": 120,
+        "h": 80,
+        "text": " fee 設為 60",
+        "figure": "Rectangle",
+        "variables": [
+          "fee"
+        ],
+        "data": ""
+      },
+      {
+        "x": 310,
+        "y": 820,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 fee",
+        "figure": "Parallelogram",
+        "variables": [
+          "fee"
+        ]
+      },
+      {
+        "x": 310,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 310,
+        "y": 950,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 280,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 460,
+            "y": 600
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 640,
+            "y": 600
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 550,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 280,
+            "y": 795
+          },
+          {
+            "x": 370,
+            "y": 795
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 460,
+            "y": 795
+          },
+          {
+            "x": 370,
+            "y": 795
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 640,
+            "y": 795
+          },
+          {
+            "x": 370,
+            "y": 795
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "600 5",
+      "0",
+      "滿 500 免運，距離不用看"
+    ],
+    [
+      "300 2",
+      "30",
+      "不到 500，3 公里以內"
+    ],
+    [
+      "300 3",
+      "30",
+      "剛好 3 公里也算以內"
+    ]
+  ]
+}

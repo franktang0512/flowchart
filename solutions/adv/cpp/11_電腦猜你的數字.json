@@ -1,0 +1,422 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/se1",
+  "questionTitle": "電腦猜你的數字",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "二分搜尋：每次猜範圍正中間，太大就把最大改成猜的減 1，太小就把最小改成猜的加 1",
+    "hint": "reply：你的回答（太大、太小、對了）",
+    "hint2": "每次猜的數字、猜了幾次"
+  },
+  "variables": [
+    {
+      "desc": "最小可能",
+      "name": "low",
+      "type": "數字",
+      "init": "1"
+    },
+    {
+      "desc": "最大可能",
+      "name": "high",
+      "type": "數字",
+      "init": "100"
+    },
+    {
+      "desc": "這次猜的",
+      "name": "guess",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "猜了幾次",
+      "name": "count",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "你的回答",
+      "name": "reply",
+      "type": "文字",
+      "init": ""
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 450,
+        "y": 160,
+        "w": 200,
+        "h": 80,
+        "text": "reply = \"對了\"",
+        "figure": "While_Loop",
+        "variables": [
+          "reply"
+        ]
+      },
+      {
+        "x": 475,
+        "y": 290,
+        "w": 150,
+        "h": 80,
+        "text": " guess 設為 (low + high) / 2",
+        "figure": "Rectangle",
+        "variables": [
+          "low",
+          "high",
+          "guess"
+        ],
+        "data": ""
+      },
+      {
+        "x": 485,
+        "y": 420,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 guess",
+        "figure": "Parallelogram",
+        "variables": [
+          "guess"
+        ]
+      },
+      {
+        "x": 450,
+        "y": 550,
+        "w": 200,
+        "h": 80,
+        "text": " count 設為 count + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "count"
+        ],
+        "data": ""
+      },
+      {
+        "x": 490,
+        "y": 680,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 reply",
+        "figure": "Parallelogram",
+        "variables": [
+          "reply"
+        ]
+      },
+      {
+        "x": 490,
+        "y": 810,
+        "w": 120,
+        "h": 90,
+        "text": "reply = \"太大\"",
+        "figure": "Diamond",
+        "variables": [
+          "reply"
+        ]
+      },
+      {
+        "x": 330,
+        "y": 950,
+        "w": 190,
+        "h": 80,
+        "text": " high 設為 guess - 1",
+        "figure": "Rectangle",
+        "variables": [
+          "high",
+          "guess"
+        ],
+        "data": ""
+      },
+      {
+        "x": 740,
+        "y": 950,
+        "w": 120,
+        "h": 90,
+        "text": "reply = \"太小\"",
+        "figure": "Diamond",
+        "variables": [
+          "reply"
+        ]
+      },
+      {
+        "x": 580,
+        "y": 1090,
+        "w": 190,
+        "h": 80,
+        "text": " low 設為 guess + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "low",
+          "guess"
+        ],
+        "data": ""
+      },
+      {
+        "x": 430,
+        "y": 1270,
+        "w": 240,
+        "h": 80,
+        "text": "輸出 \"猜了 \" + to_string(count) + \" 次\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "count"
+        ]
+      },
+      {
+        "x": 490,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 490,
+        "y": 1400,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 425,
+            "y": 855
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 675,
+            "y": 995
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 800,
+            "y": 855
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 425,
+            "y": 1195
+          },
+          {
+            "x": 50,
+            "y": 1195
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 675,
+            "y": 1195
+          },
+          {
+            "x": 50,
+            "y": 1195
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 0,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 880,
+            "y": 995
+          },
+          {
+            "x": 880,
+            "y": 1195
+          },
+          {
+            "x": 50,
+            "y": 1195
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 9,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 1050,
+            "y": 200
+          },
+          {
+            "x": 1050,
+            "y": 1245
+          },
+          {
+            "x": 550,
+            "y": 1245
+          }
+        ]
+      },
+      {
+        "from": 10,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 11,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "太大 太小 對了",
+      "50\n25\n37\n猜了 3 次",
+      "心裡想的是 37"
+    ],
+    [
+      "對了",
+      "50\n猜了 1 次",
+      "心裡想的是 50，第一次就猜中"
+    ],
+    [
+      "太小 太小 太小 太小 太小 太小 對了",
+      "50\n75\n88\n94\n97\n99\n100\n猜了 7 次",
+      "心裡想的是 100"
+    ]
+  ]
+}

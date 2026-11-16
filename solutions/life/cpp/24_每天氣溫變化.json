@@ -1,0 +1,232 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/arr5",
+  "questionTitle": "每天氣溫變化",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "今天減昨天：從第二天（索引 1）開始",
+    "hint": "temp：七天的最高氣溫",
+    "hint2": "每天比前一天多幾度"
+  },
+  "variables": [
+    {
+      "desc": "七天的最高氣溫",
+      "name": "temp",
+      "type": "陣列",
+      "init": "數字",
+      "size": "7"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 80,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 7; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 90,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "輸入 temp[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "temp"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 470,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 1; i < 7; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 100,
+        "y": 600,
+        "w": 140,
+        "h": 80,
+        "text": "輸出 temp[i] - temp[i - 1]",
+        "figure": "Parallelogram",
+        "variables": [
+          "temp"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 110,
+        "y": 780,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 705
+          },
+          {
+            "x": 50,
+            "y": 705
+          },
+          {
+            "x": 50,
+            "y": 510
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 200
+          },
+          {
+            "x": 290,
+            "y": 445
+          },
+          {
+            "x": 170,
+            "y": 445
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 510
+          },
+          {
+            "x": 290,
+            "y": 755
+          },
+          {
+            "x": 170,
+            "y": 755
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "20 22 21 21 25 19 18",
+      "2\n-1\n0\n4\n-6\n-1",
+      ""
+    ],
+    [
+      "30 30 30 30 30 30 30",
+      "0\n0\n0\n0\n0\n0",
+      "每天都一樣"
+    ],
+    [
+      "15 18 23 27 24 16 12",
+      "3\n5\n4\n-3\n-8\n-4",
+      ""
+    ]
+  ]
+}

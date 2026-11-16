@@ -1,0 +1,150 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/io2",
+  "questionTitle": "飲料總價",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "輸入杯數，算出總價",
+    "hint": "cups：杯數",
+    "hint2": "total：總價"
+  },
+  "variables": [
+    {
+      "desc": "要買幾杯",
+      "name": "cups",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "總共多少元",
+      "name": "total",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 75,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 cups",
+        "figure": "Parallelogram",
+        "variables": [
+          "cups"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 290,
+        "w": 190,
+        "h": 80,
+        "text": " total 設為 cups * 55",
+        "figure": "Rectangle",
+        "variables": [
+          "cups",
+          "total"
+        ],
+        "data": ""
+      },
+      {
+        "x": 75,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 total",
+        "figure": "Parallelogram",
+        "variables": [
+          "total"
+        ]
+      },
+      {
+        "x": 75,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 75,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "3",
+      "165",
+      "55 × 3 = 165"
+    ],
+    [
+      "10",
+      "550",
+      "55 × 10 = 550"
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

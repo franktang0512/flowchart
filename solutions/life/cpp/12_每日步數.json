@@ -1,0 +1,320 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/f3",
+  "questionTitle": "每日步數",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "7 天，每天的步數分成三種",
+    "hint": "steps：一天的步數",
+    "hint2": "每天一行：達標、差一點或要多走"
+  },
+  "variables": [
+    {
+      "desc": "一天的步數",
+      "name": "steps",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 380,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 7; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 405,
+        "y": 290,
+        "w": 130,
+        "h": 80,
+        "text": "輸入 steps",
+        "figure": "Parallelogram",
+        "variables": [
+          "steps"
+        ]
+      },
+      {
+        "x": 395,
+        "y": 420,
+        "w": 150,
+        "h": 90,
+        "text": "steps >= 10000",
+        "figure": "Diamond",
+        "variables": [
+          "steps"
+        ]
+      },
+      {
+        "x": 310,
+        "y": 560,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 \"達標\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 610,
+        "y": 560,
+        "w": 140,
+        "h": 90,
+        "text": "steps >= 6000",
+        "figure": "Diamond",
+        "variables": [
+          "steps"
+        ]
+      },
+      {
+        "x": 500,
+        "y": 700,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"差一點\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 710,
+        "y": 700,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"要多走\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 410,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 410,
+        "y": 880,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 375,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 575,
+            "y": 605
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 785,
+            "y": 605
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 680,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 375,
+            "y": 805
+          },
+          {
+            "x": 50,
+            "y": 805
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 575,
+            "y": 805
+          },
+          {
+            "x": 50,
+            "y": 805
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 785,
+            "y": 805
+          },
+          {
+            "x": 50,
+            "y": 805
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 0,
+        "to": 8,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 890,
+            "y": 200
+          },
+          {
+            "x": 890,
+            "y": 855
+          },
+          {
+            "x": 470,
+            "y": 855
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "12000 8000 5000 10000 6000 3000 9999",
+      "達標\n差一點\n要多走\n達標\n差一點\n要多走\n差一點",
+      ""
+    ],
+    [
+      "10500 11000 10200 13000 10000 12500 15000",
+      "達標\n達標\n達標\n達標\n達標\n達標\n達標",
+      "每天都達標"
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

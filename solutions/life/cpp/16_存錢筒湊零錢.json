@@ -1,0 +1,303 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/n1",
+  "questionTitle": "存錢筒湊零錢",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "10 元、50 元各試 0 到 10 枚，剛好湊出的就算一種",
+    "hint": "money：要湊的金額",
+    "hint2": "count：幾種湊法"
+  },
+  "variables": [
+    {
+      "desc": "要湊出的金額",
+      "name": "money",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "幾種湊法",
+      "name": "count",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 280,
+        "y": 160,
+        "w": 140,
+        "h": 80,
+        "text": "輸入 money",
+        "figure": "Parallelogram",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 250,
+        "y": 290,
+        "w": 200,
+        "h": 80,
+        "text": "for (int a = 0; a <= 10; a++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 250,
+        "y": 420,
+        "w": 200,
+        "h": 80,
+        "text": "for (int b = 0; b <= 10; b++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 255,
+        "y": 550,
+        "w": 190,
+        "h": 90,
+        "text": "a * 10 + b * 50 = money",
+        "figure": "Diamond",
+        "variables": [
+          "money"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 690,
+        "w": 200,
+        "h": 80,
+        "text": " count 設為 count + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "count"
+        ],
+        "data": ""
+      },
+      {
+        "x": 285,
+        "y": 920,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 count",
+        "figure": "Parallelogram",
+        "variables": [
+          "count"
+        ]
+      },
+      {
+        "x": 290,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 290,
+        "y": 1050,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 220,
+            "y": 595
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 220,
+            "y": 795
+          },
+          {
+            "x": 90,
+            "y": 795
+          },
+          {
+            "x": 90,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 465,
+            "y": 595
+          },
+          {
+            "x": 465,
+            "y": 795
+          },
+          {
+            "x": 90,
+            "y": 795
+          },
+          {
+            "x": 90,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 1,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 610,
+            "y": 460
+          },
+          {
+            "x": 610,
+            "y": 845
+          },
+          {
+            "x": 50,
+            "y": 845
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 650,
+            "y": 330
+          },
+          {
+            "x": 650,
+            "y": 895
+          },
+          {
+            "x": 350,
+            "y": 895
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "100",
+      "3",
+      "10×10、10×5 + 50×1、50×2"
+    ],
+    [
+      "120",
+      "2",
+      ""
+    ],
+    [
+      "35",
+      "0",
+      "湊不出來"
+    ]
+  ]
+}

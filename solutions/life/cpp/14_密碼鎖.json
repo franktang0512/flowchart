@@ -1,0 +1,216 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/w2",
+  "questionTitle": "密碼鎖",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "一直輸入密碼，對了才開門",
+    "hint": "pw：輸入的密碼",
+    "hint2": "密碼錯誤（每錯一次）、開門"
+  },
+  "variables": [
+    {
+      "desc": "輸入的密碼",
+      "name": "pw",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 105,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 pw",
+        "figure": "Parallelogram",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 85,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "pw = 1234",
+        "figure": "While_Loop",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 420,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"密碼錯誤\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 105,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 pw",
+        "figure": "Parallelogram",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 100,
+        "y": 730,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 \"開門\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 105,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 105,
+        "y": 860,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 165,
+            "y": 655
+          },
+          {
+            "x": 50,
+            "y": 655
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 280,
+            "y": 330
+          },
+          {
+            "x": 280,
+            "y": 705
+          },
+          {
+            "x": 165,
+            "y": 705
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "1111 2222 1234",
+      "密碼錯誤\n密碼錯誤\n開門",
+      "錯兩次，第三次對"
+    ],
+    [
+      "1234",
+      "開門",
+      "第一次就對"
+    ],
+    [
+      "",
+      "",
+      ""
+    ]
+  ]
+}

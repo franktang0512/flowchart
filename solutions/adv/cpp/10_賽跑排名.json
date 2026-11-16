@@ -1,0 +1,428 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/so2",
+  "questionTitle": "賽跑排名",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "把（秒數, 座號）放進 vector，由小到大排：秒數一樣就比座號",
+    "hint": "n：幾位選手；t：每個人的秒數",
+    "hint2": "第一名到最後一名的座號"
+  },
+  "variables": [
+    {
+      "desc": "（秒數, 座號）",
+      "name": "runners",
+      "type": "清單",
+      "init": "pair<float,int>"
+    },
+    {
+      "desc": "幾位選手",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "一個人的秒數",
+      "name": "t",
+      "type": "數字",
+      "init": "0",
+      "float": true
+    },
+    {
+      "desc": "要輸出的座號",
+      "name": "line",
+      "type": "文字",
+      "init": ""
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 230,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 200,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 1; i <= n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n",
+          "t"
+        ]
+      },
+      {
+        "x": 230,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 t",
+        "figure": "Parallelogram",
+        "variables": [
+          "t"
+        ]
+      },
+      {
+        "x": 190,
+        "y": 550,
+        "w": 200,
+        "h": 80,
+        "text": " runners 加入 {t, i}",
+        "figure": "Rectangle",
+        "variables": [
+          "runners",
+          "n",
+          "t"
+        ],
+        "data": ""
+      },
+      {
+        "x": 230,
+        "y": 730,
+        "w": 120,
+        "h": 80,
+        "text": " runners 排序 由小到大",
+        "figure": "Rectangle",
+        "variables": [
+          "runners",
+          "n"
+        ]
+      },
+      {
+        "x": 200,
+        "y": 860,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n",
+          "t"
+        ]
+      },
+      {
+        "x": 230,
+        "y": 990,
+        "w": 120,
+        "h": 80,
+        "text": "i > 0",
+        "figure": "Diamond",
+        "variables": []
+      },
+      {
+        "x": 80,
+        "y": 1120,
+        "w": 180,
+        "h": 80,
+        "text": " line 設為 line + \" \"",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "line"
+        ],
+        "data": ""
+      },
+      {
+        "x": 170,
+        "y": 1250,
+        "w": 240,
+        "h": 85,
+        "text": " line 設為 line + to_string(runners[i].second)",
+        "figure": "Rectangle",
+        "variables": [
+          "runners",
+          "n",
+          "t",
+          "line"
+        ],
+        "data": ""
+      },
+      {
+        "x": 230,
+        "y": 1435,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 line",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "line"
+        ]
+      },
+      {
+        "x": 230,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 230,
+        "y": 1565,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 655
+          },
+          {
+            "x": 160,
+            "y": 655
+          },
+          {
+            "x": 160,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 420,
+            "y": 330
+          },
+          {
+            "x": 420,
+            "y": 705
+          },
+          {
+            "x": 290,
+            "y": 705
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 1030
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 1225
+          },
+          {
+            "x": 290,
+            "y": 1225
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 8,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 370,
+            "y": 1030
+          },
+          {
+            "x": 370,
+            "y": 1225
+          },
+          {
+            "x": 290,
+            "y": 1225
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 1360
+          },
+          {
+            "x": 50,
+            "y": 1360
+          },
+          {
+            "x": 50,
+            "y": 900
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 9,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 530,
+            "y": 900
+          },
+          {
+            "x": 530,
+            "y": 1410
+          },
+          {
+            "x": 290,
+            "y": 1410
+          }
+        ]
+      },
+      {
+        "from": 10,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 11,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "5 14.2 13.8 15.0 13.8 14.0",
+      "2 4 5 1 3",
+      "2 號和 4 號都是 13.8，2 號排前面"
+    ],
+    [
+      "3 12.5 12.1 12.9",
+      "2 1 3",
+      ""
+    ],
+    [
+      "4 13.0 13.0 13.0 12.0",
+      "4 1 2 3",
+      ""
+    ]
+  ]
+}

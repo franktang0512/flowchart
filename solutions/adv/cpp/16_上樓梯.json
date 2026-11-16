@@ -1,0 +1,251 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/d1",
+  "questionTitle": "上樓梯",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "走到第 i 階 = 從 i - 1 階走 1 階 + 從 i - 2 階走 2 階",
+    "hint": "n：樓梯有幾階",
+    "hint2": "ways[n]：幾種走法"
+  },
+  "variables": [
+    {
+      "desc": "ways[i]：走到第 i 階有幾種走法",
+      "name": "ways",
+      "type": "清單",
+      "init": "數字"
+    },
+    {
+      "desc": "樓梯有幾階",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 115,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 100,
+        "y": 290,
+        "w": 150,
+        "h": 80,
+        "text": " ways 加入 1",
+        "figure": "Rectangle",
+        "variables": [
+          "ways"
+        ],
+        "data": ""
+      },
+      {
+        "x": 100,
+        "y": 420,
+        "w": 150,
+        "h": 80,
+        "text": " ways 加入 1",
+        "figure": "Rectangle",
+        "variables": [
+          "ways"
+        ],
+        "data": ""
+      },
+      {
+        "x": 85,
+        "y": 550,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 2; i <= n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 680,
+        "w": 190,
+        "h": 80,
+        "text": " ways 加入 ways[i - 1] + ways[i - 2]",
+        "figure": "Rectangle",
+        "variables": [
+          "ways"
+        ],
+        "data": ""
+      },
+      {
+        "x": 100,
+        "y": 860,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 ways[n]",
+        "figure": "Parallelogram",
+        "variables": [
+          "ways",
+          "n"
+        ]
+      },
+      {
+        "x": 115,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 115,
+        "y": 990,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 175,
+            "y": 785
+          },
+          {
+            "x": 50,
+            "y": 785
+          },
+          {
+            "x": 50,
+            "y": 590
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 300,
+            "y": 590
+          },
+          {
+            "x": 300,
+            "y": 835
+          },
+          {
+            "x": 175,
+            "y": 835
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "4",
+      "5",
+      "1111、112、121、211、22"
+    ],
+    [
+      "10",
+      "89",
+      ""
+    ],
+    [
+      "1",
+      "1",
+      ""
+    ]
+  ]
+}

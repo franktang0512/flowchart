@@ -1,0 +1,383 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/st1",
+  "questionTitle": "瀏覽器的上一頁",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "打開一頁就 push；上一頁就 pop，再看 top()",
+    "hint": "n：幾個操作；x：頁碼（0 是上一頁）",
+    "hint2": "回到的那一頁或沒有上一頁"
+  },
+  "variables": [
+    {
+      "desc": "看過的頁",
+      "name": "pages",
+      "type": "堆疊",
+      "init": "數字"
+    },
+    {
+      "desc": "幾個操作",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "頁碼，0 是上一頁",
+      "name": "x",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 490,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 460,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 490,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 x",
+        "figure": "Parallelogram",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 490,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "x > 0",
+        "figure": "Diamond",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 370,
+        "y": 680,
+        "w": 150,
+        "h": 80,
+        "text": " pages 放入 x",
+        "figure": "Rectangle",
+        "variables": [
+          "pages",
+          "x"
+        ],
+        "data": ""
+      },
+      {
+        "x": 725,
+        "y": 680,
+        "w": 150,
+        "h": 90,
+        "text": "pages.size() <= 1",
+        "figure": "Diamond",
+        "variables": [
+          "pages"
+        ]
+      },
+      {
+        "x": 580,
+        "y": 820,
+        "w": 190,
+        "h": 80,
+        "text": "輸出 \"沒有上一頁\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 855,
+        "y": 820,
+        "w": 130,
+        "h": 80,
+        "text": " pages 取出",
+        "figure": "Rectangle",
+        "variables": [
+          "pages"
+        ],
+        "data": ""
+      },
+      {
+        "x": 830,
+        "y": 950,
+        "w": 180,
+        "h": 80,
+        "text": "輸出 pages.top()",
+        "figure": "Parallelogram",
+        "variables": [
+          "pages"
+        ]
+      },
+      {
+        "x": 490,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 490,
+        "y": 1130,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 445,
+            "y": 590
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 675,
+            "y": 725
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 7,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 920,
+            "y": 725
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 800,
+            "y": 590
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 445,
+            "y": 1055
+          },
+          {
+            "x": 50,
+            "y": 1055
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 675,
+            "y": 1055
+          },
+          {
+            "x": 50,
+            "y": 1055
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 920,
+            "y": 1055
+          },
+          {
+            "x": 50,
+            "y": 1055
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 10,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 1050,
+            "y": 330
+          },
+          {
+            "x": 1050,
+            "y": 1105
+          },
+          {
+            "x": 550,
+            "y": 1105
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "6 1 2 3 0 0 0",
+      "2\n1\n沒有上一頁",
+      "打開 1、2、3 頁，上一頁回到 2、再回到 1，第三次已經沒有上一頁"
+    ],
+    [
+      "5 5 0 8 9 0",
+      "沒有上一頁\n8",
+      "只有第 5 頁時不能回上一頁；打開 8、9 後回到 8"
+    ],
+    [
+      "7 4 7 0 2 0 0 0",
+      "4\n4\n沒有上一頁\n沒有上一頁",
+      ""
+    ]
+  ]
+}

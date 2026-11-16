@@ -1,0 +1,382 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/g1",
+  "questionTitle": "收銀機找零",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "貪心：從大的硬幣開始，能找幾個就找幾個",
+    "hint": "price：價格；paid：付了多少",
+    "hint2": "每種硬幣找幾個"
+  },
+  "variables": [
+    {
+      "desc": "硬幣面額（大到小）",
+      "name": "coins",
+      "type": "陣列",
+      "init": "數字",
+      "size": "4"
+    },
+    {
+      "desc": "商品價格",
+      "name": "price",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "客人付了多少",
+      "name": "paid",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "還要找多少",
+      "name": "change",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "這種硬幣找幾個",
+      "name": "cnt",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 140,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 price",
+        "figure": "Parallelogram",
+        "variables": [
+          "price"
+        ]
+      },
+      {
+        "x": 140,
+        "y": 290,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 paid",
+        "figure": "Parallelogram",
+        "variables": [
+          "paid"
+        ]
+      },
+      {
+        "x": 125,
+        "y": 420,
+        "w": 150,
+        "h": 80,
+        "text": " coins[0] 設為 50",
+        "figure": "Rectangle",
+        "variables": [
+          "coins"
+        ],
+        "data": ""
+      },
+      {
+        "x": 125,
+        "y": 550,
+        "w": 150,
+        "h": 80,
+        "text": " coins[1] 設為 10",
+        "figure": "Rectangle",
+        "variables": [
+          "coins"
+        ],
+        "data": ""
+      },
+      {
+        "x": 130,
+        "y": 680,
+        "w": 140,
+        "h": 80,
+        "text": " coins[2] 設為 5",
+        "figure": "Rectangle",
+        "variables": [
+          "coins"
+        ],
+        "data": ""
+      },
+      {
+        "x": 130,
+        "y": 810,
+        "w": 140,
+        "h": 80,
+        "text": " coins[3] 設為 1",
+        "figure": "Rectangle",
+        "variables": [
+          "coins"
+        ],
+        "data": ""
+      },
+      {
+        "x": 135,
+        "y": 940,
+        "w": 130,
+        "h": 80,
+        "text": " change 設為 paid - price",
+        "figure": "Rectangle",
+        "variables": [
+          "price",
+          "paid",
+          "change"
+        ],
+        "data": ""
+      },
+      {
+        "x": 110,
+        "y": 1070,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 4; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 120,
+        "y": 1200,
+        "w": 160,
+        "h": 80,
+        "text": " cnt 設為 change / coins[i]",
+        "figure": "Rectangle",
+        "variables": [
+          "coins",
+          "change",
+          "cnt"
+        ],
+        "data": ""
+      },
+      {
+        "x": 110,
+        "y": 1330,
+        "w": 180,
+        "h": 80,
+        "text": " change 設為 change % coins[i]",
+        "figure": "Rectangle",
+        "variables": [
+          "coins",
+          "change"
+        ],
+        "data": ""
+      },
+      {
+        "x": 80,
+        "y": 1460,
+        "w": 240,
+        "h": 85,
+        "text": "輸出 to_string(coins[i]) + \" 元 \" + to_string(cnt) + \" 個\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "coins",
+          "cnt"
+        ]
+      },
+      {
+        "x": 140,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 140,
+        "y": 1645,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 10,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 10,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 200,
+            "y": 1570
+          },
+          {
+            "x": 50,
+            "y": 1570
+          },
+          {
+            "x": 50,
+            "y": 1110
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 11,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 12,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 350,
+            "y": 1110
+          },
+          {
+            "x": 350,
+            "y": 1620
+          },
+          {
+            "x": 200,
+            "y": 1620
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "63 100",
+      "50 元 0 個\n10 元 3 個\n5 元 1 個\n1 元 2 個",
+      "要找 37 元：3 個 10 元、1 個 5 元、2 個 1 元"
+    ],
+    [
+      "12 500",
+      "50 元 9 個\n10 元 3 個\n5 元 1 個\n1 元 3 個",
+      "要找 488 元"
+    ],
+    [
+      "100 100",
+      "50 元 0 個\n10 元 0 個\n5 元 0 個\n1 元 0 個",
+      "不用找錢"
+    ]
+  ]
+}

@@ -1,0 +1,232 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/arr4",
+  "questionTitle": "倒著播放歌單",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "存進陣列後，索引從最後一個往回數",
+    "hint": "songs：5 首歌的編號",
+    "hint2": "倒過來的編號"
+  },
+  "variables": [
+    {
+      "desc": "5 首歌的編號",
+      "name": "songs",
+      "type": "陣列",
+      "init": "數字",
+      "size": "5"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 80,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 5; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 90,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "輸入 songs[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "songs"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 470,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 4; i >= 0; i--)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 95,
+        "y": 600,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 songs[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "songs"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 110,
+        "y": 780,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 395
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 170,
+            "y": 705
+          },
+          {
+            "x": 50,
+            "y": 705
+          },
+          {
+            "x": 50,
+            "y": 510
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 200
+          },
+          {
+            "x": 290,
+            "y": 445
+          },
+          {
+            "x": 170,
+            "y": 445
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 290,
+            "y": 510
+          },
+          {
+            "x": 290,
+            "y": 755
+          },
+          {
+            "x": 170,
+            "y": 755
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "3 8 1 6 2",
+      "2\n6\n1\n8\n3",
+      ""
+    ],
+    [
+      "10 20 30 40 50",
+      "50\n40\n30\n20\n10",
+      ""
+    ],
+    [
+      "7 7 2 9 7",
+      "7\n9\n2\n7\n7",
+      "一樣的編號也照順序倒過來"
+    ]
+  ]
+}

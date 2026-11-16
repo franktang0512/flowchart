@@ -1,0 +1,347 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/g2",
+  "questionTitle": "社團博覽會",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "貪心：照結束時間，開始時間不早於上一場結束就參加",
+    "hint": "n：幾場；start、end：每場的時間",
+    "hint2": "count：最多幾場"
+  },
+  "variables": [
+    {
+      "desc": "幾場",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "這場開始",
+      "name": "start",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "這場結束",
+      "name": "end",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "上一場參加的結束時間",
+      "name": "last",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "參加幾場",
+      "name": "count",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 250,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 220,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 250,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 start",
+        "figure": "Parallelogram",
+        "variables": [
+          "start"
+        ]
+      },
+      {
+        "x": 250,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 end",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "end"
+        ]
+      },
+      {
+        "x": 215,
+        "y": 680,
+        "w": 190,
+        "h": 80,
+        "text": "start >= last",
+        "figure": "Diamond",
+        "variables": [
+          "start",
+          "last"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 810,
+        "w": 200,
+        "h": 80,
+        "text": " count 設為 count + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "count"
+        ],
+        "data": ""
+      },
+      {
+        "x": 110,
+        "y": 940,
+        "w": 140,
+        "h": 80,
+        "text": " last 設為 end",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "end",
+          "last"
+        ],
+        "data": ""
+      },
+      {
+        "x": 245,
+        "y": 1120,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 count",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "count"
+        ]
+      },
+      {
+        "x": 250,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 250,
+        "y": 1250,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 180,
+            "y": 720
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 6,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 180,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 1,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 425,
+            "y": 720
+          },
+          {
+            "x": 425,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 1045
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 7,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 570,
+            "y": 330
+          },
+          {
+            "x": 570,
+            "y": 1095
+          },
+          {
+            "x": 310,
+            "y": 1095
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "5 9 10 9 11 10 12 11 13 12 14",
+      "3",
+      "可以參加第 1、3、5 場"
+    ],
+    [
+      "4 9 10 8 12 11 13 13 15",
+      "3",
+      "第 3 場結束 13 點，第 4 場 13 點開始，可以接著參加"
+    ],
+    [
+      "3 8 18 9 19 10 20",
+      "1",
+      "三場都重疊，只能選一場"
+    ]
+  ]
+}

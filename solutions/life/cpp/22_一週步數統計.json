@@ -1,0 +1,364 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/arr3",
+  "questionTitle": "一週步數統計",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "加總七天的步數，再找最多的是哪一天",
+    "hint": "steps：七天的步數",
+    "hint2": "total：總步數；best + 1：星期幾"
+  },
+  "variables": [
+    {
+      "desc": "星期一到星期日的步數",
+      "name": "steps",
+      "type": "陣列",
+      "init": "數字",
+      "size": "7"
+    },
+    {
+      "desc": "總步數",
+      "name": "total",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "最多的那天的索引",
+      "name": "best",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 160,
+        "y": 160,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 7; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 170,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "輸入 steps[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "steps"
+        ]
+      },
+      {
+        "x": 160,
+        "y": 470,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < 7; i++)",
+        "figure": "For_Loop",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 600,
+        "w": 140,
+        "h": 80,
+        "text": " total 設為 total + steps[i]",
+        "figure": "Rectangle",
+        "variables": [
+          "steps",
+          "total"
+        ],
+        "data": ""
+      },
+      {
+        "x": 160,
+        "y": 730,
+        "w": 180,
+        "h": 90,
+        "text": "steps[i] > steps[best]",
+        "figure": "Diamond",
+        "variables": [
+          "steps",
+          "best"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 870,
+        "w": 120,
+        "h": 80,
+        "text": " best 設為 i",
+        "figure": "Rectangle",
+        "variables": [
+          "best"
+        ],
+        "data": ""
+      },
+      {
+        "x": 190,
+        "y": 1050,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 total",
+        "figure": "Parallelogram",
+        "variables": [
+          "total"
+        ]
+      },
+      {
+        "x": 175,
+        "y": 1180,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 best + 1",
+        "figure": "Parallelogram",
+        "variables": [
+          "best"
+        ]
+      },
+      {
+        "x": 190,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 190,
+        "y": 1310,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 250,
+            "y": 395
+          },
+          {
+            "x": 130,
+            "y": 395
+          },
+          {
+            "x": 130,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 140,
+            "y": 775
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 140,
+            "y": 975
+          },
+          {
+            "x": 50,
+            "y": 975
+          },
+          {
+            "x": 50,
+            "y": 510
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 360,
+            "y": 775
+          },
+          {
+            "x": 360,
+            "y": 975
+          },
+          {
+            "x": 50,
+            "y": 975
+          },
+          {
+            "x": 50,
+            "y": 510
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 370,
+            "y": 200
+          },
+          {
+            "x": 370,
+            "y": 445
+          },
+          {
+            "x": 250,
+            "y": 445
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 450,
+            "y": 510
+          },
+          {
+            "x": 450,
+            "y": 1025
+          },
+          {
+            "x": 250,
+            "y": 1025
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "5000 7200 8300 9100 7800 6400 10000",
+      "53800\n7",
+      "星期日走最多"
+    ],
+    [
+      "8000 6000 8000 5000 4000 3000 2000",
+      "36000\n1",
+      "星期一和星期三一樣多，輸出比較前面的 1"
+    ],
+    [
+      "3000 9000 4000 9500 2000 1000 500",
+      "29000\n4",
+      ""
+    ]
+  ]
+}
