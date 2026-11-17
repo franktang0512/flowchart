@@ -57,6 +57,8 @@ export interface LocalVar {
   sizeLater?: boolean;
   /** C++：數字是 long long */
   long?: boolean;
+  /** C++：文字是 char（一個字） */
+  char?: boolean;
   /** struct 變數每個欄位的初始值 */
   fieldInit?: Record<string, string>;
 }
@@ -66,6 +68,16 @@ export interface LocalVar {
  * 只是過渡用，不讓學生碰太多型別：清單只能裝這三種
  */
 export const cppType = (type: '數字' | '文字', float?: boolean, long?: boolean) => (type == '文字' ? 'string' : float ? 'float' : long ? 'long long' : 'int');
+
+/**
+ * C++ char 變數的初始值：'a'、"a" 或 a 都是 a；沒填是空白（' '）。不是一個字回傳 null
+ */
+export function charInit(raw: string | undefined): string | null {
+  const v = (raw ?? '').trim();
+  const inner = /^(".*"|'.*')$/s.test(v) ? v.slice(1, -1) : v;
+  if (inner == '') return ' ';
+  return [...inner].length == 1 ? inner : null;
+}
 
 /**
  * map 的初始值欄記著「鍵→值」的型別，例如 文字→數字 是 map<string, int>；
@@ -84,7 +96,7 @@ export const elemCppType = (init: string | undefined): string => (init?.includes
 export const mapKeyCppType = (init: string | undefined) => elemCppType(mapParts(init).key);
 
 /** 給學生看的型別名稱：C++ 寫 int / float / string、vector<int>…；Scratch、Blockly 寫數字、文字、清單 */
-export function typeLabel(type: string, float?: boolean, init?: string, size?: string, long?: boolean): string {
+export function typeLabel(type: string, float?: boolean, init?: string, size?: string, long?: boolean, char?: boolean): string {
   if (isPython()) return pyTypeName(type, float, init);
   if (getTarget() == 'cpp') {
     const elem = elemCppType(init);
@@ -98,6 +110,7 @@ export function typeLabel(type: string, float?: boolean, init?: string, size?: s
     if (type == '優先佇列') return `priority_queue<${elem}>`;
     if (type == '優先佇列小') return `priority_queue<${elem}, vector<${elem}>, greater<${elem}>>`;
     if (type == '結構') return init ?? 'struct';
+    if (type == '文字' && char) return 'char';
     return cppType(type == '文字' ? '文字' : '數字', float, long);
   }
   return type == '文字' ? t('文字', 'Text') : type == '清單' ? t('清單', 'List') : type == '二維清單' ? t('二維清單', '2D list') : t('數字', 'Number');

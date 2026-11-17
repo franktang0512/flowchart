@@ -7,10 +7,10 @@
 //     輸入一次讀一整行（input()），模組看得到主流程的變數（跟 Python 的全域變數一樣）
 // 網址加 ?target=scratch / blockly / cpp / python 可以直接指定（老師發給學生的連結用），就不會問。
 // 舊的 ?target=blocks 當作 Scratch。
-// 沒指定的話，每次打開網站都會先問一次；選了之後只記在這個分頁（sessionStorage），
-// 重新整理、在課程之間切換都不用再選，關掉分頁下次再來會再問。
+// 沒指定的話，每次打開網站都會先問一次；選了之後記在這個分頁（sessionStorage），網址列也會加上 ?target=，
+// 站內的連結（課程、題目）也都帶著，所以複製網址列、開新分頁都還是同一個語言。
 import { useSyncExternalStore } from 'react';
-import { t } from './i18n';
+import { setLinkParams, t } from './i18n';
 
 export type Target = 'scratch' | 'blockly' | 'cpp' | 'python';
 
@@ -48,6 +48,26 @@ function save(target: Target) {
 let current: Target | null = load();
 const listeners = new Set<() => void>();
 
+/**
+ * 網址列也寫上 ?target=：老師在首頁選了學習目標後，直接複製網址列給學生就好（不用自己加參數）；
+ * 重新整理、從網址打開也都是同一個語言
+ */
+function syncUrl() {
+  if (!current) return;
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('target') == current) return;
+    url.searchParams.set('target', current);
+    history.replaceState(history.state, '', url);
+  }
+  catch {
+    // 改不了網址也沒關係
+  }
+}
+syncUrl();
+// 站內連結（課程、題目、回首頁）都帶上學習目標
+setLinkParams((): Record<string, string> => (current ? { target: current } : {}));
+
 export const getChosenTarget = () => current;
 /** 還沒選過就當作 Scratch（直接打開題目連結的情況） */
 export const getTarget = (): Target => current ?? 'scratch';
@@ -56,6 +76,7 @@ export function setTarget(target: Target) {
   if (target == current) return;
   current = target;
   save(target);
+  syncUrl();
   listeners.forEach(f => f());
 }
 

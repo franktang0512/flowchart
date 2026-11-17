@@ -542,6 +542,7 @@ export function App() {
     store.structInits = Object.fromEntries(rows.filter(r => r.type == '結構' && r.fieldInit).map(r => [r.name, r.fieldInit!]));
     store.floats = rows.filter(r => r.type == '數字' && r.float).map(r => r.name);
     store.longs = rows.filter(r => r.type == '數字' && r.long).map(r => r.name);
+    store.chars = getTarget() == 'cpp' ? rows.filter(r => r.type == '文字' && r.char).map(r => r.name) : [];
     return store;
   };
   /** C++：這個全域變數被 main 的同名變數蓋住了嗎 */
@@ -837,9 +838,9 @@ export function App() {
       question: questionIn(question, getLang()),
       questionNote: noteRef.current!.value,
       vars: [
-        ...varsRef.current.map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long), v.init, v.desc]),
+        ...varsRef.current.map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long, v.char), v.init, v.desc]),
         // C++ 模組的區域變數：說明欄註明是哪個模組的
-        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long), v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
+        ...modulesRef.current.flatMap(m => (m.info.locals ?? []).map(v => [v.name, typeLabel(v.type, v.float, v.init, v.size, v.long, v.char), v.init, `${v.desc}${t(`（模組「${m.info.name}」的區域變數）`, ` (local in "${m.info.name}")`)}`])),
       ],
       cases: [0, 1, 2].map(i => cases.slice(i * 3, i * 3 + 3)),
     });
@@ -893,13 +894,8 @@ export function App() {
   const switchTarget = (next: Target) => {
     if (next == getTarget()) return;
     if (!confirm(t(`換成 ${targetName(next)} 的話，目前的作答（第一步到第三步、變數、流程圖、模組）會全部清掉，確定嗎？`, `Switch to ${targetName(next)}? All your work (steps 1–3, variables, flowchart and modules) will be cleared.`))) return;
+    // 網址上的 ?target= 也跟著換（setTarget 會改），重新整理才不會跑回原本的語言
     setTarget(next);
-    // 網址上有 ?target= 的話也換掉，重新整理才不會跑回原本的語言
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('target')) {
-      url.searchParams.set('target', next);
-      history.replaceState(null, '', url);
-    }
     applyWork(makeWorkFile({
       question: questionPath,
       questionTitle: question.title,
@@ -965,6 +961,7 @@ export function App() {
       // 以前的作品沒有 int / float：C++ 初始值有小數點的當成 float
       ...(v.float || (isCode() && v.type == '數字' && String(v.init ?? '').includes('.')) ? { float: true } : {}),
       ...(v.long && v.type == '數字' ? { long: true } : {}),
+      ...(v.char && v.type == '文字' ? { char: true } : {}),
     })));
     // 先清空舊的變數清單，不然會被當成「改名」而去改到流程圖裡的字
     varStore.var_list.name = [];
@@ -989,6 +986,7 @@ export function App() {
             ...(v.fieldInit && typeof v.fieldInit == 'object' ? { fieldInit: Object.fromEntries(Object.entries(v.fieldInit).map(([k, x]) => [k, String(x)])) } : {}),
             ...(v.float ? { float: true } : {}),
             ...(v.long ? { long: true } : {}),
+            ...(v.char && v.type == '文字' ? { char: true } : {}),
             ...(v.sizeLater ? { sizeLater: true } : {}),
           })),
         } : {}),
@@ -1132,7 +1130,7 @@ export function App() {
       <ModuleDialog request={moduleDialog} onClose={() => setModuleDialog(null)} />
       <CodeView
         open={codeOpen} onClose={() => setCodeOpen(false)} diagram={main} modules={moduleSources} onApply={applyBlocks}
-        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, sizeLater: v.sizeLater, fieldInit: v.fieldInit, global: v.global }))}
+        vars={() => varsRef.current.filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, char: v.char, size: v.size, sizeLater: v.sizeLater, fieldInit: v.fieldInit, global: v.global }))}
       />
 
       <div id="workspace" style={{ display: printing ? 'none' : undefined }}>

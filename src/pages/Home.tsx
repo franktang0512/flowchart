@@ -4,7 +4,7 @@ import { LangToggle } from '../components/LangToggle';
 import { COURSES, courseFits, questionHref, unitName, type Course } from '../courses';
 import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
-import { setTarget, targetName, useTarget, type Target } from '../target';
+import { getChosenTarget, setTarget, targetName, useTarget, type Target } from '../target';
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -134,6 +134,12 @@ export function QuestionList({ courseId }: { courseId: string }) {
   const lang = useLang();
   const course = COURSES.find(c => c.id == courseId);
   const [questions, setQuestions] = useState<Record<string, Question>>({});
+  // 只給一種語言的課程（例如生活中的演算法是 C++）：直接用那個語言，網址列和題目連結也會帶上 ?target=
+  useTarget();
+  const only = course?.target && course.target != 'blocks' ? course.target : null;
+  useEffect(() => {
+    if (only && getChosenTarget() != only) setTarget(only);
+  }, [only]);
 
   useEffect(() => {
     if (!course) return;

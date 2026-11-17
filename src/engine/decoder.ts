@@ -21,7 +21,7 @@ import { t } from '../i18n';
 import { getTarget, indexBase, isCode, isPython } from '../target';
 import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, eofVar, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget } from './labels';
-import { cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
+import { charInit, cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 import { allStructs, fieldCppType, fieldInit, findStruct, getStructs } from './structs';
@@ -56,6 +56,8 @@ export interface VarStore {
   floats?: string[];
   /** C++：宣告成 long long 的數字變數、參數；int 超過範圍會溢位（跟 C++ 一樣），long long 不會 */
   longs?: string[];
+  /** C++：宣告成 char（一個字）的文字變數（也在 type_var_list.text 裡）；存值時要是一個字，算的時候是字的編號 */
+  chars?: string[];
   /** C++：全域變數（宣告在 main 外面，模組也用得到） */
   globals?: string[];
   /**
@@ -185,6 +187,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
     calls: vars.calls,
     floats: [...g(base.floats ?? []), ...params.filter(p => p.type == '數字' && p.float).map(p => p.name), ...named.filter(v => v.type == '數字' && v.float).map(v => v.name.trim())],
     longs: [...g(base.longs ?? []), ...params.filter(p => p.type == '數字' && p.long).map(p => p.name), ...named.filter(v => v.type == '數字' && v.long).map(v => v.name.trim())],
+    chars: [...g(base.chars ?? []), ...(target == 'cpp' ? named.filter(v => v.type == '文字' && v.char).map(v => v.name.trim()) : [])],
   };
 }
 
@@ -681,6 +684,11 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
       alert(t(`變數「${target}」是${kind}，但「${v}」是${what}，不能存進去。`, `"${target}" holds ${kind}, but "${v}" is ${what}. It cannot go in.`) + fix);
       return false;
     }
+    // char 變數：一個字（'a'、s[i]、char(x)）或數字（字的編號）；"a" 這種一個字的也可以
+    if ((vars.chars ?? []).includes(target) && type != 'char' && type != 'num' && !(type == 'str' && /^(".?"|'.?')$/su.test(v))) {
+      alert(t(`變數「${target}」是 char（一個字），只能放一個字，例如 'a'（單引號）或 s[i]，但「${v}」是${what}。`, `"${target}" is a char (one letter). Put one letter like 'a' (single quotes) or s[i], but "${v}" is ${what}.`));
+      return false;
+    }
     if (vars.type_var_list.text.includes(target) && (type == 'list' || type == 'bool' || type == 'struct')) {
       alert(t(`變數「${target}」是${isPython() ? ' str（文字）' : cpp ? ' string（文字）' : '文字'}，但「${v}」是${what}，不能存進去。`, `"${target}" holds text, but "${v}" is ${what}. It cannot go in.`));
       return false;
@@ -777,7 +785,8 @@ export function braceOk(sname: string, n: number, v: string): boolean {
 function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   const map = new Map<string, VarInfo>();
   const floats = vars.floats ?? [];
-  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '', ...(floats.includes(name) ? { float: true } : {}) }));
+  const chars = vars.chars ?? [];
+  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '', ...(floats.includes(name) ? { float: true } : {}), ...(type == '文字' && chars.includes(name) ? { char: true } : {}) }));
   add(vars.type_var_list.number, '數字');
   add(vars.type_var_list.text, '文字');
   add(vars.type_var_list.array, '清單');
@@ -869,6 +878,7 @@ const runtimeMessages = () => ({
   numToTextList: t('{v} 是數字，不能放進清單「{name}」：它是 vector<string>，只能放文字。', '{v} is a number. It cannot go into "{name}", a vector<string> that holds text only.'),
   intDivZero: t('整數除以 0：C++ 的整數不能除以 0，請檢查除數。', 'Whole-number division by 0. In C++ an int cannot be divided by 0. Check the number you divide by.'),
   noInput: t('測資的輸入不夠：執行到「輸入 {name}」時，已經沒有資料可以讀了。', 'Not enough test input: nothing is left to read at "Input {name}".'),
+  charVar: t('「{name}」是 char，只能放一個字，例如 \'a\'；「{v}」不是一個字。', '"{name}" is a char. It holds one letter, like \'a\'. "{v}" is not one letter.'),
   inputNotNum: t('測資裡的「{v}」不是數字，不能存進數字變數「{name}」。如果要存文字，請把「{name}」的型別改成文字。', '"{v}" in the test input is not a number. It cannot go into the number variable "{name}". To keep words, change the type of "{name}" to Text.'),
   listToNum: t('清單不能直接存進數字變數「{name}」。', 'A list cannot go into the number variable "{name}".'),
   textToNum: t('「{v}」是文字，不能存進數字變數「{name}」。', '"{v}" is text. It cannot go into the number variable "{name}".'),
@@ -963,6 +973,7 @@ const runtime = () => `
 var __M = ${JSON.stringify(runtimeMessages())};
 var __BASE = ${indexBase()};
 var __PY = ${isPython()};
+var __CPP = ${getTarget() == 'cpp'};
 function __err(key, i, vars) {
   var m = __M[key];
   for (var k in vars) m = m.split('{' + k + '}').join(vars[k]);
@@ -974,11 +985,28 @@ function __read(input, i, name) {
   return input.shift();
 }
 function __inNum(input, i, name) {
+  // C++ 的 cin >> a：只讀前面是數字的部分，後面的留給下一次讀（3+5 讀成 3，剩下 +5）
+  if (__CPP && input.length && !(input[0].trim() != '' && isFinite(input[0]))) {
+    var m = /^[+-]?(\\d+\\.?\\d*|\\.\\d+)/.exec(input[0]);
+    if (m) { input[0] = input[0].slice(m[0].length); return Number(m[0]); }
+  }
   var v = __read(input, i, name);
   if (!(v.trim() != '' && isFinite(v))) __err('inputNotNum', i, { v: v, name: name });
   return Number(v);
 }
 function __inText(input, i, name) { return __read(input, i, name); }
+// C++ 的 cin >> c（char）：跳過空白，只拿一個字；同一段剩下的留給下一次讀（3+5 可以讀成 int、char、int）
+function __inChar(input, i, name) {
+  if (!input.length) __err('noInput', i, { name: name });
+  var w = input[0], c = w.charAt(0);
+  if (w.length > 1) input[0] = w.slice(1); else input.shift();
+  return c;
+}
+// 存進 char 變數：一個字，或數字（字的編號，跟 C++ 的 char c = 65 一樣）
+function __char(v, i, name) {
+  if (Array.isArray(v) || (typeof v == 'string' && v.length != 1)) __err('charVar', i, { name: name, v: Array.isArray(v) ? '' : v });
+  return __chr(v);
+}
 function __inList(input, i, name) {
   var v = __read(input, i, name);
   return (v.trim() != '' && isFinite(v)) ? Number(v) : v;
@@ -2110,6 +2138,7 @@ class CodeGenerator {
     const { number, text } = this.vars.type_var_list;
     const name = JSON.stringify(target);
     if (number.includes(target)) return `${target} = ${this.numConv(target)}(${value}, ${i}, ${name});\n`;
+    if ((this.vars.chars ?? []).includes(target)) return `${target} = __char(${value}, ${i}, ${name});\n`;
     if (text.includes(target)) return `${target} = __text(${value}, ${i}, ${name});\n`;
     if (this.py && (this.isList(target) || this.isGrid(target))) {
       const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(target)];
@@ -2469,6 +2498,7 @@ class CodeGenerator {
     else if (this.containerKind(v) == 'pq') code = `__pqpush(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)}, ${this.vars.type_var_list.pqMin.includes(v)});\n`;
     // stack、queue：輸入的值 push 進去
     else if (this.isList(v) || this.containerKind(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
+    else if ((this.vars.chars ?? []).includes(v)) code = `${v} = __inChar(input_list, ${i}, ${name});\n`;
     else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
     // C++ 的 int：讀到小數時小數去掉
     else code = `${v} = ${this.isIntVar(v) ? `${this.numConv(v)}(` : '('}__inNum(input_list, ${i}, ${name})${this.isIntVar(v) ? `, ${i}, ${name}` : ''});\n`;
@@ -2776,6 +2806,12 @@ function initialValue(vars: VarStore, name: string, raw: string | undefined): st
   if (vars.type_var_list.set.includes(name)) return '{__set: []}';
   if (vars.type_var_list.array.includes(name) || vars.type_var_list.grid.includes(name) || vars.type_var_list.stack.includes(name) || vars.type_var_list.queue.includes(name) || vars.type_var_list.pq.includes(name)) return '[]';
   const value = (raw ?? '').trim();
+  // char：一個字（沒填是空白）
+  if ((vars.chars ?? []).includes(name)) {
+    const c = charInit(raw);
+    if (c == null) throw new FlowError(t(`變數「${name}」是 char（一個字），但初始值「${value}」不只一個字：請到第三步的變數表改成一個字，例如 a。`, `"${name}" is a char (one letter), but its start value "${value}" has more than one letter. Change it to one letter, like a (step 3).`));
+    return JSON.stringify(c);
+  }
   if (vars.type_var_list.text.includes(name)) {
     return /^(".*"|'.*')$/.test(value) ? value : JSON.stringify(value);
   }

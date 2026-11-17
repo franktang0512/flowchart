@@ -659,6 +659,8 @@ export interface VarInfo {
   float?: boolean;
   /** C++：數字變數是 long long（很大的整數）；int 超過約 21 億會溢位 */
   long?: boolean;
+  /** C++：文字變數是 char（一個字）：算的時候是字的編號，跟 s[i] 一樣 */
+  char?: boolean;
   /** 陣列（array）的大小：宣告時就決定，之後不能改 */
   size?: string;
   /** array 的大小在流程圖中用計算積木「建立」決定（例如先輸入 n，再 int a[n];） */
@@ -734,7 +736,7 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
     case 'str': return e.ch && getTarget() == 'cpp' ? 'char' : 'str';
     case 'var': {
       const v = vars.get(e.name);
-      return isContainerType(v?.type) ? 'list' : v?.type == '文字' ? 'str' : 'num';
+      return isContainerType(v?.type) ? 'list' : v?.type == '文字' ? (v.char && getTarget() == 'cpp' ? 'char' : 'str') : 'num';
     }
     case 'method': {
       if (isPython()) {

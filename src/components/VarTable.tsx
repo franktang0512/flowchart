@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
 import { isContainerType, type VarType } from '../engine/structure';
 import { findStruct, getStructs, isPair, PAIR_TYPES } from '../engine/structs';
-import { mapParts, pyElemName } from '../engine/modules';
+import { charInit, mapParts, pyElemName } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { getTarget, isCode, isPython } from '../target';
 import { useCommit } from '../useCommit';
@@ -23,6 +23,8 @@ export interface VarRow {
   sizeLater?: boolean;
   /** C++：數字是 long long（很大的整數）；int 超過約 21 億會溢位 */
   long?: boolean;
+  /** C++：文字是 char（一個字），例如 'a'；算的時候是字的編號（c - '0'、c + 1） */
+  char?: boolean;
   /** struct 變數每個欄位的初始值（欄位名稱 → 值；沒填是 0 或空的文字） */
   fieldInit?: Record<string, string>;
   /** C++：全域變數（宣告在 main 外面，每個模組都用得到，例如 DFS 要用的圖和 visited） */
@@ -200,15 +202,18 @@ function structInitText(row: VarRow): string {
 /** 型別選單裡 struct 的值：「struct:Edge」 */
 const STRUCT_PREFIX = 'struct:';
 
-export const typeValue =(type: string, float?: boolean, long?: boolean) => (type == '數字' && isCode() ? (float ? 'float' : long && !isPython() ? 'long' : type) : type);
+export const typeValue = (type: string, float?: boolean, long?: boolean, char?: boolean) => (type == '數字' && isCode() ? (float ? 'float' : long && !isPython() ? 'long' : type)
+  : type == '文字' && char && getTarget() == 'cpp' ? 'char' : type);
 export const fromTypeValue = (value: string) => (value == 'float'
-  ? { type: '數字' as const, float: true, long: undefined }
+  ? { type: '數字' as const, float: true, long: undefined, char: undefined }
   : value == 'long'
-  ? { type: '數字' as const, float: undefined, long: true }
-  : { type: value as VarRow['type'], float: undefined, long: undefined });
+  ? { type: '數字' as const, float: undefined, long: true, char: undefined }
+  : value == 'char'
+  ? { type: '文字' as const, float: undefined, long: undefined, char: true }
+  : { type: value as VarRow['type'], float: undefined, long: undefined, char: undefined });
 
 /** 數字、文字的選項（C++ 寫成 int、float、string）；beforeString 放在 float 和 string 中間（變數表的 array） */
-export function TypeOptions({ beforeString }: { beforeString?: React.ReactNode } = {}) {
+export function TypeOptions({ beforeString, withChar }: { beforeString?: React.ReactNode; withChar?: boolean } = {}) {
   // Python 的整數不會溢位，所以沒有 long long
   if (isPython()) {
     return (
@@ -228,6 +233,8 @@ export function TypeOptions({ beforeString }: { beforeString?: React.ReactNode }
         <option value="float">{t('float（小數）', 'float')}</option>
         {beforeString}
         <option value="文字">{t('string（文字）', 'string')}</option>
+        {/* 一個字：char c = s[i];、c - '0'、cin >> op（變數表才有，參數、回傳值先不用） */}
+        {withChar && <option value="char" title={t("一個字，例如 'a'：存 s[i] 的一個字、讀一個運算符號；算的時候是字的編號（c - '0'、c + 1）", "One letter like 'a': holds s[i] or an operator you read; in math it is the letter's code (c - '0', c + 1)")}>{t('char（一個字）', 'char')}</option>}
       </>
     );
   }
@@ -367,16 +374,16 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
       </td>
       <td>
         <select
-          className="var_input" value={row.type == '結構' ? STRUCT_PREFIX + row.init : typeValue(row.type, row.float, row.long)}
+          className="var_input" value={row.type == '結構' ? STRUCT_PREFIX + row.init : typeValue(row.type, row.float, row.long, row.char)}
           onChange={e => {
             // 選了某個 struct（例如 Edge）：型別是 struct，初始值欄記是哪一個
             const structName = e.target.value.startsWith(STRUCT_PREFIX) ? e.target.value.slice(STRUCT_PREFIX.length) : null;
             if (structName != null) {
-              onChange(row.id, { type: '結構', init: structName, float: undefined, long: undefined, fieldInit: undefined });
+              onChange(row.id, { type: '結構', init: structName, float: undefined, long: undefined, char: undefined, fieldInit: undefined });
               onCommit();
               return;
             }
-            const { type, float, long } = fromTypeValue(e.target.value);
+            const { type, float, long, char } = fromTypeValue(e.target.value);
             // 預設的初始值跟著型別換：數字是 0，文字是空的，清單預設裝數字；改成 int 時初始值的小數去掉
             // 換成別的容器時，原本裝的 struct 照樣留著
             const keepStruct = isListType(type) && findStruct(row.init) && (!sortedType(type) || isPair(row.init));
@@ -387,12 +394,14 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
               : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
             if (type == '數字' && !float && /^\s*-?\d+\.\d*\s*$/.test(init)) init = String(Math.trunc(Number(init)));
+            // char：只留一個字（原本的文字太長就清掉）
+            if (char && charInit(init) == null) init = '';
             // array 要先有大小：預設 5 格
-            onChange(row.id, { type, init, float, long, ...(type == '陣列' && !row.size?.trim() ? { size: '5' } : {}) });            onCommit();
+            onChange(row.id, { type, init, float, long, char, ...(type == '陣列' && !row.size?.trim() ? { size: '5' } : {}) });            onCommit();
           }}
         >
           {/* C++：array 放在 float 和 string 中間，其他容器放在後面 */}
-          <TypeOptions beforeString={cpp && containerOptions(['陣列'])} />
+          <TypeOptions beforeString={cpp && containerOptions(['陣列'])} withChar={cpp} />
           {py
             ? <>
                 {containerOptions(['清單', '二維清單', '佇列', '優先佇列小', '集合', '對應表'])}

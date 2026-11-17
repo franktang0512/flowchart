@@ -48,9 +48,19 @@ export function useLang(): Lang {
 }
 
 /** 站內連結：固定英文時把 lang=en 帶到下一頁，例如 link('?course=114')、link('./') */
+/** 連結要多帶的參數（目前的學習目標 ?target=，由 target.ts 設定；這裡不 import target.ts，避免互相引用） */
+let extraParams: () => Record<string, string> = () => ({});
+export const setLinkParams = (f: () => Record<string, string>) => { extraParams = f; };
+
+/** 站內連結：帶上 ?target=（學習目標）、?lang=en（固定英文），複製網址給學生時就不用自己加 */
 export function link(href: string) {
-  if (!LOCKED_EN) return href;
-  return href.includes('?') ? href + '&lang=en' : href + '?lang=en';
+  const params: Record<string, string> = { ...extraParams(), ...(LOCKED_EN ? { lang: 'en' } : {}) };
+  const add = Object.entries(params)
+    .filter(([k]) => !new RegExp(`[?&]${k}=`).test(href))
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('&');
+  if (!add) return href;
+  return href + (href.includes('?') ? '&' : '?') + add;
 }
 
 /** 依目前語言回傳中文或英文 */

@@ -1,7 +1,7 @@
 // 「看程式」：流程圖的結構 → C++（學習目標是 C++ 時，清單的索引從 0 開始，所以位置直接照抄）。
 // 給學生看「流程圖怎麼變成程式」，以好讀為主：型別照第三步學生選的 int / float / string，清單用 vector。
 import { t } from '../i18n';
-import { cppType, elemCppType, mapKeyCppType, mapParts, splitArgs } from './modules';
+import { charInit, cppType, elemCppType, mapKeyCppType, mapParts, splitArgs } from './modules';
 import { CHAR_TESTS, exprType, fieldOf, isContainerType, parseExpr, type Expr, type ExprType, type ModuleProgram, type Stmt, type VarInfo } from './structure';
 import { fieldCppType, findStruct, getStructs, isPair } from './structs';
 
@@ -24,7 +24,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     ...globalOnly.map(v => ['::' + v.name, { ...v, name: '::' + v.name }] as const),
   ]);
   /** 模組的區域變數（寫在函式裡面） */
-  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, size: v.size, sizeLater: v.sizeLater, fieldInit: v.fieldInit }));
+  const localsOf = (m: ModuleProgram): VarInfo[] => (m.locals ?? []).filter(v => v.name.trim() != '').map(v => ({ name: v.name.trim(), type: v.type, init: v.init, float: v.float, long: v.long, char: v.char, size: v.size, sizeLater: v.sizeLater, fieldInit: v.fieldInit }));
   /** 目前寫到的地方看得到的變數：主程式是變數表；模組裡再加上參數和區域變數 */
   let vars = globals;
   /** 目前寫到哪個模組（null 是主程式） */
@@ -313,6 +313,12 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
             const v = vars.get(s.target);
             const target = parseExpr(s.target);
             const textField = target.t == 'field' && fieldOf(target, vars)?.type == '文字';
+            // char 變數：數字就是字的編號（c = 65 是 'A'），不用 to_string；"a" 寫成 'a'
+            if (v?.type == '文字' && v.char) {
+              const one = s.value?.t == 'str' && [...s.value.v].length == 1 && !s.round ? charLit(s.value.v) : value;
+              emit(depth, `${s.target} = ${one};`);
+              break;
+            }
             const numToText = (v?.type == '文字' || textField) && s.value && typeOf(s.value) == 'num';
             if (numToText) uses.string = true;
             emit(depth, `${s.target} = ${numToText ? `to_string(${value})` : value};`);
@@ -490,6 +496,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
     if (v.type == '優先佇列') return `${pad}priority_queue<${elemType(v.name)}> ${v.name};`;
     // 小的先出來：priority_queue<int, vector<int>, greater<int>>
     if (v.type == '優先佇列小') return `${pad}priority_queue<${elemType(v.name)}, vector<${elemType(v.name)}>, greater<${elemType(v.name)}>> ${v.name};`;
+    if (v.type == '文字' && v.char) return `${pad}char ${v.name} = ${charLit(charInit(v.init) ?? ' ')};`;
     if (v.type == '文字') return `${pad}string ${v.name} = ${JSON.stringify(stripQuotes(v.init))};`;
     return `${pad}${cppType('數字', v.float, v.long)} ${v.name} = ${v.init.trim() || '0'};`;
   };

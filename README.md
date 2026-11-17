@@ -30,7 +30,7 @@
 | | Scratch | Blockly | C++ | Python |
 | --- | --- | --- | --- | --- |
 | 清單從哪裡開始 | 第 1 項 | 第 1 項 | 索引 0 | 索引 0 |
-| 變數型別 | 數字、文字、清單 | 數字、文字、清單 | int、float、string、vector、stack… | int、float、str、list、deque… |
+| 變數型別 | 數字、文字、清單 | 數字、文字、清單 | int、float、string、char、vector、stack… | int、float、str、list、deque… |
 | 看程式 | Scratch 積木 | Blockly 積木 | C++ 程式碼 | Python 程式碼 |
 | 模組 | 自訂積木，不能回傳 | 函式，可以回傳 | 函式，可以回傳 | 函式，可以回傳 |
 | 模組在畫面上叫 | 模組 | 模組 | 模組/函式 | 模組/函式 |
@@ -77,6 +77,7 @@
 | 型別 | 說明 |
 | --- | --- |
 | `int`、`long long`、`float`、`string` | `int` 跟 C++ 一樣會溢位（超過約 21 億變成負的），`long long` 不會 |
+| `char` | 一個字，初始值填一個字（`a`，沒填是空白）；可以存 `s[i]`、`'x'`、`char(n)`、`toupper(c)`、數字（字的編號）；`c - '0'`、`c + 1` 算出來是數字 |
 | `array` | 大小固定（變數表填，或在流程圖中「建立」）；一開始每格是 0，不能加入、刪除 |
 | `vector` | 添加、插入、替換、刪除、排序 |
 | 二維 `vector` | 「建立 n 列 m 行」；「建立 n 列 0 行」再往某一列 `push_back`（鄰接串列） |
@@ -96,7 +97,8 @@
 | 排序 | 由小到大 / 由大到小；array 可以只排前 n 個；struct 依欄位排，可以一層一層加條件 |
 | 最大、最小 | `max(a, b)`、`max(a, b, c)`；`max(v)` 是整個 vector / array 裡最大的 |
 | 字串 | `s.length()`、`s.size()`、`s.substr(開始, 幾個字)`、`s[i]`、`stoi(s)`、`to_string(n)`；可以只改其中一個字 `s[i] = 'A'` |
-| 字元 | `'a'`、`s[i] - '0'`、`'a' + k`、`char(x)`、`isdigit`、`isalpha`、`isupper`、`islower`、`toupper`、`tolower` |
+| 字元 | `'a'`、`s[i] - '0'`、`'a' + k`、`char(x)`、`isdigit`、`isalpha`、`isupper`、`islower`、`toupper`、`tolower`；存進 char 變數：`char c = s[i];` |
+| 輸入 | 跟 `cin` 一樣：`int`、`float` 只讀前面是數字的部分，`char` 跳過空白只讀一個字，剩下的留給下一次讀（測資 `3+5` 可以讀成 int、char、int） |
 | struct、pair | `e.from`、`edges[i].w`、`q.front().w`、`pq.top().second`；一整筆寫成 `{x, y}`，例如 `q.push({x, y})` |
 | 二維 vector 的列 | `g[u].size()`、`g[u].empty()`、`g[u].push_back(v)` |
 | 整數除法 | `int / int` 跟 C++ 一樣去掉小數 |
@@ -108,6 +110,7 @@
 - `map`、`set` 只能整個輸出，不能用 for 一個一個看；沒有 `begin()`、`find()`、`lower_bound()`。
 - 型別轉換只有 `char(x)`，沒有 `(char)x`。
 - `set`、`priority_queue` 不能裝自己定義的 struct（可以裝 pair）。
+- `char` 只能當變數（變數表、區域變數）；參數、回傳值、容器裡裝的、struct 的欄位還不能是 char（用 `string` 就夠了，`s[i]` 本來就能讀、能改）。
 - 「一直輸入到沒有資料」只能讀進數字、文字變數；要存進 vector，迴圈裡再 `push_back`（`while (cin >> a[i])` 用 for 就好，不做）。
 - `::a` 只能用在全域的數字、文字變數。
 - struct 不能當模組的參數或回傳值、不能巢狀、不能整筆輸出或比大小。
@@ -231,7 +234,7 @@ npm run build      # 輸出到 dist/，整個資料夾放到任何靜態網站�
 | `?course=adv&target=cpp` | 題目清單也可以加 `target`，學生從清單點進每一題都是 C++ |
 | `?course=adv&target=cpp&lang=en` | 再加 `lang=en`：介面和題目用英文 |
 
-給學生的連結加 `target` 就好：打開後同一個分頁會記住學習目標，在課程之間切換不用再選；開新分頁（例如 Ctrl + 點連結）會再問一次。
+在首頁選了學習目標之後，網址列會自動加上 `target`（例如 `?course=adv&target=cpp`），頁面裡的課程、題目連結也都帶著，所以**直接複製網址列給學生就好**；重新整理、開新分頁也還是同一個語言。換學習目標時網址列跟著換。只給一種語言的課程（「生活中的演算法」是 C++、「生活中的演算法（Python）」是 Python）不加 `target` 也會自動用那個語言。
 
 上課用的例子：
 
