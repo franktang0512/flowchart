@@ -87,6 +87,12 @@ export const indexBase = () => (isCode() ? 0 : 1);
 /** 依學習目標選說法：積木（第幾項）、C++（索引）或 Python（沒給就跟 C++ 一樣） */
 export const byTarget = (blocks: string, cpp: string, python: string = cpp) => (isPython() ? python : isCode() ? cpp : blocks);
 
+/**
+ * 「模組」的說法：C++、Python 寫成「模組/函式」（程式語言叫 function），積木照舊叫「模組」。
+ * en 是英文的說法（例如 'module'、'Module'），C++、Python 後面加上「/function」
+ */
+export const moduleWord = (en = 'module') => (isCode() ? t('模組/函式', `${en}/function`) : t('模組', en));
+
 /** 學習目標的名稱 */
 export const targetName = (target: Target) => ({ scratch: 'Scratch', blockly: 'Blockly', cpp: 'C++', python: 'Python' })[target];
 

@@ -6,7 +6,7 @@ import { pyElemName } from '../engine/modules';
 import type { RectAction, SortKey } from '../engine/labels';
 import { cppType, GLOBAL_PREFIX, type LocalVar, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { byTarget, canReturn as canReturnTarget, getTarget, isCode, isPython, itemWord } from '../target';
+import { byTarget, canReturn as canReturnTarget, getTarget, isCode, isPython, itemWord, moduleWord } from '../target';
 import { forInit, pyFor } from '../engine/structure';
 import { fieldCppType, findStruct, type StructDef } from '../engine/structs';
 
@@ -889,14 +889,14 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                   <p className="io_choice output_kind">
                     {t('輸出：', 'Output: ')}
                     <label><input type="radio" name="output_kind" checked={f.outputKind == ''} onChange={() => set({ outputKind: '' })} />{t('變數或字串', 'A variable or "text"')}</label>
-                    <label><input type="radio" name="output_kind" checked={f.outputKind == '回傳'} onChange={() => set({ outputKind: '回傳' })} />{t('模組回傳值', "A module's return value")}</label>
+                    <label><input type="radio" name="output_kind" checked={f.outputKind == '回傳'} onChange={() => set({ outputKind: '回傳' })} />{t(`${moduleWord()}回傳值`, `A ${moduleWord()}'s return value`)}</label>
                   </p>
                 )}
                 {f.outputKind == '回傳'
                   ? (
                     <>
                       <p>
-                        {t('模組：', 'Module: ')}
+                        {t(`${moduleWord()}：`, `${moduleWord('Module')}: `)}
                         <select className="var_select" id="module_select" value={f.moduleName} onChange={e => set({ moduleName: e.target.value, moduleArgs: [] })}>
                           <option value="" disabled>{t('請選擇', 'Choose one')}</option>
                           {f.moduleName && !returningModules.some(x => x.name == f.moduleName) && <option value={f.moduleName}>{f.moduleName}</option>}
@@ -980,7 +980,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       const m = modules.find(x => x.name == f.moduleName);
       body = (
         <>
-          <p id="hint">{t('要執行哪一個模組？', 'Which module do you want to run?')}</p>
+          <p id="hint">{t(`要執行哪一個${moduleWord()}？`, `Which ${moduleWord()} do you want to run?`)}</p>
           {modules.length
             ? (
               <select className="var_select" id="module_select" value={f.moduleName} onChange={e => set({ moduleName: e.target.value, moduleArgs: [] })}>
@@ -989,7 +989,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                 {modules.map(x => <option key={x.name} value={x.name}>{x.name}</option>)}
               </select>
             )
-            : <p className="dialog_note">{t('還沒有模組：請先按流程圖上方的「＋ 新增模組」。', 'There are no modules yet. Click "+ New module" above the flowchart first.')}</p>}
+            : <p className="dialog_note">{t(`還沒有${moduleWord()}：請先按流程圖上方的「＋ 新增${moduleWord()}」。`, `There are none yet. Click "+ New ${moduleWord()}" above the flowchart first.`)}</p>}
           {m && argFields(m)}
           {m?.returns && (
             <p className="dialog_note return_tip">
@@ -1102,7 +1102,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                 title={returning.length ? undefined : t('還沒有有回傳值的模組：到模組上方的「修改名稱、參數」設定回傳值', 'No module returns a value yet. Set a return value in "Edit name, parameters".')}
                 className={!returning.length && kind != '接收' ? 'disabled_choice' : undefined}
               >
-                <input type="radio" name="rect_kind" checked={kind == '接收'} disabled={!returning.length && kind != '接收'} onChange={() => pickKind('接收')} />{t('接收模組回傳值', "A module's return value")}
+                <input type="radio" name="rect_kind" checked={kind == '接收'} disabled={!returning.length && kind != '接收'} onChange={() => pickKind('接收')} />{t(`接收${moduleWord()}回傳值`, `A ${moduleWord()}'s return value`)}
                 {!returning.length && kind != '接收' && <span className="muted">{t('（還沒有有回傳值的模組）', ' (no module returns a value yet)')}</span>}
               </label>
             )}
@@ -1110,7 +1110,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           {kind == '接收' && (
             <>
               <p>
-                {t('模組：', 'Module: ')}
+                {t(`${moduleWord()}：`, `${moduleWord('Module')}: `)}
                 <select className="var_select" id="module_select" value={f.moduleName} onChange={e => set({ moduleName: e.target.value, moduleArgs: [] })}>
                   <option value="" disabled>{t('請選擇', 'Choose one')}</option>
                   {f.moduleName && !recvModule && <option value={f.moduleName}>{f.moduleName}</option>}

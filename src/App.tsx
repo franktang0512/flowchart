@@ -25,7 +25,7 @@ import { allowedVarTypes, EMPTY_QUESTION, loadQuestion, questionIn, type Questio
 import { fitRowOnInput } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
 import { getLang, link, onLangChange, t, useLang } from './i18n';
-import { getTarget, isCode, isPython, setTarget, targetName, useTarget, type Target } from './target';
+import { getTarget, isCode, isPython, moduleWord, setTarget, targetName, useTarget, type Target } from './target';
 import { COURSES, courseFits } from './courses';
 import { useCommit } from './useCommit';
 import { savePdf } from './pdf';
@@ -48,7 +48,7 @@ const BLOCK_TOOLS = [
   { id: 'Rectangle', icon: 'cal', name: () => t('計算', 'Math') },
   { id: 'Loop', icon: 'loop', name: () => t('迴圈', 'Loop') },
   // 流程圖的「預定處理」：執行一個模組（Scratch 的自訂積木）
-  { id: 'Function', icon: 'func', name: () => t('執行模組', 'Run a module') },
+  { id: 'Function', icon: 'func', name: () => t(`執行${moduleWord()}`, `Run a ${moduleWord()}`) },
 ];
 
 /** 一個模組：名稱、參數，和它自己的一張流程圖；id 用來切換分頁（主程式是 0） */
@@ -690,7 +690,7 @@ export function App() {
   }, [page, pageNonce]);
 
   /** 第幾張流程圖的名字：主流程、模組：xxx */
-  const sheetLabel = (sheet: number) => (sheet == 0 ? t('主流程', 'Main flow') : t('模組：', 'Module: ') + (modulesRef.current[sheet - 1]?.info.name ?? ''));
+  const sheetLabel = (sheet: number) => (sheet == 0 ? t('主流程', 'Main flow') : t(`${moduleWord()}：`, `${moduleWord('Module')}: `) + (modulesRef.current[sheet - 1]?.info.name ?? ''));
   // 這一步在模組裡的話，是從哪個積木執行進來的（一層一層的最後一個）
   const callStack = run?.stack[Math.min(step, (run?.stack.length ?? 1) - 1)] ?? [];
 
@@ -1233,17 +1233,17 @@ export function App() {
                 {t('看程式', 'See code')}（{targetName(getTarget())}）
               </button>
               <span className="canvas_hint" />
-              <button id="clear_canvas" onClick={clickClear}>{sheet == 0 ? t('清空流程圖', 'Clear all') : t('清空這個模組', 'Clear this module')}</button>
+              <button id="clear_canvas" onClick={clickClear}>{sheet == 0 ? t('清空流程圖', 'Clear all') : t(`清空這個${moduleWord()}`, `Clear this ${moduleWord()}`)}</button>
             </div>
             {/* 主程式和每個模組各一張流程圖 */}
             <div className="sheet_tabs" role="tablist">
               <button role="tab" aria-selected={sheet == 0} className={sheet == 0 ? 'selected' : ''} onClick={() => showSheet(0)}>{t('主流程', 'Main flow')}</button>
               {modules.map(m => (
                 <button key={m.id} role="tab" aria-selected={sheet == m.id} className={sheet == m.id ? 'selected' : ''} onClick={() => showSheet(m.id)}>
-                  {t('模組：', 'Module: ')}{m.info.name}
+                  {t(`${moduleWord()}：`, `${moduleWord('Module')}: `)}{m.info.name}
                 </button>
               ))}
-              <button className="sheet_add" onClick={newModule}>{t('＋ 新增模組', '+ New module')}</button>
+              <button className="sheet_add" onClick={newModule}>{t(`＋ 新增${moduleWord()}`, `+ New ${moduleWord()}`)}</button>
             </div>
             {sheet != 0 && (() => {
               const m = modules.find(x => x.id == sheet);
@@ -1257,7 +1257,7 @@ export function App() {
                   </span>
                   <span className="muted">{t('從「開始」做到「結束」，做完回到執行它的地方', 'Runs from Start to End, then goes back to where it was run')}</span>
                   <button onClick={() => editModule(m)}>{t('修改名稱、參數', 'Edit name, parameters')}</button>
-                  <button onClick={() => deleteModule(m)}>{t('刪除模組', 'Delete module')}</button>
+                  <button onClick={() => deleteModule(m)}>{t(`刪除${moduleWord()}`, `Delete ${moduleWord()}`)}</button>
                 </div>
               );
             })()}

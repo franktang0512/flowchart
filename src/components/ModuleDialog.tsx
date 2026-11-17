@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isName, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
-import { canReturn, getTarget, isCode, isPython } from '../target';
+import { canReturn, getTarget, isCode, isPython, moduleWord } from '../target';
 import { fromTypeValue, TypeOptions, typeValue } from './VarTable';
 
 export interface ModuleRequest {
@@ -89,8 +89,10 @@ function ModuleForm({ request, onClose }: { request: ModuleRequest; onClose: () 
 
   return (
     <>
-      <h5 className="card_title" style={{ marginTop: 0 }}>{request.initial ? t('修改模組', 'Edit module') : t('新增模組', 'New module')}</h5>
-      <p className="dialog_note">{t('模組就是 Scratch 的「自訂積木」：把一段常用的步驟包起來取個名字，需要時用「執行模組」積木執行它。', 'A module is like a Scratch "My Block": a group of steps with a name. Use the "Run module" block to run it.')}</p>
+      <h5 className="card_title" style={{ marginTop: 0 }}>{request.initial ? t(`修改${moduleWord()}`, `Edit ${moduleWord()}`) : t(`新增${moduleWord()}`, `New ${moduleWord()}`)}</h5>
+      <p className="dialog_note">{isCode()
+        ? t(`模組在 ${isPython() ? 'Python' : 'C++'} 叫函式（function）：把一段常用的步驟包起來取個名字，需要時用「執行模組/函式」積木執行它。`, `In ${isPython() ? 'Python' : 'C++'} a module is called a function: a group of steps with a name. Use the "Run a module/function" block to run it.`)
+        : t('模組就是 Scratch 的「自訂積木」：把一段常用的步驟包起來取個名字，需要時用「執行模組」積木執行它。', 'A module is like a Scratch "My Block": a group of steps with a name. Use the "Run module" block to run it.')}</p>
       <p>
         <label>{t('名稱：', 'Name: ')}<input id="module_name" value={name} onChange={e => setName(e.target.value)} autoFocus /></label>
       </p>

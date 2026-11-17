@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MAX_STEPS, type RunResult } from '../engine/decoder';
 import { t, useLang } from '../i18n';
-import { indexBase, isPython } from '../target';
+import { indexBase, isPython, moduleWord } from '../target';
 import type { RunView } from '../engine/diagram';
 
 /** 第四步的一張流程圖：主流程、一層一層執行進來的模組，最後一張是正在執行的 */
@@ -107,7 +107,7 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
     const empty = m.names.length == 0 && <span className="muted">{t('（沒有參數和區域變數）', '(none)')}</span>;
     return (
       <div key={m.sheet} className={'run_module_vars' + (isRunning ? ' is_running' : own.length ? '' : ' is_idle')}>
-        <p className="section_label">{t(`模組：${m.name} 的參數和區域變數`, `Module ${m.name}: parameters and local variables`)}<span className="run_module_status">{status}</span></p>
+        <p className="section_label">{t(`${moduleWord()}：${m.name} 的參數和區域變數`, `${moduleWord('Module')} ${m.name}: parameters and local variables`)}<span className="run_module_status">{status}</span></p>
         {own.length == 0 && <div className="var_boxes">{m.names.map(n => varBox(n, undefined, undefined, 'idle'))}{empty}</div>}
         {own.slice(-3).map(f => {
           const before = prevFrames.find(p => p.sheet == f.sheet && p.depth == f.depth)?.vals;

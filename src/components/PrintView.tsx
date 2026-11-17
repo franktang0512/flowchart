@@ -15,6 +15,7 @@ export interface PrintData {
 }
 
 import { t, useLang } from '../i18n';
+import { moduleWord } from '../target';
 import type { QuestionText } from '../questions';
 
 // 題目附表與範例的內容是老師寫的 HTML（有些題目用 <br> 換行），跟題目區一樣直接當 HTML 顯示
@@ -129,7 +130,7 @@ export function PrintView({ visible, capture = false, data, imgSrc, modules }: {
           </tr>
           {modules.map(m => (
             <tr key={m.title}>
-              <th>{t('模組', 'Module')}<br />{m.title}</th>
+              <th>{moduleWord('Module')}<br />{m.title}</th>
               <td><img className="flow_chart_module" src={m.src} data-cuts={m.cuts.join(',')} /></td>
             </tr>
           ))}
