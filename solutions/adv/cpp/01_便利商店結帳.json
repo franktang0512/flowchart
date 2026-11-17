@@ -1,0 +1,236 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/eof1",
+  "questionTitle": "便利商店結帳",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "不知道有幾件：一直輸入價格到沒有資料，每讀到一件就數一件、加進總金額",
+    "hint": "price：每一件的價格（一行一個，讀到沒有資料為止）",
+    "hint2": "共幾件、總共幾元"
+  },
+  "variables": [
+    {
+      "desc": "這一件的價格",
+      "name": "price",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "目前幾件",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "目前總共幾元",
+      "name": "total",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 80,
+        "y": 160,
+        "w": 210,
+        "h": 80,
+        "text": "輸入 price 讀不到",
+        "figure": "While_Loop",
+        "variables": [
+          "price"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 290,
+        "w": 130,
+        "h": 80,
+        "text": " n 設為 n + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "n"
+        ],
+        "data": ""
+      },
+      {
+        "x": 125,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": " total 設為 total + price",
+        "figure": "Rectangle",
+        "variables": [
+          "price",
+          "total"
+        ],
+        "data": ""
+      },
+      {
+        "x": 85,
+        "y": 600,
+        "w": 200,
+        "h": 80,
+        "text": "輸出 \"共 \" + to_string(n) + \" 件\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 70,
+        "y": 730,
+        "w": 230,
+        "h": 80,
+        "text": "輸出 \"總共 \" + to_string(total) + \" 元\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "total"
+        ]
+      },
+      {
+        "x": 125,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 125,
+        "y": 860,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 185,
+            "y": 525
+          },
+          {
+            "x": 50,
+            "y": 525
+          },
+          {
+            "x": 50,
+            "y": 200
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 320,
+            "y": 200
+          },
+          {
+            "x": 320,
+            "y": 575
+          },
+          {
+            "x": 185,
+            "y": 575
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "35\n20\n15",
+      "共 3 件\n總共 70 元",
+      "35 + 20 + 15 = 70"
+    ],
+    [
+      "120",
+      "共 1 件\n總共 120 元",
+      "只買一件"
+    ],
+    [
+      "10\n10\n10\n10\n5",
+      "共 5 件\n總共 45 元",
+      "題目沒有先說有幾件，要讀到沒有資料才知道"
+    ]
+  ]
+}

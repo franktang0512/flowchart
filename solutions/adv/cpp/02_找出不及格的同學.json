@@ -1,0 +1,266 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/eof2",
+  "questionTitle": "找出不及格的同學",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "每一輪讀一行的座號和分數，讀到沒有資料就停；不及格就輸出座號、數一個",
+    "hint": "no、score：每一行的座號和分數（讀到沒有資料為止）",
+    "hint2": "不及格的座號、共幾人不及格"
+  },
+  "variables": [
+    {
+      "desc": "座號",
+      "name": "no",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "分數",
+      "name": "score",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "幾人不及格",
+      "name": "cnt",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 150,
+        "y": 160,
+        "w": 240,
+        "h": 90,
+        "text": "輸入 no, score 讀不到",
+        "figure": "While_Loop",
+        "variables": [
+          "no",
+          "score"
+        ]
+      },
+      {
+        "x": 185,
+        "y": 300,
+        "w": 170,
+        "h": 80,
+        "text": "score < 60",
+        "figure": "Diamond",
+        "variables": [
+          "score"
+        ]
+      },
+      {
+        "x": 100,
+        "y": 430,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 no",
+        "figure": "Parallelogram",
+        "variables": [
+          "no"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 560,
+        "w": 160,
+        "h": 80,
+        "text": " cnt 設為 cnt + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "cnt"
+        ],
+        "data": ""
+      },
+      {
+        "x": 150,
+        "y": 740,
+        "w": 240,
+        "h": 85,
+        "text": "輸出 \"共 \" + to_string(cnt) + \" 人不及格\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "cnt"
+        ]
+      },
+      {
+        "x": 210,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 210,
+        "y": 875,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 160,
+            "y": 340
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 160,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 205
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 0,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 375,
+            "y": 340
+          },
+          {
+            "x": 375,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 665
+          },
+          {
+            "x": 50,
+            "y": 205
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 490,
+            "y": 205
+          },
+          {
+            "x": 490,
+            "y": 715
+          },
+          {
+            "x": 270,
+            "y": 715
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "1 75\n2 48\n3 90\n4 59",
+      "2\n4\n共 2 人不及格",
+      "2 號 48 分、4 號 59 分不及格"
+    ],
+    [
+      "7 100",
+      "共 0 人不及格",
+      "只有一位同學，而且及格"
+    ],
+    [
+      "5 30\n6 20\n8 60",
+      "5\n6\n共 2 人不及格",
+      "60 分是及格"
+    ]
+  ]
+}
