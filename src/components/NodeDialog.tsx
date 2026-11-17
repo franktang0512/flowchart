@@ -958,7 +958,47 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           {py && radio('pyfor', t('for 迴圈（range、一個一個拿）', 'for loop (range, or each item)'), () => set({ showWhile: false }))}{' '}
           {(!isCode() || f.radio == 'for') && radio('for', t('執行完幾次', 'After some times'), () => set({ showWhile: false }))}{' '}
           {radio('while', t('達成某個條件', 'When something is true'), () => set({ showWhile: true }))}{' '}
+          {isCode() && radio('eof', t('一直輸入到沒有資料', 'Input until there is no more data'), () => set({ showWhile: false }))}{' '}
           <br /><br />{' '}
+          {f.radio == 'eof' && (
+            <>
+              <p className="io_choice">
+                {t('每一輪讀：', 'Each round reads: ')}
+                <label><input type="radio" name="eof_target" checked={f.ioTarget != '多個'} onChange={() => set({ ioTarget: '變數' })} />{t('一個變數', 'One variable')}</label>
+                <label><input type="radio" name="eof_target" checked={f.ioTarget == '多個'} onChange={() => set({ ioTarget: '多個' })} />{py ? t('一行好幾個變數', 'Many variables from one line') : t('好幾個變數', 'Many variables')}</label>
+              </p>
+              {f.ioTarget == '多個'
+                ? (
+                  <p>
+                    {f.ioMany.map((v, k) => (
+                      <span key={k}>
+                        {k > 0 && (py ? ', ' : ' >> ')}
+                        <VarPicker
+                          marked={globalMarks}
+                          id={k == 0 ? 'var_select' : `var_select_${k}`} value={v} onChange={x => set({ ioMany: f.ioMany.map((y, j) => (j == k ? x : y)) })}
+                          names={[...varTypes.number, ...varTypes.text]} params={paramNames} locals={[...localT.number, ...localT.text]}
+                        />
+                        {f.ioMany.length > 2 && <button type="button" className="snippet" title={t('拿掉', 'Remove')} onClick={() => set({ ioMany: f.ioMany.filter((_, j) => j != k) })}>✕</button>}
+                      </span>
+                    ))}{' '}
+                    <button type="button" className="snippet" onClick={() => set({ ioMany: [...f.ioMany, ''] })}>{t('＋ 再一個', '+ One more')}</button>
+                  </p>
+                )
+                : (
+                  <p>
+                    {t('輸入到：', 'Input into: ')}
+                    <VarPicker
+                      marked={globalMarks}
+                      id="var_select" value={f.varSelect} onChange={v => set({ varSelect: v })}
+                      names={[...varTypes.number, ...varTypes.text]} params={paramNames} locals={[...localT.number, ...localT.text]}
+                    />
+                  </p>
+                )}
+              <span className="dialog_note">{py
+                ? t('每一輪讀一行存進變數（一行好幾個就照空白切開），讀完了（沒有下一行）就離開迴圈。Python 寫成 for line in sys.stdin:，題目說「輸入到檔案結束」就用這個。', 'Each round reads a line into the variable (many variables: split by spaces). When there are no more lines, the loop ends. In Python: for line in sys.stdin:. Use it when the input goes "until end of file".')
+                : t('每一輪讀一個存進變數（好幾個就照順序讀），讀不到（測資用完了）就離開迴圈。C++ 寫成 while (cin >> a) 或 while (cin >> a >> b)，題目說「輸入到檔案結束」就用這個。', 'Each round reads into the variable (many: in order). When nothing is left to read, the loop ends. In C++: while (cin >> a) or while (cin >> a >> b). Use it when the input goes "until end of file".')}</span>
+            </>
+          )}
           {f.radio == 'cfor' && <ForEditor f={f} set={set} helper={helper} />}
           {f.radio == 'pyfor' && <PyForEditor f={f} set={set} />}
           <div id="while_div" style={{ display: f.showWhile ? 'block' : 'none' }}>{' '}
@@ -966,7 +1006,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
             {codeInput}{' '}
             {f.showWhile && helper('code', f.code, v => set({ code: v }))}
           </div>{' '}
-          <div id="for_div" style={{ display: f.showWhile || f.radio == 'cfor' || f.radio == 'pyfor' ? 'none' : 'block' }}>{' '}
+          <div id="for_div" style={{ display: f.showWhile || f.radio == 'cfor' || f.radio == 'pyfor' || f.radio == 'eof' ? 'none' : 'block' }}>{' '}
             <p id="hint">{t('請輸入次數', 'How many times?')}</p>{' '}
             <input id="for_number" style={{ width: '80%' }} value={f.forNumber} onChange={e => set({ forNumber: e.target.value })} />{' '}
             {!f.showWhile && helper('for_number', f.forNumber, v => set({ forNumber: v }))}

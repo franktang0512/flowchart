@@ -60,6 +60,8 @@ export const COURSES: Course[] = [
     name: '生活中的演算法', nameEn: 'Algorithms in Everyday Life',
     target: 'cpp',
     units: [
+      // 不知道有幾筆：一直輸入到沒有資料（C++ 的 while (cin >> a)、Python 的 for line in sys.stdin）
+      { name: '輸入到檔案結束（EOF）', nameEn: 'Input until end of file (EOF)', questions: ['adv/eof1', 'adv/eof2'] },
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st_array', 'adv/st_basic', 'adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q_array', 'adv/q_basic', 'adv/q1', 'adv/q2'] },
       { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },
@@ -78,6 +80,7 @@ export const COURSES: Course[] = [
     name: '生活中的演算法（Python）', nameEn: 'Algorithms in Everyday Life (Python)',
     target: 'python',
     units: [
+      { name: '輸入到檔案結束（EOF）', nameEn: 'Input until end of file (EOF)', questions: ['adv/eof1', 'adv/eof2'] },
       // Python 的 list 本身就是 stack（append、pop），沒有另外的函式庫，所以只有一題基本操作
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['py/st_basic', 'py/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['py/q_array', 'py/q_basic', 'py/q1', 'adv/q2'] },

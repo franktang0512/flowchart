@@ -101,6 +101,9 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
     return code;
   };
 
+  /** 有「一直輸入到沒有資料」的迴圈：要 import sys */
+  let usesStdin = false;
+
   /** 讀一行變成某個變數的型別：int(input())、float(input())、input() */
   const readAs = (target: string, src = 'input()') => {
     const v = vars.get(target);
@@ -295,6 +298,23 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
         emit(depth, `while ${cond(s.cond, true)}:`);
         block(s.body, depth + 1);
         break;
+      // 一直輸入到沒有資料：sys.stdin 一行一行拿，拿完就停（文字要去掉最後的換行）
+      case 'eof':
+        usesStdin = true;
+        emit(depth, 'for line in sys.stdin:');
+        const many = splitArgs(s.target);
+        // 一行好幾個：a, b = map(int, line.split())
+        if (many.length > 1) {
+          const kinds = many.map(n => (vars.get(n)?.type == '文字' ? 'str' : vars.get(n)?.float ? 'float' : 'int'));
+          if (kinds.every(k => k == kinds[0])) emit(depth + 1, kinds[0] == 'str' ? `${many.join(', ')} = line.split()` : `${many.join(', ')} = map(${kinds[0]}, line.split())`);
+          else {
+            emit(depth + 1, `${many.join(', ')} = line.split()`);
+            many.forEach((n, k) => kinds[k] != 'str' && emit(depth + 1, `${n} = ${kinds[k]}(${n})`));
+          }
+        }
+        else emit(depth + 1, `${s.target} = ${readAs(s.target, vars.get(s.target)?.type == '文字' ? 'line.rstrip("\\n")' : 'line')}`);
+        stmts(s.body, depth + 1);
+        break;
       case 'call':
         emit(depth, `${s.name}(${s.args.map((a, k) => argCode(s.name, a, k)).join(', ')})`);
         break;
@@ -372,6 +392,7 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
     if (s.kind == 'input' && s.place == 'var') return splitArgs(s.target);
     if (s.kind == 'rect' && (s.action == '設為' || s.action == '建立')) return [s.target];
     if (s.kind == 'if') return [...assignedNames(s.yes), ...assignedNames(s.no)];
+    if (s.kind == 'eof') return [...splitArgs(s.target), ...assignedNames(s.body)];
     if (s.kind == 'repeat' || s.kind == 'until' || s.kind == 'for' || s.kind == 'range' || s.kind == 'each') return assignedNames(s.body);
     return [];
   });
@@ -419,7 +440,7 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
       case 'output': return inExpr(s.value);
       case 'if': return [...inExpr(s.cond), ...callsOf(s.yes), ...callsOf(s.no)];
       case 'until': return [...inExpr(s.cond), ...callsOf(s.body)];
-      case 'repeat': case 'for': case 'range': case 'each': return callsOf(s.body);
+      case 'repeat': case 'for': case 'range': case 'each': case 'eof': return callsOf(s.body);
       default: return [];
     }
   });
@@ -437,7 +458,7 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
   });
 
   const head: string[] = [];
-  if (options.fastInput || recursive) head.push('import sys');
+  if (options.fastInput || recursive || usesStdin) head.push('import sys');
   if (uses.deque) head.push('from collections import deque');
   if (uses.heapq) head.push('from heapq import heappush, heappop');
   if (uses.math) head.push('import math');

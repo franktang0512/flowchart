@@ -20,7 +20,7 @@
 import { t } from '../i18n';
 import { getTarget, indexBase, isCode, isPython } from '../target';
 import type { Diagram } from './diagram';
-import { displayLinkText, displayNodeText, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget } from './labels';
+import { displayLinkText, displayNodeText, eofVar, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget } from './labels';
 import { cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
@@ -2202,61 +2202,7 @@ class CodeGenerator {
         else if (parts[0].includes('輸入')) {
           const v = parts.slice(1).join(' ').trim();
           if (!v) this.fail(label(node) + t(' 沒有寫要存到哪個變數。', ' needs a variable name.'), node);
-          this.checkLoopVarChange(node, v);
-          const name = JSON.stringify(v);
-          const item = listItemTarget(v);
-          const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
-          const cell = splitTarget(v);
-          const field = splitField(v);
-          const scoped = scopedName(v);
-          // 輸入 ::a：全域的 a
-          if (scoped != null) {
-            const g = this.vars.globalVars;
-            const conv = (g?.longs ?? []).includes(scoped) ? '__long' : (g?.floats ?? []).includes(scoped) ? '__num' : '__int';
-            code = g?.type_var_list.text.includes(scoped)
-              ? `__GL[${JSON.stringify(scoped)}] = __inText(input_list, ${i}, ${name});\n`
-              : `__GL[${JSON.stringify(scoped)}] = ${conv}(__inNum(input_list, ${i}, ${name}), ${i}, ${name});\n`;
-          }
-          // 輸入 e.from、輸入 edges[i].w：照欄位的型別讀
-          else if (field) {
-            const f = fieldOf(parseExpr(v) as Expr & { t: 'field' }, varInfoMap(this.vars));
-            const read = f?.type == '文字' ? '__inText' : `${getTarget() == 'cpp' && f && !f.float ? 'Math.trunc' : ''}(__inNum`;
-            code = `${expr(field.base)}.${field.field} = ${read}(input_list, ${i}, ${name})${f?.type == '文字' ? '' : ')'};\n`;
-          }
-          // 輸入 表[a][b]：二維清單的一格
-          else if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
-            const g = JSON.stringify(cell.name);
-            const read = this.gridHoldsText(cell.name) ? '__inText' : '__inNum';
-            code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${this.item(cell.name, `${read}(input_list, ${i}, ${g})`, i)});\n`;
-          }
-          // 輸入 成績 插入第 k 項：跟計算積木的「插入」一樣，k 可以是 1 到 長度+1
-          else if (insert) {
-            const list = insert[1].trim();
-            const listName = JSON.stringify(list);
-            code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), ${this.item(list, `${this.listReader(list)}(input_list, ${i}, ${listName})`, i)});\n`;
-          }
-          // 輸入 m[k]：map 的一格（照值的型別讀）
-          else if (item && this.isMap(item.list)) {
-            const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(item.list)];
-            const read = mapParts(holds).value == '文字' ? '__inText' : '__inNum';
-            code = this.assign(v, `${read}(input_list, ${i}, ${name})`, i);
-          }
-          // 輸入 成績[k]：替換第 k 項，跟計算積木一樣從第 1 項開始，超出範圍會提示
-          else if (item && this.isVar(item.list)) {
-            const list = JSON.stringify(item.list);
-            code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), ${this.item(item.list, `${this.listReader(item.list)}(input_list, ${i}, ${list})`, i)});\n`;
-          }
-          else if (this.isFixed(v)) {
-            this.fail(t(`${label(node)}：「${v}」是 array，大小是固定的，不能把值加到最後面。請雙擊積木，選要存到第幾格（索引）。`, `${label(node)}: "${v}" is an array with a fixed size. You cannot add to the end. Double-click the block and choose an index.`), node);
-          }
-          // set：放進去（不重複）；priority_queue：放到排好的位置
-          else if (this.containerKind(v) == 'set') code = `__sins(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
-          else if (this.containerKind(v) == 'pq') code = `__pqpush(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)}, ${this.vars.type_var_list.pqMin.includes(v)});\n`;
-          // stack、queue：輸入的值 push 進去
-          else if (this.isList(v) || this.containerKind(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
-          else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
-          // C++ 的 int：讀到小數時小數去掉
-          else code = `${v} = ${this.isIntVar(v) ? `${this.numConv(v)}(` : '('}__inNum(input_list, ${i}, ${name})${this.isIntVar(v) ? `, ${i}, ${name}` : ''});\n`;
+          code = this.cppInput(node, v, i);
         }
         else {
           const what = parts.slice(1).join(' ').trim();
@@ -2305,6 +2251,19 @@ class CodeGenerator {
         return { code, next: l.next };
       }
       case 'While_Loop': {
+        // 一直輸入到沒有資料：還有資料就讀一筆、做一輪；測資用完就離開（C++ 的 while (cin >> a)）
+        const ev = eofVar(node.text);
+        if (ev != null) {
+          if (!isCode()) this.fail(t(`${label(node)}：「一直輸入到沒有資料」只有 C++、Python 能用。`, `${label(node)}: "Input until there is no more data" works only in C++ and Python.`), node);
+          // Python 一次讀一行（一行可以有好幾個值）；C++ 一個一個讀，讀到一半沒資料了也是離開（cin >> a >> b 讀不到 b 是 false）
+          const reads = this.py ? [this.pyInput(node, ev, i)] : splitArgs(ev).map(v => this.cppInput(node, v, i));
+          reads.forEach(r => this.checkSyntax(node, r));
+          let code = 'while(true){\n' + reads.map(r => 'if(__NO_INPUT || !input_list.length) break;\n' + r).join('') + 'total_step ++;' + update;
+          const l = this.loop(node, '假', '真');
+          code += `if(--__loopTrap < 0) __err('tooManyLoops', ${i}, {});\n` + l.code + '\n}\n';
+          code += 'total_step ++;' + update;
+          return { code, next: l.next };
+        }
         const cond = expr(node.text, true);
         this.checkSyntax(node, 'return (' + cond + ');');
         let code = 'while(!(' + cond + ')){\ntotal_step ++;' + update;
@@ -2448,6 +2407,72 @@ class CodeGenerator {
     const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(name)];
     if (findStruct(holds)) return null;
     return holds == '文字' ? 'str' : holds == '小數' ? 'float' : 'int';
+  }
+
+  /** C++ 和積木的「輸入」：讀一筆存進 v（變數、清單的一項、二維清單的一格、struct 的欄位⋯）；回傳 JavaScript */
+  private cppInput(node: FlowNode, v: string, i: number): string {
+    const expr = (text: string) => {
+      const js = this.expr(text, i, false);
+      if (FUNC_CALL(i).test(js)) this.funcHelpers.add(i);
+      return js;
+    };
+    let code: string;
+    this.checkLoopVarChange(node, v);
+    const name = JSON.stringify(v);
+    const item = listItemTarget(v);
+    const insert = /^(.*?) 插入第 (.*) 項$/s.exec(v);
+    const cell = splitTarget(v);
+    const field = splitField(v);
+    const scoped = scopedName(v);
+    // 輸入 ::a：全域的 a
+    if (scoped != null) {
+      const g = this.vars.globalVars;
+      const conv = (g?.longs ?? []).includes(scoped) ? '__long' : (g?.floats ?? []).includes(scoped) ? '__num' : '__int';
+      code = g?.type_var_list.text.includes(scoped)
+        ? `__GL[${JSON.stringify(scoped)}] = __inText(input_list, ${i}, ${name});\n`
+        : `__GL[${JSON.stringify(scoped)}] = ${conv}(__inNum(input_list, ${i}, ${name}), ${i}, ${name});\n`;
+    }
+    // 輸入 e.from、輸入 edges[i].w：照欄位的型別讀
+    else if (field) {
+      const f = fieldOf(parseExpr(v) as Expr & { t: 'field' }, varInfoMap(this.vars));
+      const read = f?.type == '文字' ? '__inText' : `${getTarget() == 'cpp' && f && !f.float ? 'Math.trunc' : ''}(__inNum`;
+      code = `${expr(field.base)}.${field.field} = ${read}(input_list, ${i}, ${name})${f?.type == '文字' ? '' : ')'};\n`;
+    }
+    // 輸入 表[a][b]：二維清單的一格
+    else if (cell && cell.indexes.length == 2 && this.isVar(cell.name)) {
+      const g = JSON.stringify(cell.name);
+      const read = this.gridHoldsText(cell.name) ? '__inText' : '__inNum';
+      code = `__set2(${cell.name}, ${g}, ${i}, (${expr(cell.indexes[0])}), (${expr(cell.indexes[1])}), ${this.item(cell.name, `${read}(input_list, ${i}, ${g})`, i)});\n`;
+    }
+    // 輸入 成績 插入第 k 項：跟計算積木的「插入」一樣，k 可以是 1 到 長度+1
+    else if (insert) {
+      const list = insert[1].trim();
+      const listName = JSON.stringify(list);
+      code = `__insert(${list}, ${listName}, ${i}, (${expr(insert[2])}), ${this.item(list, `${this.listReader(list)}(input_list, ${i}, ${listName})`, i)});\n`;
+    }
+    // 輸入 m[k]：map 的一格（照值的型別讀）
+    else if (item && this.isMap(item.list)) {
+      const holds = this.vars.var_list.value[this.vars.var_list.name.indexOf(item.list)];
+      const read = mapParts(holds).value == '文字' ? '__inText' : '__inNum';
+      code = this.assign(v, `${read}(input_list, ${i}, ${name})`, i);
+    }
+    // 輸入 成績[k]：替換第 k 項，跟計算積木一樣從第 1 項開始，超出範圍會提示
+    else if (item && this.isVar(item.list)) {
+      const list = JSON.stringify(item.list);
+      code = `__set(${item.list}, ${list}, ${i}, (${expr(item.index)}), ${this.item(item.list, `${this.listReader(item.list)}(input_list, ${i}, ${list})`, i)});\n`;
+    }
+    else if (this.isFixed(v)) {
+      this.fail(t(`${label(node)}：「${v}」是 array，大小是固定的，不能把值加到最後面。請雙擊積木，選要存到第幾格（索引）。`, `${label(node)}: "${v}" is an array with a fixed size. You cannot add to the end. Double-click the block and choose an index.`), node);
+    }
+    // set：放進去（不重複）；priority_queue：放到排好的位置
+    else if (this.containerKind(v) == 'set') code = `__sins(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
+    else if (this.containerKind(v) == 'pq') code = `__pqpush(${v}, ${name}, ${i}, ${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)}, ${this.vars.type_var_list.pqMin.includes(v)});\n`;
+    // stack、queue：輸入的值 push 進去
+    else if (this.isList(v) || this.containerKind(v)) code = `${v}.push(${this.item(v, `${this.listReader(v)}(input_list, ${i}, ${name})`, i)});\n`;
+    else if (this.vars.type_var_list.text.includes(v)) code = `${v} = __inText(input_list, ${i}, ${name});\n`;
+    // C++ 的 int：讀到小數時小數去掉
+    else code = `${v} = ${this.isIntVar(v) ? `${this.numConv(v)}(` : '('}__inNum(input_list, ${i}, ${name})${this.isIntVar(v) ? `, ${i}, ${name}` : ''});\n`;
+    return code;
   }
 
   /**
@@ -2829,6 +2854,8 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   // 測資的輸入放在外面，主程式和模組都讀同一份；__depth 是模組執行自己的層數
   let code = `var total_step = 0;\nvar output_result = "";\nvar step_list = {step: [], var: [], output: [], stack: []};\nvar __loopTrap = ${MAX_LOOPS};\nvar __depth = 0;\nvar __stack = [];\nvar __frames = [];\n`;
   code += 'var input_list = ' + JSON.stringify(input_list) + ';\n';
+  // Python：測資完全空白時 input_list 是 ['']（一行空的），但真的 sys.stdin 什麼都沒有：「一直輸入到沒有資料」一圈都不跑
+  code += 'var __NO_INPUT = ' + (isPython() && input_list.length == 1 && input_list[0] == '') + ';\n';
   const fixedNames = [...vars.type_var_list.fixed, ...(gv?.type_var_list.fixed ?? []), ...modules.flatMap(m => (m.info.locals ?? []).filter(v => v.type == '陣列').map(v => v.name.trim()))];
   code += 'var __FIXED = ' + JSON.stringify(Object.fromEntries(fixedNames.map(n => [n, true]))) + ';\n';
   // 大小在流程圖中建立的 array

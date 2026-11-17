@@ -7,11 +7,12 @@ import { createConnectors } from './connector';
 import { getCodeVar, type VarStore } from './decoder';
 import type { Diagram } from './diagram';
 import type { FigureName } from './figures';
-import { sortKeysText } from './labels';
+import { eofText, sortKeysText } from './labels';
 import type { Point } from './link';
 import { callText } from './modules';
 import type { FlowNode } from './node';
-import type { Expr, Stmt } from './structure';
+import { PY_NAME, type Expr, type Stmt } from './structure';
+import { isPython } from '../target';
 
 const GAP_Y = 50;
 const GAP_X = 60;
@@ -55,7 +56,8 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
     case 'not': return wrap(`not ${exprText(e.a, cond, 7)}`, 2.5, parent);
     case 'call': {
-      const name = { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min', chr: 'char', toupper: 'toupper', tolower: 'tolower', isdigit: 'isdigit', isalpha: 'isalpha', isupper: 'isupper', islower: 'islower', float: 'float', abs: 'abs', sum: 'sum', ord: 'ord', round: 'round' }[e.fn];
+      // Python 照 Python 的寫法（str( )、int( )、len( )），不然套用回流程圖後 str(n) 會變成 to_string(n)
+      const name = (isPython() ? PY_NAME[e.fn] : undefined) ?? { len: '長度', find: '項目編號', has: '包含', stoi: 'stoi', tostr: 'to_string', max: 'max', min: 'min', chr: 'char', toupper: 'toupper', tolower: 'tolower', isdigit: 'isdigit', isalpha: 'isalpha', isupper: 'isupper', islower: 'islower', float: 'float', abs: 'abs', sum: 'sum', ord: 'ord', round: 'round' }[e.fn];
       return `${name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     }
     case 'bin': {
@@ -133,6 +135,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
         return { kind: 'loop', loop: node(`${exprText(s.times)}次`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
       case 'until':
         return { kind: 'loop', loop: node(exprText(s.cond, true), 'While_Loop'), body: items(s.body), enter: '假', exit: '真' };
+      case 'eof':
+        return { kind: 'loop', loop: node(eofText(s.target), 'While_Loop'), body: items(s.body), enter: '假', exit: '真' };
       case 'call':
         return { kind: 'node', node: node(callText(s.name, s.args.map(a => exprText(a))), 'Function') };
       case 'return':

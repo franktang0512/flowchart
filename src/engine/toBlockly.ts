@@ -218,7 +218,9 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       }
       // Python 的 for（積木用不到，只是寫完整）：當成重複幾次
       case 'range':
-      case 'each': {
+      case 'each':
+      // 一直輸入到沒有資料（只有 C++、Python 有，積木不會走到這裡）
+      case 'eof': {
         const body = chain(s.body);
         return [{ type: scratch ? 'scratch_repeat_ext' : 'controls_repeat_ext', inputs: { TIMES: input(literal('', true)), ...(body ? { DO: input(body) } : {}) } }];
       }

@@ -1,7 +1,7 @@
 // 「看程式」：流程圖的結構 → C++（學習目標是 C++ 時，清單的索引從 0 開始，所以位置直接照抄）。
 // 給學生看「流程圖怎麼變成程式」，以好讀為主：型別照第三步學生選的 int / float / string，清單用 vector。
 import { t } from '../i18n';
-import { cppType, elemCppType, mapKeyCppType, mapParts } from './modules';
+import { cppType, elemCppType, mapKeyCppType, mapParts, splitArgs } from './modules';
 import { CHAR_TESTS, exprType, fieldOf, isContainerType, parseExpr, type Expr, type ExprType, type ModuleProgram, type Stmt, type VarInfo } from './structure';
 import { fieldCppType, findStruct, getStructs, isPair } from './structs';
 
@@ -400,6 +400,12 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         break;
       case 'until':
         emit(depth, `while (${cond(s.cond, true)}) {`);
+        stmts(s.body, depth + 1);
+        emit(depth, '}');
+        break;
+      // 一直輸入到沒有資料：cin 讀不到時是 false，迴圈就停
+      case 'eof':
+        emit(depth, `while (cin >> ${splitArgs(s.target).join(' >> ')}) {`);
         stmts(s.body, depth + 1);
         emit(depth, '}');
         break;

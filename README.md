@@ -20,11 +20,12 @@
 - [Python 可以用的功能](#python-可以用的功能)
 - [APCS 實作題](#apcs-實作題)
 - [出題](#出題)
+- [解答](#解答)
 - [開發](#開發)
 
 ## 學習目標
 
-首頁先選學習目標（或網址加 `?target=scratch`、`blockly`、`cpp`、`python`）。四種的積木操作一樣，可以用的型別和寫法照那個語言的規則：
+首頁先選學習目標（或網址加 `?target=scratch`、`blockly`、`cpp`、`python`，見[網址](#網址)）。四種的積木操作一樣，可以用的型別和寫法照那個語言的規則：
 
 | | Scratch | Blockly | C++ | Python |
 | --- | --- | --- | --- | --- |
@@ -32,7 +33,9 @@
 | 變數型別 | 數字、文字、清單 | 數字、文字、清單 | int、float、string、vector、stack… | int、float、str、list、deque… |
 | 看程式 | Scratch 積木 | Blockly 積木 | C++ 程式碼 | Python 程式碼 |
 | 模組 | 自訂積木，不能回傳 | 函式，可以回傳 | 函式，可以回傳 | 函式，可以回傳 |
+| 模組在畫面上叫 | 模組 | 模組 | 模組/函式 | 模組/函式 |
 | 輸入 | 一次讀一個值 | 一次讀一個值 | 一次讀一個值 | 一次讀一整行 |
+| 輸入到檔案結束 | 沒有 | 沒有 | `while (cin >> a)` | `for line in sys.stdin:` |
 
 題目和單元名稱也會照學習目標換說法：積木說「清單」、C++ 說「陣列」「vector」、Python 說「list」。
 
@@ -43,7 +46,7 @@
 | 課程 | 學習目標 | 內容 |
 | --- | --- | --- |
 | 生活中的解題 | 都可以 | 輸入輸出、判斷、迴圈、清單、排序、搜尋 |
-| 生活中的演算法 | C++ | stack、queue、排序、搜尋、窮舉、貪心、動態規劃、樹、圖 |
+| 生活中的演算法 | C++ | 輸入到檔案結束（EOF）、stack、queue、排序、搜尋、窮舉、貪心、動態規劃、樹、圖 |
 | 生活中的演算法（Python） | Python | 同上，題目改成 Python 的說法、輸入照行排 |
 | 清單 | Scratch、Blockly | 清單的操作、清單搭配迴圈、插入刪除、文字 |
 | 信義國中 114 上學期、暖暖高中、113 上學期、題庫 | 都可以 | 各學校的課程題目 |
@@ -53,6 +56,8 @@
 ## 操作
 
 - **畫積木**：點工具再點畫布，或直接從左邊的工具列拖進畫布。
+- **變數加減**：計算積木選「變數」→「改變（加多少）」，填 1 就是加 1、填 -1 就是減 1（Scratch 的「變數改變」、Blockly 的「將變數的值加」）。
+- **一直輸入到沒有資料**（C++、Python）：迴圈積木選「一直輸入到沒有資料」，每一輪先讀一筆存進變數（可以一次讀好幾個），測資讀完就離開迴圈；積木上顯示「輸入 a（沒有資料了？）」，「真」離開、「假」進到迴圈裡。題目沒先給筆數、要讀到檔案結束時用。
 - **縮放**：第三步、第四步的畫布右下角有「－ / 比例 / ＋」（30%～200%）；第三步也可以按住 Ctrl 滾動滑鼠滾輪。
 - **第四步**：只能看、不能改，可以拖曳畫布；正在執行的積木跑出畫面會自動移過去。
 - **執行時的檢查**：型別不對、清單超出範圍等錯誤會說明原因並標出積木；出錯前的每一步都還看得到。
@@ -95,13 +100,15 @@
 | struct、pair | `e.from`、`edges[i].w`、`q.front().w`、`pq.top().second`；一整筆寫成 `{x, y}`，例如 `q.push({x, y})` |
 | 二維 vector 的列 | `g[u].size()`、`g[u].empty()`、`g[u].push_back(v)` |
 | 整數除法 | `int / int` 跟 C++ 一樣去掉小數 |
+| 輸入到檔案結束 | `while (cin >> a)`、`while (cin >> a >> b)`：讀到一半沒資料了也是離開 |
+| 判斷接判斷 | 「否則」裡面只有另一個判斷時，寫成 `else if` |
 
 ### 限制
 
 - `map`、`set` 只能整個輸出，不能用 for 一個一個看；沒有 `begin()`、`find()`、`lower_bound()`。
 - 型別轉換只有 `char(x)`，沒有 `(char)x`。
 - `set`、`priority_queue` 不能裝自己定義的 struct（可以裝 pair）。
-- 沒有「讀到輸入結束」（`while (cin >> x)`），題目要先給筆數。
+- 「一直輸入到沒有資料」只能讀進數字、文字變數；要存進 vector，迴圈裡再 `push_back`（`while (cin >> a[i])` 用 for 就好，不做）。
 - `::a` 只能用在全域的數字、文字變數。
 - struct 不能當模組的參數或回傳值、不能巢狀、不能整筆輸出或比大小。
 - 模組的參數只能是數字、文字；要用陣列、圖，請勾成全域變數。
@@ -138,6 +145,8 @@
 | 字串 | `s[i]`、`s[-1]`、`s[a:b]`、`s[::-1]`、`upper`、`lower`、`strip`、`replace`、`split`、`find`、`count`、`isdigit`、`isalpha`、`startswith`…、`"-" * 10`；文字和數字不能直接 `+`（要先 `str( )`） |
 | for 迴圈 | `for i in range(n)`、`range(a, b)`、`range(a, b, -1)`、`for x in a`（list、字串、set、dict 的鍵） |
 | 輸入 | 一個輸入積木讀一整行：變數（`int(input())`）、一行讀好幾個變數（`a, b = map(int, input().split())`）、一行照空白切開存進 list、二維 list 加一列、list / dict 的一格 |
+| 輸入到檔案結束 | `for line in sys.stdin:`，下一行是 `a = int(line)`；一行好幾個是 `a, b = map(int, line.split())`；測資完全空白時一圈都不跑 |
+| 判斷接判斷 | 「否則」裡面只有另一個判斷時，寫成 `elif` |
 | 輸出 | 「輸出 a, b」用空白隔開；整個 list 是 `print(*a)`；勾「不換行」是 `print(..., end=" ")`；什麼都不填是 `print()` |
 | 排序 | `a.sort()`、`reverse=True`；可以填 key：`a.sort(key=lambda x: len(x))` |
 | 模組 | 寫成 `def`；看得到主流程的變數，改到時會寫 `global`；有遞迴時自動加 `sys.setrecursionlimit`（流程圖最多 3000 層） |
@@ -158,7 +167,7 @@
 
 | 題目程度 | 常見題型 | 現在 |
 | --- | --- | --- |
-| 第 1、2 題 | 輸入輸出、判斷、迴圈、陣列統計、找最大最小、排序 | 可以 |
+| 第 1、2 題 | 輸入輸出、判斷、迴圈、陣列統計、找最大最小、排序、讀到檔案結束 | 可以 |
 | 第 3 題 | 二維陣列、字串、字元、遞迴、排序、二分搜尋、前綴和、簡單 DP | 可以 |
 | 第 4 題 | BFS / DFS、最短路徑、貪心、較難的 DP | 可以，但流程圖會很長，比較適合上課帶學生走一次原理 |
 
@@ -188,6 +197,19 @@
   - Python：`list`、`2d_list`、`deque`、`heapq`、`set`、`dict`、`tuple`
 - **單元名稱照學習目標換**：在 `courses.ts` 的單元加 `byTarget`，例如 `byTarget: { cpp: { name: '陣列與 vector', nameEn: 'Arrays and vectors' } }`。
 
+## 解答
+
+老師用的參考解答放在 [solutions/](solutions/)，都是作品檔（`.json`），「檔案 → 匯入作品資料」就能看，第四步可以直接跑測資。目錄和每一題的解法見 [solutions/README.md](solutions/README.md)。
+
+```
+solutions/
+  課程代號/            跟網址 ?course= 一樣，例如 life、adv
+    學習目標/          cpp、python、scratch、blockly
+      序號_題目名稱.json  序號是題目在課程裡的順序
+```
+
+目前有「生活中的解題」和「生活中的演算法」的 C++ 解答。**repo 是公開的話，學生在 GitHub 上看得到這個資料夾**（網站本身不會放這些檔案）。
+
 ## 開發
 
 ```bash
@@ -206,6 +228,19 @@ npm run build      # 輸出到 dist/，整個資料夾放到任何靜態網站�
 | `?course=114` | 這門課的題目（依單元分組） |
 | `?w=114&h=3` | 學習單，載入 `src/questions/114/3.json` |
 | `?w=114&h=3&target=cpp` | 直接指定學習目標（`scratch`、`blockly`、`cpp`、`python`），學生就不用選 |
+| `?course=adv&target=cpp` | 題目清單也可以加 `target`，學生從清單點進每一題都是 C++ |
+| `?course=adv&target=cpp&lang=en` | 再加 `lang=en`：介面和題目用英文 |
+
+給學生的連結加 `target` 就好：打開後同一個分頁會記住學習目標，在課程之間切換不用再選；開新分頁（例如 Ctrl + 點連結）會再問一次。
+
+上課用的例子：
+
+| 給學生的網址後面加 | 打開的是 |
+| --- | --- |
+| `?course=adv&target=cpp` | 「生活中的演算法」題目清單（C++） |
+| `?course=py&target=python` | 「生活中的演算法（Python）」題目清單 |
+| `?w=adv&h=eof1&target=cpp` | 直接打開「便利商店結帳」（C++） |
+| `?w=life&h=w1&target=scratch` | 直接打開「存錢買遊戲機」（Scratch） |
 
 ### 程式結構
 
@@ -230,3 +265,5 @@ npm run build      # 輸出到 dist/，整個資料夾放到任何靜態網站�
 | `src/engine/structs.ts` | struct 的定義、內建的 pair |
 | `src/pdf.ts` | 交作業：列印畫面直接存成 PDF |
 | `src/workFile.ts` | 尚未完成作品的存檔格式、匯出、匯入 |
+| `src/engine/toFlowchart.ts` | 「看程式」的編輯模式：改過的積木畫回流程圖（自動排版） |
+| `solutions/` | 老師用的參考解答（見[解答](#解答)） |

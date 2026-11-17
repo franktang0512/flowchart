@@ -1,0 +1,44 @@
+{
+  "title": "便利商店結帳",
+  "question": "店員把客人的商品一件一件刷條碼，每刷一件就輸入它的價格（一行一個），刷完就沒有資料了。不知道客人買了幾件，請一直輸入到沒有資料為止，輸出「共 幾 件」和「總共 幾 元」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "35\n20\n15",
+      "output": "共 3 件\n總共 70 元",
+      "note": "35 + 20 + 15 = 70"
+    },
+    {
+      "input": "120",
+      "output": "共 1 件\n總共 120 元",
+      "note": "只買一件"
+    },
+    {
+      "input": "10\n10\n10\n10\n5",
+      "output": "共 5 件\n總共 45 元",
+      "note": "題目沒有先說有幾件，要讀到沒有資料才知道"
+    }
+  ],
+  "en": {
+    "title": "Checkout",
+    "question": "The cashier scans a customer's items one by one and inputs each price (one per line). When scanning is done, there is no more data. You do not know how many items there are, so keep reading until there is no more data. Output \"Items: n\" and \"Total: x dollars\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "35\n20\n15",
+        "output": "Items: 3\nTotal: 70 dollars",
+        "note": "35 + 20 + 15 = 70"
+      },
+      {
+        "input": "120",
+        "output": "Items: 1\nTotal: 120 dollars",
+        "note": "Only one item"
+      },
+      {
+        "input": "10\n10\n10\n10\n5",
+        "output": "Items: 5\nTotal: 45 dollars",
+        "note": "The input does not say how many; read until there is no more data"
+      }
+    ]
+  }
+}

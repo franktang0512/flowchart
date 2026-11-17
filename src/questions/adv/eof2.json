@@ -1,0 +1,44 @@
+{
+  "title": "找出不及格的同學",
+  "question": "老師把成績一行一行輸入，每一行是一位同學的座號和分數（例如 2 48），輸入到沒有資料為止。請依序輸出不及格（60 分以下）同學的座號，一個一行，最後輸出「共 幾 人不及格」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1 75\n2 48\n3 90\n4 59",
+      "output": "2\n4\n共 2 人不及格",
+      "note": "2 號 48 分、4 號 59 分不及格"
+    },
+    {
+      "input": "7 100",
+      "output": "共 0 人不及格",
+      "note": "只有一位同學，而且及格"
+    },
+    {
+      "input": "5 30\n6 20\n8 60",
+      "output": "5\n6\n共 2 人不及格",
+      "note": "60 分是及格"
+    }
+  ],
+  "en": {
+    "title": "Who Failed?",
+    "question": "The teacher inputs scores line by line. Each line has a student's number and score (like 2 48). Keep reading until there is no more data. Output the numbers of students who failed (below 60), one per line, in order. Then output \"Failed: k\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1 75\n2 48\n3 90\n4 59",
+        "output": "2\n4\nFailed: 2",
+        "note": "No. 2 (48) and No. 4 (59) failed"
+      },
+      {
+        "input": "7 100",
+        "output": "Failed: 0",
+        "note": "Only one student, and they passed"
+      },
+      {
+        "input": "5 30\n6 20\n8 60",
+        "output": "5\n6\nFailed: 2",
+        "note": "60 is a pass"
+      }
+    ]
+  }
+}

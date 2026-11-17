@@ -154,7 +154,7 @@ function changedParam(mods: ModuleProgram[]): { module: string; param: string } 
       for (const s of list) {
         if (s.kind == 'input' && s.place == 'var' && names.has(s.target)) return s.target;
         if (s.kind == 'rect' && s.action == '設為' && s.index == undefined && names.has(s.target)) return s.target;
-        const inner = s.kind == 'if' ? find(s.yes) ?? find(s.no) : s.kind == 'repeat' || s.kind == 'until' ? find(s.body) : null;
+        const inner = s.kind == 'if' ? find(s.yes) ?? find(s.no) : s.kind == 'repeat' || s.kind == 'until' || s.kind == 'eof' ? find(s.body) : null;
         if (inner) return inner;
       }
       return null;

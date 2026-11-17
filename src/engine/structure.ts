@@ -4,7 +4,7 @@
 import { t } from '../i18n';
 import type { Diagram } from './diagram';
 import { FlowError, tokenize, type Token } from './decoder';
-import { parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget, type RectAction, type SortKey } from './labels';
+import { eofVar, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget, type RectAction, type SortKey } from './labels';
 import { mapParts, parseCall, splitArgs, type ModuleInfo, type ModuleSource } from './modules';
 import { findStruct, type StructField } from './structs';
 import { getTarget, isPython } from '../target';
@@ -39,6 +39,8 @@ export type Stmt =
   | { kind: 'continue' }
   /** 條件迴圈：重複直到條件成立 */
   | { kind: 'until'; cond: Expr; body: Stmt[] }
+  /** 一直輸入到沒有資料：每一輪先讀一筆存進 target，讀不到就離開（C++ 的 while (cin >> a)） */
+  | { kind: 'eof'; target: string; body: Stmt[] }
   /** 執行模組（見 modules.ts） */
   | { kind: 'call'; name: string; args: Expr[] }
   /** 模組回傳值（流程圖上後面直接接「結束」） */
@@ -176,6 +178,7 @@ export function structure(diagram: Diagram): Stmt[] {
           ? { kind: 'for', name: init.name, start: parseExpr(init.start), cond: parseExpr(header.cond), next: parseExpr(next), update: header.update, body }
           : n.figure == 'For_Loop'
           ? { kind: 'repeat', times: parseExpr(n.text.slice(0, -1)), body }
+          : eofVar(n.text) ? { kind: 'eof', target: eofVar(n.text)!, body }
           : { kind: 'until', cond: parseExpr(n.text), body };
         return { stmts: [stmt], next: exit };
       }

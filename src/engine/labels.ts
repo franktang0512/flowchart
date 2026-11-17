@@ -32,6 +32,17 @@ export function sortKeyExpr(spec: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+/**
+ * 「一直輸入到沒有資料」的條件迴圈（C++ 的 while (cin >> a)、Python 的 for line in sys.stdin）：
+ * 積木上存「輸入 a 讀不到」。每一輪先讀一筆存進 a；讀不到（測資用完）就是「真」，離開迴圈
+ */
+export const eofText = (v: string) => `輸入 ${v} 讀不到`;
+/** 「輸入 a 讀不到」→ a（一輪讀好幾個：「輸入 a, b 讀不到」→ "a, b"）；不是這種寫法回傳 null */
+export function eofVar(text: string): string | null {
+  const m = /^\s*輸入 (.+?) 讀不到\s*$/.exec(text);
+  return m ? m[1] : null;
+}
+
 /** 輸出積木最後的「(不換行)」：Python 的 print(..., end=" ") */
 export const NO_NEWLINE = ' (不換行)';
 /** 輸出的內容拆成要印的東西、要不要換行 */
@@ -245,12 +256,18 @@ export function displayNodeText(text: string, figure: FigureName): string {
   if (figure == 'Parallelogram') return ioLabel(text, getLang() == 'en');
   // 執行模組：跟 Scratch 的自訂積木一樣，積木上就是模組的名字和參數
   if (figure == 'Function') return text;
+  // 一直輸入到沒有資料：「輸入 a（沒有資料了？）」，真就離開
+  if (figure == 'While_Loop' && getLang() != 'en' && eofVar(text)) return `輸入 ${eofVar(text)}（沒有資料了？）`;
   if (getLang() != 'en') return text;
   switch (figure) {
     case 'Circle':
       return text == '開始' ? 'Start' : text == '結束' ? 'End' : text;
     case 'For_Loop':
       return text.endsWith('次') ? `repeat ${text.slice(0, -1)}` : text;
+    case 'While_Loop': {
+      const v = eofVar(text);
+      return v ? `Input ${v} (no more data?)` : text;
+    }
     default:
       return text;
   }

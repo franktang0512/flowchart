@@ -2,7 +2,7 @@
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
 import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
-import { NO_NEWLINE, parseSortKeys, sortKeyExpr, sortKeysText, splitOutput, splitRectangle, splitTarget } from './engine/labels';
+import { eofText, eofVar, NO_NEWLINE, parseSortKeys, sortKeyExpr, sortKeysText, splitOutput, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { forInit, forUpdate, parseExpr, pyFor, splitFor } from './engine/structure';
 import { isPython } from './target';
@@ -437,6 +437,10 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
     case 'Diamond':
       return checkVar(vars, f.code, true) && add(f.code, 'Diamond', getCodeVar(vars, f.code));
     case 'Loop':
+      if (f.radio == 'eof') {
+        const text = eofLoopText(f);
+        return text != null && add(text, 'While_Loop', getCodeVar(vars, text));
+      }
       if (f.radio == 'cfor' || f.radio == 'pyfor') {
         const text = f.radio == 'pyfor' ? pyForText(vars, f) : forText(vars, f);
         return text != null && add(text, 'For_Loop', getCodeVar(vars, text));
@@ -460,6 +464,27 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
     default:
       return false;
   }
+}
+
+/** 一直輸入到沒有資料的迴圈：「輸入 a 讀不到」；還沒選變數時提醒，回傳 null */
+function eofLoopText(f: DialogForm): string | null {
+  if (f.ioTarget == '多個') {
+    const names = f.ioMany.map(n => n.trim());
+    if (names.some(n => !n)) {
+      alert(t('每一格都要選一個變數（用不到的格子按 ✕ 拿掉）。', 'Choose a variable in every box (remove unused ones with ✕).'));
+      return null;
+    }
+    if (new Set(names).size != names.length) {
+      alert(t('同一個變數選了兩次：每一格要選不同的變數。', 'The same variable is chosen twice. Choose different variables.'));
+      return null;
+    }
+    return eofText(names.join(', '));
+  }
+  if (!f.varSelect) {
+    alert(t('請選每一輪要輸入到哪個變數。', 'Choose the variable to input into each round.'));
+    return null;
+  }
+  return eofText(f.varSelect);
 }
 
 /** 雙擊後修改積木 */
@@ -488,6 +513,14 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
       return done();
     case 'For_Loop':
     case 'While_Loop': {
+      if (f.radio == 'eof') {
+        const text = eofLoopText(f);
+        if (text == null) return false;
+        node.figure = 'While_Loop';
+        node.text = text;
+        node.variables = getCodeVar(vars, text);
+        return done();
+      }
       if (f.radio == 'cfor' || f.radio == 'pyfor') {
         const text = f.radio == 'pyfor' ? pyForText(vars, f) : forText(vars, f);
         if (text == null) return false;
@@ -599,8 +632,14 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       if (h) return { kind: 'For_Loop', initial: { radio: 'cfor', forInit: h.init, forCond: h.cond, forUpdate: h.update, showWhile: false } };
       return { kind: 'For_Loop', initial: { radio: 'for', forNumber: text.substring(0, text.length - 1), showWhile: false } };
     }
-    case 'While_Loop':
+    case 'While_Loop': {
+      const ev = eofVar(text);
+      if (ev != null) {
+        const many = splitArgs(ev);
+        return { kind: 'While_Loop', initial: many.length > 1 ? { radio: 'eof', ioTarget: '多個', ioMany: many, showWhile: false } : { radio: 'eof', ioTarget: '變數', varSelect: ev, showWhile: false } };
+      }
       return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
+    }
     case 'Rectangle': {
       const { target, action, index, index2, expr } = splitRectangle(text);
       if (action == '跳出' || action == '下一輪') return { kind: 'Rectangle', initial: { rectKind: '迴圈控制', rectAction: action } };
