@@ -1,7 +1,7 @@
 // 首頁：選學習目標（積木或 C++）→ 選課程 → 看這門課的題目 → 點題目進入學習單
 import { useEffect, useState } from 'react';
 import { LangToggle } from '../components/LangToggle';
-import { COURSES, courseFits, questionHref, unitName, type Course } from '../courses';
+import { COURSES, courseFits, questionHref, unitName, unitQuestions, type Course } from '../courses';
 import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
 import { getChosenTarget, setTarget, targetName, useTarget, type Target } from '../target';
@@ -32,7 +32,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const questionCount = (c: Course) => c.units.reduce((n, u) => n + u.questions.length, 0);
+const questionCount = (c: Course) => c.units.reduce((n, u) => n + unitQuestions(u).length, 0);
 const courseName = (c: { name: string; nameEn: string }) => t(c.name, c.nameEn);
 
 /** 學習目標的選項：名稱、說明、清單從哪裡開始；沒有 target 的是還在準備、先不能選的 */
@@ -143,7 +143,7 @@ export function QuestionList({ courseId }: { courseId: string }) {
 
   useEffect(() => {
     if (!course) return;
-    const paths = course.units.flatMap(u => u.questions);
+    const paths = course.units.flatMap(unitQuestions);
     Promise.all(paths.map(p => loadQuestionByPath(p).then(q => [p, q] as const)))
       .then(entries => setQuestions(Object.fromEntries(entries)));
   }, [courseId]);
@@ -170,7 +170,7 @@ export function QuestionList({ courseId }: { courseId: string }) {
         <div key={unit.name} className="home_unit">
           <h5>{courseName(unitName(unit))}</h5>
           <ol className="home_questions">
-            {unit.questions.map(p => {
+            {unitQuestions(unit).map(p => {
               no++;
               const q = questions[p];
               const title = q ? questionIn(q, lang).title : '';

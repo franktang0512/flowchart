@@ -2,7 +2,7 @@
 // 題目寫成 "資料夾/檔名"，對應 src/questions/資料夾/檔名.json，網址是 ?w=資料夾&h=檔名。
 // 要調整課程名稱、單元、題目順序、隱藏某題，都只要改這個檔案。
 import { link } from './i18n';
-import { getTarget, isBlocks, type Target } from './target';
+import { getTarget, isBlocks, isCode, type Target } from './target';
 
 export interface Unit {
   name: string;
@@ -10,7 +10,12 @@ export interface Unit {
   /** 依學習目標換名稱（例如積木叫「清單」、C++ 叫「陣列與 vector」、Python 叫「list」）；沒寫的用 name、nameEn */
   byTarget?: Partial<Record<Target, { name: string; nameEn: string }>>;
   questions: string[];
+  /** 只給 C++、Python 的題目（例如讀到檔案結束：Scratch、Blockly 沒有這種輸入） */
+  codeOnly?: string[];
 }
+
+/** 這個單元在目前的學習目標下有哪些題目 */
+export const unitQuestions = (u: Unit) => u.questions.filter(p => !u.codeOnly?.includes(p) || isCode());
 
 /** 單元在目前的學習目標下叫什麼 */
 export const unitName = (u: Unit) => u.byTarget?.[getTarget()] ?? u;
@@ -40,6 +45,11 @@ export const COURSES: Course[] = [
       { name: '巢狀條件', nameEn: 'If inside if', questions: ['life/if5'] },
       { name: '次數迴圈', nameEn: 'Repeat n times', questions: ['life/f1', 'life/f2', 'life/f3'] },
       { name: '條件迴圈', nameEn: 'Repeat until', questions: ['life/w1', 'life/w2', 'life/w3'] },
+      // 不知道有幾筆：先讀到 -1 為止（每種語言都可以），C++、Python 再讀到檔案結束（while (cin >> a)、for line in sys.stdin）
+      {
+        name: '讀到結束為止', nameEn: 'Read until the end',
+        byTarget: { cpp: { name: '讀到結束為止（-1、EOF）', nameEn: 'Read until the end (-1, EOF)' }, python: { name: '讀到結束為止（-1、EOF）', nameEn: 'Read until the end (-1, EOF)' } },
+        questions: ['life/end1', 'life/eof1', 'life/eof2'], codeOnly: ['life/eof1', 'life/eof2'] },
       { name: '巢狀迴圈', nameEn: 'Loop inside a loop', questions: ['life/n1', 'life/n2'] },
       // 每個單元先放「基本操作｜」的題目（看標題就知道在練什麼），後面才是有情境的題目；
       // 基本操作先用原生的做法（例如用 array 自己做 stack），再用函式庫
@@ -60,8 +70,6 @@ export const COURSES: Course[] = [
     name: '生活中的演算法', nameEn: 'Algorithms in Everyday Life',
     target: 'cpp',
     units: [
-      // 不知道有幾筆：一直輸入到沒有資料（C++ 的 while (cin >> a)、Python 的 for line in sys.stdin）
-      { name: '輸入到檔案結束（EOF）', nameEn: 'Input until end of file (EOF)', questions: ['adv/eof1', 'adv/eof2'] },
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st_array', 'adv/st_basic', 'adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q_array', 'adv/q_basic', 'adv/q1', 'adv/q2'] },
       { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },
@@ -80,7 +88,6 @@ export const COURSES: Course[] = [
     name: '生活中的演算法（Python）', nameEn: 'Algorithms in Everyday Life (Python)',
     target: 'python',
     units: [
-      { name: '輸入到檔案結束（EOF）', nameEn: 'Input until end of file (EOF)', questions: ['adv/eof1', 'adv/eof2'] },
       // Python 的 list 本身就是 stack（append、pop），沒有另外的函式庫，所以只有一題基本操作
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['py/st_basic', 'py/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['py/q_array', 'py/q_basic', 'py/q1', 'adv/q2'] },

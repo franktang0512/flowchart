@@ -1,0 +1,44 @@
+{
+  "title": "班級募款箱",
+  "question": "班上在募款，每位同學把錢投進募款箱，老師就輸入那位同學投了多少元（一行一個）。投完了，老師輸入 -1 代表結束（-1 不算錢）。請輸出「共 幾 人」和「總共 幾 元」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "50\n100\n20\n-1",
+      "output": "共 3 人\n總共 170 元",
+      "note": "50 + 100 + 20 = 170，-1 不算"
+    },
+    {
+      "input": "-1",
+      "output": "共 0 人\n總共 0 元",
+      "note": "一開始就輸入 -1：沒有人投錢"
+    },
+    {
+      "input": "10\n10\n10\n10\n-1",
+      "output": "共 4 人\n總共 40 元",
+      "note": "讀到 -1 才知道結束了"
+    }
+  ],
+  "en": {
+    "title": "Class Donation Box",
+    "question": "The class is collecting money. Each time a student puts money in the box, the teacher inputs how much (one per line). When everyone is done, the teacher inputs -1 to stop (-1 is not money). Output \"People: n\" and \"Total: x dollars\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "50\n100\n20\n-1",
+        "output": "People: 3\nTotal: 170 dollars",
+        "note": "50 + 100 + 20 = 170; -1 does not count"
+      },
+      {
+        "input": "-1",
+        "output": "People: 0\nTotal: 0 dollars",
+        "note": "-1 first: nobody gave money"
+      },
+      {
+        "input": "10\n10\n10\n10\n-1",
+        "output": "People: 4\nTotal: 40 dollars",
+        "note": "We only know it is over when we read -1"
+      }
+    ]
+  }
+}

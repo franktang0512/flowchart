@@ -45,8 +45,8 @@
 
 | 課程 | 學習目標 | 內容 |
 | --- | --- | --- |
-| 生活中的解題 | 都可以 | 輸入輸出、判斷、迴圈、清單、排序、搜尋 |
-| 生活中的演算法 | C++ | 輸入到檔案結束（EOF）、stack、queue、排序、搜尋、窮舉、貪心、動態規劃、樹、圖 |
+| 生活中的解題 | 都可以 | 輸入輸出、判斷、迴圈、讀到結束為止（-1；C++、Python 還有讀到檔案結束）、清單、排序、搜尋 |
+| 生活中的演算法 | C++ | stack、queue、排序、搜尋、窮舉、貪心、動態規劃、樹、圖 |
 | 生活中的演算法（Python） | Python | 同上，題目改成 Python 的說法、輸入照行排 |
 | 清單 | Scratch、Blockly | 清單的操作、清單搭配迴圈、插入刪除、文字 |
 | 信義國中 114 上學期、暖暖高中、113 上學期、題庫 | 都可以 | 各學校的課程題目 |
@@ -199,6 +199,7 @@
   - C++：`vector`、`2d_vector`、`array`、`stack`、`queue`、`priority_queue`、`priority_queue_min`（小的先）、`set`、`map`、`struct`（含 pair）
   - Python：`list`、`2d_list`、`deque`、`heapq`、`set`、`dict`、`tuple`
 - **單元名稱照學習目標換**：在 `courses.ts` 的單元加 `byTarget`，例如 `byTarget: { cpp: { name: '陣列與 vector', nameEn: 'Arrays and vectors' } }`。
+- **只給 C++、Python 的題目**：在單元加 `codeOnly`，例如讀到檔案結束的題目 `codeOnly: ['life/eof1', 'life/eof2']`，Scratch、Blockly 的題目清單就不會列出來。
 
 ## 解答
 
@@ -242,7 +243,7 @@ npm run build      # 輸出到 dist/，整個資料夾放到任何靜態網站�
 | --- | --- |
 | `?course=adv&target=cpp` | 「生活中的演算法」題目清單（C++） |
 | `?course=py&target=python` | 「生活中的演算法（Python）」題目清單 |
-| `?w=adv&h=eof1&target=cpp` | 直接打開「便利商店結帳」（C++） |
+| `?w=life&h=eof1&target=cpp` | 直接打開「便利商店結帳」（C++） |
 | `?w=life&h=w1&target=scratch` | 直接打開「存錢買遊戲機」（Scratch） |
 
 ### 程式結構

@@ -1,6 +1,6 @@
 {
   "title": "便利商店結帳",
-  "question": "店員把客人的商品一件一件刷條碼，每刷一件就輸入它的價格（一行一個），刷完就沒有資料了。不知道客人買了幾件，請一直輸入到沒有資料為止，輸出「共 幾 件」和「總共 幾 元」。",
+  "question": "店員把客人的商品一件一件刷條碼，每刷一件就輸入它的價格（一行一個）。跟「班級募款箱」不一樣：最後沒有 -1，刷完就沒有資料了。請一直輸入到沒有資料為止，輸出「共 幾 件」和「總共 幾 元」。",
   "array": [],
   "test_case": [
     {
@@ -21,7 +21,7 @@
   ],
   "en": {
     "title": "Checkout",
-    "question": "The cashier scans a customer's items one by one and inputs each price (one per line). When scanning is done, there is no more data. You do not know how many items there are, so keep reading until there is no more data. Output \"Items: n\" and \"Total: x dollars\".",
+    "question": "The cashier scans a customer's items one by one and inputs each price (one per line). Unlike \"Class Donation Box\", there is no -1 at the end: when scanning is done, there is no more data. Keep reading until there is no more data. Output \"Items: n\" and \"Total: x dollars\".",
     "array": [],
     "test_case": [
       {
