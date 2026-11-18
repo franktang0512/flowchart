@@ -1,6 +1,6 @@
 {
   "title": "族譜往上找",
-  "question": "族譜是一棵樹：每個人只有一個爸爸或媽媽在上一層。家族裡的人編號 0 到 n - 1，0 號是阿祖（第 1 代），他上面沒有人，記成 -1。\n請先輸入有幾個人，再依序輸入 0 號、1 號……每個人的上一代是幾號，最後輸入要查的人。從他開始一路往上走到阿祖，把經過的人一行一個輸出，最後輸出他是「第 幾 代」。",
+  "question": "族譜是一棵樹，跟「基本操作｜樹」一樣用 parent 記每個人的上一代。家族裡的人編號 0 到 n - 1，0 號是阿祖（第 1 代），他沒有上一代，記成 -1。\n先輸入有幾個人，再依序輸入 0 號、1 號……的上一代，最後輸入要查的人。\n從他開始一直往上找到阿祖，把經過的人一行一個輸出，最後輸出他是「第 幾 代」。",
   "array": [],
   "test_case": [
     {
@@ -21,7 +21,7 @@
   ],
   "en": {
     "title": "Family Tree",
-    "question": "A family tree is a tree: each person has one parent in the level above. People are numbered 0 to n - 1. Number 0 is the great-grandparent (generation 1). Nobody is above them, so we write -1.\nFirst input the number of people. Then input the parent of person 0, 1, and so on. Last, input the person to look up. Go up from that person to number 0. Output each person on the way, one per line. At the end, output \"Generation \" and the number.",
+    "question": "A family tree is a tree. Like in \"Basics | tree\", parent keeps the parent of each person. People are numbered 0 to n - 1. Number 0 is the great-grandparent (generation 1), who has no parent, so we write -1.\nFirst input the number of people, then the parent of person 0, 1, and so on. Last, input the person to look up.\nGo up from that person to number 0. Output each person on the way, one per line. At the end, output \"Generation \" and the number.",
     "array": [],
     "test_case": [
       {

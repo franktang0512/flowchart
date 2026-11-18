@@ -23,7 +23,7 @@ import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, eofVar, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget } from './labels';
 import { charInit, cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
-import { exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
+import { entriesInto, exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 import { allStructs, fieldCppType, fieldInit, findStruct, getStructs } from './structs';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -2404,8 +2404,8 @@ class CodeGenerator {
     return link ? this.nodes[link.to] ?? undefined : undefined;
   }
 
-  private linksInto(node: FlowNode | undefined) {
-    return this.diagram.links.filter(l => l && node && l.to == this.idx(node)).length;
+  private linksInto(node: FlowNode | undefined, from: FlowNode) {
+    return entriesInto(this.diagram, node, from);
   }
 
   /** Python 排序的 key=lambda x: …：x 是 list 的每一項（照 list 裝的東西決定型別） */
@@ -2698,7 +2698,7 @@ class CodeGenerator {
     let next = this.nextOf(node, pred);
     if (!next) this.fail(t(`判斷${label(node)} 少了「${name}」的箭頭。`, `The decision ${label(node)} needs a "${arrowName(name)}" arrow.`), node);
     let code = '';
-    let num = this.linksInto(next);
+    let num = this.linksInto(next, node);
     while (next && ((next.figure != 'Diamond' && num == 1) || (next.figure == 'Diamond' && num < 2))) {
       guard(this.counter);
       const r = this.toCode(next);
@@ -2706,7 +2706,7 @@ class CodeGenerator {
       if (r.jumps) return { code, next: undefined, jumps: true };
       if (!r.next && next.text != '結束') this.noNext(next);
       next = r.next;
-      num = this.linksInto(next);
+      num = this.linksInto(next, node);
     }
     return { code, next, jumps: false };
   }

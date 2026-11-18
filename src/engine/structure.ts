@@ -123,6 +123,31 @@ export function structureModules(modules: ModuleSource[]): ModuleProgram[] {
 
 const ROUND_OF: Record<string, string> = { '(取四捨五入)': 'Math.round', '(取無條件捨去)': 'Math.floor', '(取無條件進位)': 'Math.ceil' };
 
+/**
+ * 有幾條箭頭指進這個積木（判斷 from 的兩條路走到這裡就是匯合點）。
+ * 判斷在迴圈外面時，迴圈從自己裡面繞回來的箭頭不算，不然判斷的一邊放迴圈時，迴圈會被當成匯合點、跑到判斷外面；
+ * 判斷在迴圈裡面時，走回迴圈開頭就是這一圈做完了，照樣算。
+ */
+export function entriesInto(diagram: Diagram, n: FlowNode | undefined, from: FlowNode): number {
+  if (!n) return 0;
+  const nodes = diagram.nodes;
+  const at = nodes.indexOf(n);
+  const into = diagram.links.filter(l => l && l.to == at);
+  if (n.figure != 'For_Loop' && n.figure != 'While_Loop') return into.length;
+  // 迴圈裡面有哪些積木：從「進入迴圈／假」那條走，走到繞回迴圈為止
+  const start = diagram.links.find(l => l && l.from == at && (l.text.includes('進入迴圈') || l.text.includes('假')));
+  const body = new Set<number>();
+  const todo = start ? [start.to] : [];
+  while (todo.length) {
+    const i = todo.pop()!;
+    if (i == at || body.has(i) || !nodes[i] || nodes[i]!.text == '結束') continue;
+    body.add(i);
+    for (const l of diagram.links) if (l && l.from == i) todo.push(l.to);
+  }
+  if (body.has(nodes.indexOf(from))) return into.length;
+  return into.filter(l => l && !body.has(l.from)).length;
+}
+
 /** 把流程圖整理成結構；流程圖接得不完整時丟出 FlowError */
 export function structure(diagram: Diagram): Stmt[] {
   const nodes = diagram.nodes;
@@ -131,7 +156,7 @@ export function structure(diagram: Diagram): Stmt[] {
     const link = diagram.links.find(l => l && l.from == idx(n) && pred(l.text));
     return link ? nodes[link.to] ?? undefined : undefined;
   };
-  const linksInto = (n: FlowNode | undefined) => diagram.links.filter(l => l && n && l.to == idx(n)).length;
+  const linksInto = (n: FlowNode | undefined, from: FlowNode) => entriesInto(diagram, n, from);
   let steps = 0;
   const guard = () => {
     if (++steps > 10000) throw new FlowError(t('流程圖繞成一圈出不來：如果要重複執行，請用「迴圈」積木。', 'The flowchart goes around and never stops. To repeat, use a Loop block.'));
@@ -210,7 +235,7 @@ export function structure(diagram: Diagram): Stmt[] {
     let next = nextOf(n, pred);
     if (!next) throw broken(n);
     const stmts: Stmt[] = [];
-    let num = linksInto(next);
+    let num = linksInto(next, n);
     while (next && ((next.figure != 'Diamond' && num == 1) || (next.figure == 'Diamond' && num < 2))) {
       guard();
       const r = step(next);
@@ -218,7 +243,7 @@ export function structure(diagram: Diagram): Stmt[] {
       if (r.jumps) return { stmts, next: undefined, jumps: true };
       if (!r.next && next.text != '結束') throw broken(next);
       next = r.next;
-      num = linksInto(next);
+      num = linksInto(next, n);
     }
     return { stmts, next, jumps: false };
   };

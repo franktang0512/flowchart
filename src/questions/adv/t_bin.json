@@ -1,0 +1,47 @@
+{
+  "title": "基本操作｜二元樹：用 array 一層一層存",
+  "question": "二元樹（binary tree）的每個點最多有兩個孩子：左孩子和右孩子。如果從最上面開始，一層一層、由左到右把點放進 array，就不用另外記誰是誰的孩子：\n位置 0 是最上面的根；位置 i 的左孩子在 2 * i + 1，右孩子在 2 * i + 2，上一層在 (i - 1) / 2（整數除法）。以後的 heap sort 就是這樣存樹的。\n第一行輸入 n（不超過 20），接著一層一層輸入 n 個數字，再輸入 N，接下來輸入 N 個指令：\n1 i：輸出位置 i 的左孩子；沒有就輸出 None!\n2 i：輸出位置 i 的右孩子；沒有就輸出 None!\n3 i：輸出位置 i 的上一層；i 是根就輸出 Root!\n要輸出的是那個位置放的數字。每個要輸出的結果各輸出一行。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "7\n50 30 70 20 40 60 80\n5\n1 0\n2 0\n1 1\n3 6\n3 0",
+      "output": "30\n70\n20\n70\nRoot!",
+      "note": "50 在最上面，下面是 30、70；30 下面是 20、40；70 下面是 60、80"
+    },
+    {
+      "input": "5\n8 3 9 1 4\n4\n2 1\n1 2\n3 4\n2 2",
+      "output": "4\nNone!\n3\nNone!",
+      "note": "位置 2 的左孩子在位置 5，只有 5 個數字（位置 0 到 4），所以沒有"
+    },
+    {
+      "input": "1\n42\n3\n1 0\n2 0\n3 0",
+      "output": "None!\nNone!\nRoot!",
+      "note": "只有根"
+    }
+  ],
+  "var_types": [
+    "array"
+  ],
+  "en": {
+    "title": "Basics | binary tree: store it level by level in an array",
+    "question": "In a binary tree, each point has at most two children: a left child and a right child. If we put the points into an array from the top, level by level, left to right, we do not need to write down who is whose child:\nPlace 0 is the root at the top. The left child of place i is at 2 * i + 1, the right child is at 2 * i + 2, and the point above is at (i - 1) / 2 (whole-number division). Heap sort keeps a tree this way, too.\nFirst input n (20 or less), then the n numbers level by level, then N, then N commands:\n1 i: output the left child of place i. If there is none, output None!\n2 i: output the right child of place i. If there is none, output None!\n3 i: output the point above place i. If i is the root, output Root!\nOutput the number in that place. Output each result on its own line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "7\n50 30 70 20 40 60 80\n5\n1 0\n2 0\n1 1\n3 6\n3 0",
+        "output": "30\n70\n20\n70\nRoot!",
+        "note": "50 is at the top with 30 and 70 under it. 20 and 40 are under 30; 60 and 80 are under 70"
+      },
+      {
+        "input": "5\n8 3 9 1 4\n4\n2 1\n1 2\n3 4\n2 2",
+        "output": "4\nNone!\n3\nNone!",
+        "note": "The left child of place 2 would be place 5, but there are only places 0 to 4"
+      },
+      {
+        "input": "1\n42\n3\n1 0\n2 0\n3 0",
+        "output": "None!\nNone!\nRoot!",
+        "note": "Only the root"
+      }
+    ]
+  }
+}

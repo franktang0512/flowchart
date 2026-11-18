@@ -73,7 +73,7 @@ export const COURSES: Course[] = [
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st_array', 'adv/st_basic', 'adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q_array', 'adv/q_basic', 'adv/q1', 'adv/q2'] },
       // 樹、圖放在排序前面：heap sort 會用到樹，圖的 BFS 接著 queue 用
-      { name: '樹', nameEn: 'Trees', questions: ['adv/t1'] },
+      { name: '樹', nameEn: 'Trees', questions: ['adv/t_parent', 'adv/t_bin', 'adv/t1'] },
       { name: '圖', nameEn: 'Graphs', questions: ['adv/gr1'] },
       { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },
       { name: '搜尋', nameEn: 'Searching', questions: ['adv/se1'] },
