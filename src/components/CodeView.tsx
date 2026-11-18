@@ -125,10 +125,46 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
     head.addEventListener('pointercancel', up);
   };
 
+  /** 拉四個邊、四個角調大小（dir 是方向：n 上、s 下、w 左、e 右） */
+  const startResize = (dir: string) => (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button != 0) return;
+    e.preventDefault();
+    const dialog = ref.current!;
+    const handle = e.currentTarget;
+    const box = dialog.getBoundingClientRect();
+    const x0 = e.clientX, y0 = e.clientY;
+    const MIN_W = 360, MIN_H = 260;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
+    dialog.style.margin = '0';
+    dialog.style.left = box.left + 'px';
+    dialog.style.top = box.top + 'px';
+    handle.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0, dy = ev.clientY - y0;
+      let { left, top, width, height } = box;
+      if (dir.includes('e')) width = clamp(box.width + dx, MIN_W, window.innerWidth - box.left);
+      if (dir.includes('w')) { width = clamp(box.width - dx, MIN_W, box.right); left = box.right - width; }
+      if (dir.includes('s')) height = clamp(box.height + dy, MIN_H, window.innerHeight - box.top);
+      if (dir.includes('n')) { height = clamp(box.height - dy, MIN_H, box.bottom); top = box.bottom - height; }
+      Object.assign(dialog.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' });
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+
   const target = getTarget();
   return (
     <dialog id="code_view" ref={ref} onCancel={onClose}>
-      <div className="code_view_head" onPointerDown={startDrag} title={t('拖曳這裡可以移動視窗；右下角可以拉大縮小', 'Drag here to move. Drag the bottom-right corner to resize.')}>
+      {['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'].map(d => (
+        <div key={d} className={`code_resize code_resize_${d}`} onPointerDown={startResize(d)} title={t('拉這裡調大小', 'Drag to resize')} />
+      ))}
+      <div className="code_view_head" onPointerDown={startDrag} title={t('拖曳這裡可以移動視窗；拉視窗的邊或角可以調大小', 'Drag here to move. Drag an edge or corner to resize.')}>
         <h5 className="card_title" style={{ margin: 0 }}>
           {t('看程式', 'See the code')}<span className="target_badge">{targetName(target)}</span>
         </h5>
@@ -246,6 +282,9 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
     if (!json) return;
     let workspace: BlocklyModule = null;
     let cancelled = false;
+    // 拉視窗的邊調大小時，積木區跟著變大變小
+    const resize = new ResizeObserver(() => { if (workspace) live.current?.Blockly.svgResize(workspace); });
+    if (boxRef.current) resize.observe(boxRef.current);
     setLoadError(null);
     setApplyError(null);
     loadBlockly().then(({ Blockly, themes }) => {
@@ -281,6 +320,7 @@ function BlocklyCode({ mode, diagram, vars, modules, onApply }: { mode: BlockMod
     });
     return () => {
       cancelled = true;
+      resize.disconnect();
       live.current = null;
       workspace?.dispose();
     };
