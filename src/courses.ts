@@ -72,13 +72,14 @@ export const COURSES: Course[] = [
     units: [
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st_array', 'adv/st_basic', 'adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q_array', 'adv/q_basic', 'adv/q1', 'adv/q2'] },
+      // 樹、圖放在排序前面：heap sort 會用到樹，圖的 BFS 接著 queue 用
+      { name: '樹', nameEn: 'Trees', questions: ['adv/t1'] },
+      { name: '圖', nameEn: 'Graphs', questions: ['adv/gr1'] },
       { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },
       { name: '搜尋', nameEn: 'Searching', questions: ['adv/se1'] },
       { name: '窮舉', nameEn: 'Brute force', questions: ['adv/b1', 'adv/b2'] },
       { name: '貪心', nameEn: 'Greedy', questions: ['adv/g1', 'adv/g2'] },
       { name: '動態規劃', nameEn: 'Dynamic programming', questions: ['adv/d1', 'adv/d2'] },
-      { name: '樹', nameEn: 'Trees', questions: ['adv/t1'] },
-      { name: '圖', nameEn: 'Graphs', questions: ['adv/gr1'] },
     ],
   },
   {
