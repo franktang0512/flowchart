@@ -23,6 +23,7 @@ import type { Diagram } from './diagram';
 import { displayLinkText, displayNodeText, eofVar, parseSortKeys, sortKeyExpr, splitOutput, splitRectangle, splitTarget } from './labels';
 import { charInit, cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
+import { isEnterLink, isExitLink, isWhileMode } from './loops';
 import { entriesInto, exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 import { allStructs, fieldCppType, fieldInit, findStruct, getStructs } from './structs';
 
@@ -849,7 +850,7 @@ function syntaxOk(code: string) {
 
 /** 積木在說明裡的稱呼，例如「輸入 n」（英文模式用英文的積木文字） */
 const label = (node: FlowNode) => {
-  const text = displayNodeText(node.text ?? '', node.figure).trim();
+  const text = displayNodeText(node.text ?? '', node.figure, node.data).trim();
   return t('「' + (text || '空白的積木') + '」', '"' + (text || 'empty block') + '"');
 };
 
@@ -2295,8 +2296,10 @@ class CodeGenerator {
         }
         const cond = expr(node.text, true);
         this.checkSyntax(node, 'return (' + cond + ');');
-        let code = 'while(!(' + cond + ')){\ntotal_step ++;' + update;
-        const l = this.loop(node, '假', '真');
+        // 條件成立才執行：while (條件)；達成條件就離開（重複直到）：while (!條件)
+        const whileMode = isWhileMode(node);
+        let code = (whileMode ? 'while((' : 'while(!(') + cond + ')){\ntotal_step ++;' + update;
+        const l = whileMode ? this.loop(node, '真', '假') : this.loop(node, '假', '真');
         code += `if(--__loopTrap < 0) __err('tooManyLoops', ${i}, {});\n` + l.code + '\n}\n';
         code += 'total_step ++;' + update;
         return { code, next: l.next };
@@ -2671,8 +2674,8 @@ class CodeGenerator {
   }
 
   private loopBody(node: FlowNode, enter: string, exit: string): CodeResult {
-    const isEnter = (t: string) => t.includes('進入迴圈') || t.includes('假');
-    const isExit = (t: string) => t.includes('離開迴圈') || t.includes('真');
+    const isEnter = (t: string) => isEnterLink(node, t);
+    const isExit = (t: string) => isExitLink(node, t);
     let next = this.nextOf(node, isEnter);
     if (!next) this.fail(t(`迴圈${label(node)} 少了「${enter}」的箭頭（迴圈裡要做的事）。`, `The loop ${label(node)} needs a "${arrowName(enter)}" arrow (what to repeat).`), node);
     let code = '';
@@ -2683,7 +2686,15 @@ class CodeGenerator {
       // break / continue：這條路到這裡結束
       if (!r.next && r.jumps) break;
       if (!r.next) {
-        if (next.text == '結束') this.fail(t(`迴圈${label(node)} 裡面的積木要接回迴圈，不能直接接到「結束」。`, `Blocks inside the loop ${label(node)} must go back to the loop, not to "End".`), next);
+        if (next.text == '結束') {
+          // 條件迴圈走「進去做」那條卻走到結束：多半是真假接反了（例如想要 while，卻選了「達成條件就離開」）
+          if (node.figure == 'While_Loop' && !eofVar(node.text)) {
+            this.fail(isWhileMode(node)
+              ? t(`迴圈${label(node)} 是「條件成立才執行」：真＝執行迴圈裡的積木，假＝離開迴圈。現在真那條走到「結束」了，真假是不是接反了？`, `The loop ${label(node)} runs while the condition is true: Yes = do the blocks inside, No = leave. The Yes path reaches "End". Are Yes and No swapped?`)
+              : t(`迴圈${label(node)} 是「達成條件就離開」：假＝再做一次，真＝離開迴圈。現在假那條走到「結束」了，真假是不是接反了？如果你要的是條件成立才執行，點兩下迴圈改選「條件成立才執行」。`, `The loop ${label(node)} stops when the condition is true: No = do it again, Yes = leave. The No path reaches "End". Are Yes and No swapped? To run while the condition is true, double-click the loop and choose "Run while true".`), next);
+          }
+          this.fail(t(`迴圈${label(node)} 裡面的積木要接回迴圈，不能直接接到「結束」。`, `Blocks inside the loop ${label(node)} must go back to the loop, not to "End".`), next);
+        }
         this.fail(label(next) + t(' 後面沒有接箭頭：迴圈裡最後一個積木要用箭頭接回迴圈。', ' has no arrow. The last block in a loop needs an arrow back to the loop.'), next);
       }
       next = r.next;

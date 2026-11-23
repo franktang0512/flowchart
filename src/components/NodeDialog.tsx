@@ -12,7 +12,7 @@ import { fieldCppType, findStruct, type StructDef } from '../engine/structs';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
-  | 'Function' | 'Rectangle' | 'link_tf' | 'link_for' | 'clear';
+  | 'Function' | 'Rectangle' | 'link_tf' | 'link_for' | 'link_until' | 'link_while' | 'clear';
 
 export interface DialogForm {
   radio: string;
@@ -159,6 +159,8 @@ const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
   Rectangle: '',
   link_tf: '真',
   link_for: '進入迴圈',
+  link_until: '假',
+  link_while: '真',
 };
 
 export const defaultForm = (kind: DialogKind): DialogForm => ({
@@ -952,12 +954,14 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
     case 'While_Loop':
       body = (
         <>
-          <p id="hint">{t('離開迴圈的條件是？', 'When does the loop stop?')}</p>{' '}
+          <p id="hint">{t('迴圈要重複到什麼時候？', 'How does the loop repeat?')}</p>{' '}
           {/* C++：次數迴圈是 for (int i = 0; i < n; i++)；舊的「執行完幾次」只在打開舊積木時列出來 */}
           {getTarget() == 'cpp' && radio('cfor', t('for 迴圈（計數）', 'for loop (counting)'), () => set({ showWhile: false }))}{' '}
           {py && radio('pyfor', t('for 迴圈（range、一個一個拿）', 'for loop (range, or each item)'), () => set({ showWhile: false }))}{' '}
           {(!isCode() || f.radio == 'for') && radio('for', t('執行完幾次', 'After some times'), () => set({ showWhile: false }))}{' '}
-          {radio('while', t('達成某個條件', 'When something is true'), () => set({ showWhile: true }))}{' '}
+          {/* 條件迴圈兩種：whiletrue（C++、Python 的 while）、while（Scratch 的重複直到；舊的積木都是這種） */}
+          {radio('whiletrue', t('條件成立才執行', 'Run while true'), () => set({ showWhile: true }))}{' '}
+          {radio('while', t('達成條件就離開', 'Stop when true'), () => set({ showWhile: true }))}{' '}
           {isCode() && radio('eof', t('一直輸入到沒有資料', 'Input until there is no more data'), () => set({ showWhile: false }))}{' '}
           <br /><br />{' '}
           {f.radio == 'eof' && (
@@ -1002,6 +1006,11 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           {f.radio == 'cfor' && <ForEditor f={f} set={set} helper={helper} />}
           {f.radio == 'pyfor' && <PyForEditor f={f} set={set} />}
           <div id="while_div" style={{ display: f.showWhile ? 'block' : 'none' }}>{' '}
+            <p className="dialog_note">
+              {f.radio == 'whiletrue'
+                ? t('條件成立（真）就做一次迴圈裡的積木，不成立（假）就離開迴圈。例如 C++ 的 while (n > 0)。', 'While the condition is true (Yes), do the blocks inside. When it is false (No), leave. Like while (n > 0).')
+                : t('條件還沒達成（假）就再做一次，達成了（真）就離開迴圈。例如 Scratch 的「重複直到」。', 'Until the condition is true, do it again (No). When it is true (Yes), leave. Like Scratch "repeat until".')}
+            </p>{' '}
             {conditionHint}{' '}
             {codeInput}{' '}
             {f.showWhile && helper('code', f.code, v => set({ code: v }))}
@@ -1394,6 +1403,27 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           <p id="hint">{t('請選擇', 'Choose one')}</p>{' '}
           {radio('真', t('真', 'Yes'))}{' '}
           {radio('假', t('假', 'No'))}{' '}
+          <br />{buttons}
+        </>
+      );
+      break;
+    // 條件迴圈：箭頭上還是寫真、假，選項寫清楚在這種迴圈是進去做還是離開
+    case 'link_until':
+      body = (
+        <>
+          <p id="hint">{t('這個迴圈是「達成條件就離開」，這條箭頭是：', 'This loop stops when the condition is true. This arrow is:')}</p>{' '}
+          {radio('假', t('假（還沒達成：做迴圈裡的積木）', 'No (not yet: do the blocks inside)'))}{' '}
+          {radio('真', t('真（達成了：離開迴圈）', 'Yes (done: leave the loop)'))}{' '}
+          <br />{buttons}
+        </>
+      );
+      break;
+    case 'link_while':
+      body = (
+        <>
+          <p id="hint">{t('這個迴圈是「條件成立才執行」，這條箭頭是：', 'This loop runs while the condition is true. This arrow is:')}</p>{' '}
+          {radio('真', t('真（成立：做迴圈裡的積木）', 'Yes (true: do the blocks inside)'))}{' '}
+          {radio('假', t('假（不成立：離開迴圈）', 'No (false: leave the loop)'))}{' '}
           <br />{buttons}
         </>
       );

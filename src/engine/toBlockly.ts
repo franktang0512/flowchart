@@ -226,7 +226,10 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
       }
       case 'until': {
         const body = chain(s.body);
-        return [{ type: scratch ? 'scratch_whileUntil' : 'controls_whileUntil', fields: { MODE: 'UNTIL' }, inputs: { BOOL: input(expr(s.cond)), ...(body ? { DO: input(body) } : {}) } }];
+        // 重複直到 不成立 → 「當…重複」（流程圖的「條件成立才執行」）
+        const whileMode = s.cond.t == 'not';
+        const cond = s.cond.t == 'not' ? s.cond.a : s.cond;
+        return [{ type: scratch ? 'scratch_whileUntil' : 'controls_whileUntil', fields: { MODE: whileMode ? 'WHILE' : 'UNTIL' }, inputs: { BOOL: input(expr(cond)), ...(body ? { DO: input(body) } : {}) } }];
       }
       case 'call': {
         // 執行模組：Scratch 的自訂積木、Blockly 的「執行函式」；參數照模組定義的順序

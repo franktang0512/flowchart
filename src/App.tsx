@@ -117,6 +117,8 @@ export function App() {
   const [pdfBusy, setPdfBusy] = useState(false);
   /** 第三步畫布現在的縮放比例（每張流程圖各自的） */
   const [zoom, setZoomState] = useState(1);
+  /** 畫布上有選到積木或箭頭：顯示「編輯／刪除」按鈕（平板、手機沒有 Delete 鍵、不好雙擊） */
+  const [hasSelection, setHasSelection] = useState(false);
   const [printData, setPrintData] = useState<PrintData | null>(null);
   const [printImg, setPrintImg] = useState<{ src: string; cuts: number[] }>();
   const [printModules, setPrintModules] = useState<{ title: string; src: string; cuts: number[] }[]>([]);
@@ -170,6 +172,7 @@ export function App() {
     editNode: (d, i) => editNodeRef.current(d, i),
     selectedTool: () => toolRef.current,
     zoomChanged: z => setZoomState(z),
+    selectionChanged: s => setHasSelection(s),
   }));
   const [main] = useState(() => new Diagram(hooks));
   // 開發模式下給自動化測試讀積木位置
@@ -626,8 +629,8 @@ export function App() {
     const pending = takePendingImport();
     if (pending && pending.question == questionPath) applyWork(pending);
 
-    // 記住滑鼠在畫布上的位置，點畫布新增積木時放在這裡
-    const onMouseMove = (event: MouseEvent) => {
+    // 記住滑鼠（手指）在畫布上的位置，點畫布新增積木時放在這裡；手指沒有「滑過」，按下時也要記
+    const onMouseMove = (event: PointerEvent) => {
       const canvas = myCanvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -637,8 +640,12 @@ export function App() {
       if (!d.pause && inside) myMouse.current = diagramPoint(d, canvasPoint(canvas, event));
       if (!inside) d.copyNode = null;
     };
-    window.addEventListener('mousemove', onMouseMove);
-    return () => window.removeEventListener('mousemove', onMouseMove);
+    window.addEventListener('pointermove', onMouseMove);
+    window.addEventListener('pointerdown', onMouseMove);
+    return () => {
+      window.removeEventListener('pointermove', onMouseMove);
+      window.removeEventListener('pointerdown', onMouseMove);
+    };
   }, []);
 
   // ---------------- 切換步驟 ----------------
@@ -1268,6 +1275,12 @@ export function App() {
               </div>
               <div className="canvas_wrap">
                 <canvas id="my_canvas" ref={myCanvasRef} onClick={clickCanvas} onDragOver={dragOverCanvas} onDrop={dropOnCanvas}></canvas>
+                {page == 2 && hasSelection && (
+                  <div className="select_controls">
+                    <button onClick={() => currentDiagram().editSelected()}>{t('編輯', 'Edit')}</button>
+                    <button onClick={() => currentDiagram().deleteSelected()}>{t('刪除', 'Delete')}</button>
+                  </div>
+                )}
                 {/* 放大縮小：流程圖太大時縮小看全部（Ctrl + 滾輪也可以）；點比例回到 100% */}
                 <div className="zoom_controls">
                   <button title={t('縮小', 'Zoom out')} aria-label={t('縮小', 'Zoom out')} onClick={() => currentDiagram().setZoom(currentDiagram().zoom / 1.25)}>－</button>

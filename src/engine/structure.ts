@@ -9,6 +9,7 @@ import { mapParts, parseCall, splitArgs, type ModuleInfo, type ModuleSource } fr
 import { findStruct, type StructField } from './structs';
 import { getTarget, isPython } from '../target';
 import type { FlowNode } from './node';
+import { isEnterLink, isExitLink, isWhileMode } from './loops';
 
 // ---------------- 流程圖的結構 ----------------
 
@@ -135,7 +136,7 @@ export function entriesInto(diagram: Diagram, n: FlowNode | undefined, from: Flo
   const into = diagram.links.filter(l => l && l.to == at);
   if (n.figure != 'For_Loop' && n.figure != 'While_Loop') return into.length;
   // 迴圈裡面有哪些積木：從「進入迴圈／假」那條走，走到繞回迴圈為止
-  const start = diagram.links.find(l => l && l.from == at && (l.text.includes('進入迴圈') || l.text.includes('假')));
+  const start = diagram.links.find(l => l && l.from == at && isEnterLink(n, l.text));
   const body = new Set<number>();
   const todo = start ? [start.to] : [];
   while (todo.length) {
@@ -191,7 +192,7 @@ export function structure(diagram: Diagram): Stmt[] {
       case 'For_Loop':
       case 'While_Loop': {
         const body = loop(n);
-        const exit = nextOf(n, s => s.includes('離開迴圈') || s.includes('真'));
+        const exit = nextOf(n, s => isExitLink(n, s));
         if (!exit) throw broken(n);
         const py = n.figure == 'For_Loop' && isPython() ? pyFor(n.text) : null;
         if (py?.range) return { stmts: [{ kind: 'range', name: py.name, start: parseExpr(py.range.start), stop: parseExpr(py.range.stop), step: parseExpr(py.range.step), body }], next: exit };
@@ -204,6 +205,8 @@ export function structure(diagram: Diagram): Stmt[] {
           : n.figure == 'For_Loop'
           ? { kind: 'repeat', times: parseExpr(n.text.slice(0, -1)), body }
           : eofVar(n.text) ? { kind: 'eof', target: eofVar(n.text)!, body }
+          // 條件成立才執行：寫成「重複直到 不成立」，產生程式時會變回 while (條件)
+          : isWhileMode(n) ? { kind: 'until', cond: { t: 'not', a: parseExpr(n.text) }, body }
           : { kind: 'until', cond: parseExpr(n.text), body };
         return { stmts: [stmt], next: exit };
       }
@@ -212,9 +215,9 @@ export function structure(diagram: Diagram): Stmt[] {
     }
   };
 
-  /** 迴圈裡面：走「進入迴圈/假」那條直到繞回迴圈 */
+  /** 迴圈裡面：走「進入迴圈」（條件迴圈是假，條件成立才執行的是真）那條直到繞回迴圈 */
   const loop = (n: FlowNode): Stmt[] => {
-    let next = nextOf(n, s => s.includes('進入迴圈') || s.includes('假'));
+    let next = nextOf(n, s => isEnterLink(n, s));
     const body: Stmt[] = [];
     while (next != n) {
       guard();

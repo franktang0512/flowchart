@@ -9,6 +9,7 @@ import { isPython } from './target';
 import { splitArgs } from './engine/modules';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
+import { isWhileMode } from './engine/loops';
 import { t } from './i18n';
 import { findStruct } from './engine/structs';
 
@@ -446,8 +447,8 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
         return text != null && add(text, 'For_Loop', getCodeVar(vars, text));
       }
       if (checkVar(vars, f.forNumber, true) || checkVar(vars, f.code, true)) {
-        const text = f.radio == 'while' ? f.code : f.forNumber + '次';
-        return add(text, f.radio == 'for' ? 'For_Loop' : 'While_Loop', getCodeVar(vars, text));
+        const text = isCondLoop(f) ? f.code : f.forNumber + '次';
+        return add(text, f.radio == 'for' ? 'For_Loop' : 'While_Loop', getCodeVar(vars, text), f.radio == 'whiletrue' ? 'while' : undefined);
       }
       return false;
     case 'Rectangle':
@@ -465,6 +466,9 @@ export function addMainNode(tool: string, d: Diagram, vars: VarStore, f: DialogF
       return false;
   }
 }
+
+/** 條件迴圈（條件成立才執行、達成條件就離開） */
+const isCondLoop = (f: DialogForm) => f.radio == 'while' || f.radio == 'whiletrue';
 
 /** 一直輸入到沒有資料的迴圈：「輸入 a 讀不到」；還沒選變數時提醒，回傳 null */
 function eofLoopText(f: DialogForm): string | null {
@@ -518,6 +522,7 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
         if (text == null) return false;
         node.figure = 'While_Loop';
         node.text = text;
+        node.data = undefined;
         node.variables = getCodeVar(vars, text);
         return done();
       }
@@ -525,13 +530,16 @@ export function editMainNode(node: FlowNode, d: Diagram, vars: VarStore, f: Dial
         const text = f.radio == 'pyfor' ? pyForText(vars, f) : forText(vars, f);
         if (text == null) return false;
         node.figure = 'For_Loop';
+        node.data = undefined;
         node.text = text;
         node.variables = getCodeVar(vars, text);
         return done();
       }
-      const text = f.radio == 'while' ? f.code : f.forNumber + '次';
+      const text = isCondLoop(f) ? f.code : f.forNumber + '次';
       node.figure = f.radio == 'for' ? 'For_Loop' : 'While_Loop';
       node.text = text;
+      // 換成另一種條件迴圈時箭頭不動：通常是箭頭照心裡想的接好了、只是選錯種類（例如 while 卻選了重複直到）
+      node.data = f.radio == 'whiletrue' ? 'while' : undefined;
       node.variables = getCodeVar(vars, text);
       return done();
     }
@@ -638,7 +646,7 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
         const many = splitArgs(ev);
         return { kind: 'While_Loop', initial: many.length > 1 ? { radio: 'eof', ioTarget: '多個', ioMany: many, showWhile: false } : { radio: 'eof', ioTarget: '變數', varSelect: ev, showWhile: false } };
       }
-      return { kind: 'While_Loop', initial: { radio: 'while', code: text, showWhile: true } };
+      return { kind: 'While_Loop', initial: { radio: isWhileMode(node) ? 'whiletrue' : 'while', code: text, showWhile: true } };
     }
     case 'Rectangle': {
       const { target, action, index, index2, expr } = splitRectangle(text);

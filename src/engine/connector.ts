@@ -2,7 +2,8 @@
 
 // 舊版的全域 connector_r：只有選了箭頭工具時連接點才有半徑（才看得到、點得到）
 // hit：點得到的範圍是 r 的幾倍（縮小畫面時連接點變小，點得到的範圍維持在螢幕上差不多大）
-export const connectorState = { r: 0, hit: 1 };
+// grab：用手指操作時是 3（手指比滑鼠粗，縮放把手、箭頭上的點也一起放大好按），滑鼠是 1
+export const connectorState = { r: 0, hit: 1, grab: 1 };
 
 export interface ConnectorDecoration {
   fillStyle: string;

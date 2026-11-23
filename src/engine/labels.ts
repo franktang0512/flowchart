@@ -249,9 +249,14 @@ function ioLabel(text: string, en: boolean): string {
   return en ? text.replace(/^輸入/, 'Input').replace(/^輸出/, 'Output') : text;
 }
 
-/** 積木上顯示的字 */
-export function displayNodeText(text: string, figure: FigureName): string {
+/** 積木上顯示的字（data：條件迴圈是哪一種，見 loops.ts） */
+export function displayNodeText(text: string, figure: FigureName, data?: string): string {
   if (!text) return text;
+  // 條件迴圈：積木上寫出是哪一種，「當 n > 0」（條件成立才執行）、「直到 n == 0」（達成條件就離開）
+  if (figure == 'While_Loop' && !eofVar(text)) {
+    const en = getLang() == 'en';
+    return data == 'while' ? (en ? 'while ' : '當 ') + text : (en ? 'until ' : '直到 ') + text;
+  }
   if (figure == 'Rectangle') return rectangleLabel(text, getLang() == 'en');
   if (figure == 'Parallelogram') return ioLabel(text, getLang() == 'en');
   // 執行模組：跟 Scratch 的自訂積木一樣，積木上就是模組的名字和參數

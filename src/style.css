@@ -693,6 +693,13 @@ input, textarea, select, button {
     width: 100%;
     height: 100%;
 }
+/* 第三步的畫布：手指在上面拖是拖積木、拉箭頭，不是捲動或縮放頁面 */
+#my_canvas {
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
 
 /* 變數表的 map：鍵 → 值 排成一行 */
 .map_types {
@@ -707,6 +714,26 @@ input, textarea, select, button {
 }
 
 /* 第三步畫布右下角：放大縮小 */
+/* 選到積木或箭頭時的「編輯／刪除」（平板、手機用；電腦也可以雙擊、按 Delete） */
+.select_controls {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    display: flex;
+    gap: 6px;
+}
+.select_controls button {
+    border: 1px solid var(--card-line);
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px 14px;
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.select_controls button:hover {
+    background: var(--green);
+}
 .zoom_controls {
     position: absolute;
     right: 10px;
@@ -1210,7 +1237,8 @@ input, textarea, select, button {
     }
     .stage,
     #run_code_area {
-        grid-template-columns: 1fr;
+        /* minmax(0, …)：欄寬不要被裡面的表格撐得比螢幕寬 */
+        grid-template-columns: minmax(0, 1fr);
     }
     .col {
         overflow: visible;
@@ -1221,6 +1249,41 @@ input, textarea, select, button {
     }
     .page_tab {
         font-size: 0.85rem;
+    }
+}
+
+/* 手機（給老師展示用）：標頭換行、四個步驟排成兩行，畫面才不會比螢幕寬 */
+@media (max-width: 600px) {
+    #header {
+        padding: 8px 12px;
+    }
+    .header_left {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .logo {
+        white-space: nowrap;
+    }
+    #workspace {
+        padding: 8px 8px 12px;
+    }
+    #page_set {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-radius: 16px;
+    }
+    .page_tab {
+        justify-content: flex-start;
+        white-space: normal;
+        text-align: left;
+        font-size: 0.8rem;
+    }
+    /* 變數表欄位多：太寬時表格自己左右滑，不撐開整頁 */
+    #var_table,
+    #local_table,
+    #param_table {
+        display: block;
+        overflow-x: auto;
     }
 }
 

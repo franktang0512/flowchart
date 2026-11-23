@@ -1,4 +1,6 @@
 // 節點四角的縮放把手，以及直角連線上可拖曳的折點
+import { connectorState } from './connector';
+
 export class Anchor {
   x: number;
   y: number;
@@ -40,6 +42,6 @@ export class Anchor {
   }
 
   isInside(x: number, y: number, originX: number, originY: number, width: number, height: number) {
-    return this.distance(x, y, originX, originY, width, height) <= this.radius * this.radius;
+    return this.distance(x, y, originX, originY, width, height) <= (this.radius * connectorState.grab) ** 2;
   }
 }

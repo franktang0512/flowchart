@@ -134,6 +134,8 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
       case 'repeat':
         return { kind: 'loop', loop: node(`${exprText(s.times)}次`, 'For_Loop'), body: items(s.body), enter: '進入迴圈', exit: '離開迴圈' };
       case 'until':
+        // 重複直到 不成立（積木的「當…重複」）：畫成「條件成立才執行」，真進去、假離開
+        if (s.cond.t == 'not') return { kind: 'loop', loop: node(exprText(s.cond.a, true), 'While_Loop', 'while'), body: items(s.body), enter: '真', exit: '假' };
         return { kind: 'loop', loop: node(exprText(s.cond, true), 'While_Loop'), body: items(s.body), enter: '假', exit: '真' };
       case 'eof':
         return { kind: 'loop', loop: node(eofText(s.target), 'While_Loop'), body: items(s.body), enter: '假', exit: '真' };

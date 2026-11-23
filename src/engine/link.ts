@@ -1,5 +1,6 @@
 // 兩個積木之間的箭頭
 import { Anchor } from './anchor';
+import { connectorState } from './connector';
 import { displayLinkText } from './labels';
 import type { FlowNode } from './node';
 import { reSegment } from './routing';
@@ -76,7 +77,7 @@ export class Link {
 
   /** 滑鼠在哪個可以拖的地方上（選取箭頭之後才用得到） */
   handleAt(p: Point): LinkHandle | null {
-    const near = (q: Point) => this.distance(p, q) <= HANDLE_R;
+    const near = (q: Point) => this.distance(p, q) <= HANDLE_R * connectorState.grab;
     const s = this.segments;
     if (s.length < 2) return null;
     // 自動算的路線裡的轉折點，拖了也一樣變成自己的折點
@@ -228,7 +229,7 @@ export class Link {
   }
 
   private isBetween(a: Point, c: Point, b: Point) {
-    return this.distance(a, c) + this.distance(c, b) - this.distance(a, b) < 1;
+    return this.distance(a, c) + this.distance(c, b) - this.distance(a, b) < connectorState.grab;
   }
 
   isOverLink(point: Point) {

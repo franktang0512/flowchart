@@ -6,8 +6,10 @@ import type { FigureName } from './figures';
 import { t } from '../i18n';
 import { Link, type LinkHandle, type Point } from './link';
 import { FlowNode } from './node';
+import { isWhileMode } from './loops';
 
-export type LinkLabelKind = 'link_tf' | 'link_for';
+// link_until / link_while：條件迴圈拉出來的箭頭（選項會寫出真、假在這種迴圈是什麼意思）
+export type LinkLabelKind = 'link_tf' | 'link_for' | 'link_until' | 'link_while';
 
 export interface DiagramHooks {
   /** 從判斷或迴圈積木拉出箭頭時，詢問箭頭上的標籤；回傳 null 代表取消 */
@@ -18,7 +20,12 @@ export interface DiagramHooks {
   selectedTool(): string;
   /** 縮放比例改了（Ctrl + 滾輪也會改），畫面上的比例跟著更新 */
   zoomChanged?(zoom: number): void;
+  /** 有沒有選到積木或箭頭（平板、手機沒有 Delete 鍵，畫布上要顯示「編輯／刪除」按鈕） */
+  selectionChanged?(selected: boolean): void;
 }
+
+/** 這個事件是手指（或觸控筆）不是滑鼠 */
+const isTouch = (ev: MouseEvent) => 'pointerType' in ev && (ev as PointerEvent).pointerType != 'mouse';
 
 /** 滑鼠在畫布上的座標（扣掉邊框，並換算成畫布內部的像素座標） */
 export function canvasPoint(c: HTMLCanvasElement, ev: MouseEvent): Point {
@@ -170,9 +177,11 @@ export class Diagram {
         return;
       }
     }
-    const figure = this.nodes[link.from]?.figure;
+    const from = this.nodes[link.from];
+    const figure = from?.figure;
     if ((figure == 'For_Loop' || figure == 'Diamond' || figure == 'While_Loop')) {
-      this.hooks.askLinkLabel(figure == 'For_Loop' ? 'link_for' : 'link_tf').then(label => {
+      const kind: LinkLabelKind = figure == 'For_Loop' ? 'link_for' : figure == 'Diamond' ? 'link_tf' : isWhileMode(from!) ? 'link_while' : 'link_until';
+      this.hooks.askLinkLabel(kind).then(label => {
         if (label == null) return;
         link.text = label;
         this.links.push(link);
@@ -232,6 +241,7 @@ export class Diagram {
       this.ctx.fillText(t('拖曳線上的點可以改變線的形狀；雙擊圓點可以刪掉它', 'Drag the dots to change the line. Double-click a round dot to remove it.'), 10, 10);
       this.ctx.restore();
     }
+    if (this.active) this.hooks.selectionChanged?.((this.selNode != null && this.nodes[this.selNode] != null) || !!selLink);
   }
 
   /** 綁定（或換到）某個 canvas，並依外框大小設定畫布尺寸 */
@@ -240,9 +250,11 @@ export class Diagram {
     this.ctx = canvas.getContext('2d')!;
     if (!this.attached.has(canvas)) {
       this.attached.add(canvas);
-      canvas.addEventListener('mousedown', this.down);
-      canvas.addEventListener('mousemove', this.move);
-      canvas.addEventListener('mouseup', this.up);
+      // pointer 事件：滑鼠、手指、觸控筆都會收到（手指沒有「滑過」，按下去時才判斷按到什麼，見 down）
+      canvas.addEventListener('pointerdown', this.down);
+      canvas.addEventListener('pointermove', this.move);
+      canvas.addEventListener('pointerup', this.up);
+      canvas.addEventListener('pointercancel', this.up);
       canvas.addEventListener('dblclick', this.dblclick);
       canvas.addEventListener('wheel', this.wheel, { passive: false });
       canvas.ondragstart = () => false;
@@ -457,9 +469,18 @@ export class Diagram {
     const p = canvasPoint(this.myCanvas, ev);
     // 縮小時連接點畫得比較小，點得到的範圍放大回來，才不會很難抓；
     // 瀏覽器縮小（Ctrl −，例如 67%）時 devicePixelRatio 會變小，也一起算進去
-    connectorState.hit = Math.max(1, 1 / (this.zoom * Math.min(1, window.devicePixelRatio || 1)));
+    // 手指比滑鼠粗：連接點、縮放把手、箭頭上的點都放大成大約 3 倍好按
+    connectorState.grab = isTouch(ev) ? 3 : 1;
+    connectorState.hit = Math.max(1, 1 / (this.zoom * Math.min(1, window.devicePixelRatio || 1))) * connectorState.grab;
     return { x: p.x / this.zoom, y: p.y / this.zoom };
   }
+
+  /** 手指點兩下（瀏覽器的 dblclick 在平板、手機上不一定會來，自己判斷） */
+  private lastTap = { time: 0, x: 0, y: 0 };
+  /** 這次手指按下的位置、有沒有拖動（拖了就不算點一下） */
+  private tapStart: { x: number; y: number; moved: boolean } | null = null;
+  /** 最近一次手指操作的時間：之後瀏覽器補送的 dblclick 不要再處理一次 */
+  private lastTouch = 0;
 
   /** 在 draw() 之外直接畫在畫布上的東西（滑鼠移過去的紅圈）也要照縮放比例畫，位置才對得上 */
   private zoomed(paint: () => void) {
@@ -493,6 +514,13 @@ export class Diagram {
 
   private down = (ev: MouseEvent) => {
     if (!this.mine(ev)) return;
+    const touch = isTouch(ev);
+    if (touch) {
+      this.lastTouch = Date.now();
+      this.tapStart = { x: ev.clientX, y: ev.clientY, moved: false };
+      // 手指拖出畫布外也要一直收到 move / up
+      try { this.myCanvas.setPointerCapture((ev as PointerEvent).pointerId); } catch { /* 不支援就算了 */ }
+    }
     this.pause = true;
     if (this.editText) {
       this.editText = false;
@@ -500,6 +528,8 @@ export class Diagram {
       if (ed) ed.style.display = 'none';
     }
     const mouseC = this.mouseCoords(ev);
+    // 手指沒有「滑過」：先照滑鼠移到這裡的樣子，找出按到的連接點、縮放把手
+    if (touch && this.dragging == null) this.hover(mouseC);
     const newselNode = this.findNode(mouseC);
 
     if (this.selConnector != null) {
@@ -553,7 +583,10 @@ export class Diagram {
         this.selNode = null;
         this.selLink = null;
         this.dragging = null;
-        setTimeout(() => { this.pause = false; }, 10);
+        // 點空白處之後的 click 要能新增積木。滑鼠按下到放開會隔一下，所以晚一點再解除；
+        // 手指點一下時 down、up、click 幾乎同時來，要馬上解除，不然 click 來的時候還在暫停
+        if (touch) this.pause = false;
+        else setTimeout(() => { this.pause = false; }, 10);
 
         // 點到箭頭？
         for (let index = 0; index < this.links.length; index++) {
@@ -596,6 +629,9 @@ export class Diagram {
 
   private move = (ev: MouseEvent) => {
     if (!this.mine(ev)) return;
+    if (this.tapStart && Math.hypot(ev.clientX - this.tapStart.x, ev.clientY - this.tapStart.y) > 10) this.tapStart.moved = true;
+    // 手指還沒按下時不會有 move；按著但沒拖動（只是抖一下）時不要把整張圖拖走
+    if (isTouch(ev) && !this.tapStart?.moved) return;
     const mouseC = this.mouseCoords(ev);
     switch (this.dragging) {
       case 'all':
@@ -702,35 +738,40 @@ export class Diagram {
         this.draw();
         break;
       default:
-        if (this.selNode != null) {
-          const element = this.nodes[this.selNode]!;
-          // 滑鼠在縮放把手上？
-          const i = element.isInsideAnchors(mouseC.x, mouseC.y);
-          if (i != null) {
-            this.selAnchor = i;
-            this.myCanvas.style.cursor = element.anchors[i].cursorClass;
-            this.zoomed(() => element.anchors[i].highlight(this.ctx, element.x, element.y, element.w, element.h));
-          }
-          else {
-            if (this.selAnchor != null) this.draw();
-            this.selAnchor = null;
-            this.dragging = null;
-            this.myCanvas.style.cursor = 'auto';
-          }
-          this.hoverConnectors(mouseC);
-        }
-        else if (this.selLink != null) {
-          const link = this.links[this.selLink];
-          if (!link) break;
-          // 滑鼠移到箭頭上可以拖的點，游標變成「移動」
-          this.myCanvas.style.cursor = link.handleAt(mouseC) ? 'move' : 'auto';
-        }
-        else {
-          this.hoverConnectors(mouseC);
-        }
+        this.hover(mouseC);
         break;
     }
   };
+
+  /** 滑鼠移過（手指按下）的地方：標出縮放把手、連接點，按下去就能拖 */
+  private hover(mouseC: Point) {
+    if (this.selNode != null && this.nodes[this.selNode]) {
+      const element = this.nodes[this.selNode]!;
+      // 滑鼠在縮放把手上？
+      const i = element.isInsideAnchors(mouseC.x, mouseC.y);
+      if (i != null) {
+        this.selAnchor = i;
+        this.myCanvas.style.cursor = element.anchors[i].cursorClass;
+        this.zoomed(() => element.anchors[i].highlight(this.ctx, element.x, element.y, element.w, element.h));
+      }
+      else {
+        if (this.selAnchor != null) this.draw();
+        this.selAnchor = null;
+        this.dragging = null;
+        this.myCanvas.style.cursor = 'auto';
+      }
+      this.hoverConnectors(mouseC);
+    }
+    else if (this.selLink != null) {
+      const link = this.links[this.selLink];
+      if (!link) return;
+      // 滑鼠移到箭頭上可以拖的點，游標變成「移動」
+      this.myCanvas.style.cursor = link.handleAt(mouseC) ? 'move' : 'auto';
+    }
+    else {
+      this.hoverConnectors(mouseC);
+    }
+  }
 
   /** 滑鼠移到連接點上就標出來，按下去就能拉箭頭 */
   private hoverConnectors(mouseC: Point) {
@@ -805,27 +846,41 @@ export class Diagram {
       this.selConnector = null;
       this.linkHandle = null;
     }
+    // 手指：沒拖動的點一下，跟上一下很近、很快就算點兩下（跟滑鼠雙擊一樣：改積木、改箭頭上的字）
+    const tap = this.tapStart;
+    this.tapStart = null;
+    if (isTouch(ev) && tap && !tap.moved && ev.type == 'pointerup') {
+      this.lastTouch = Date.now();
+      const last = this.lastTap;
+      if (Date.now() - last.time < 400 && Math.hypot(ev.clientX - last.x, ev.clientY - last.y) < 30) {
+        this.lastTap = { time: 0, x: 0, y: 0 };
+        this.editSelected(this.mouseCoords(ev));
+      }
+      else this.lastTap = { time: Date.now(), x: ev.clientX, y: ev.clientY };
+    }
   };
+
+  /** 刪除選取的積木（連同它的箭頭）或箭頭（Delete 鍵，或畫布上的「刪除」按鈕） */
+  deleteSelected() {
+    // 刪掉的位置留 null，其他積木的 index 才不會跑掉（箭頭是用 index 記住兩端積木的）
+    if (this.selNode != null) {
+      this.links.forEach((l, index) => {
+        if (l && (l.from == this.selNode || l.to == this.selNode)) this.links[index] = null;
+      });
+      this.nodes[this.selNode] = null;
+      this.selNode = null;
+      this.draw();
+    }
+    if (this.selLink != null) {
+      this.links[this.selLink] = null;
+      this.selLink = null;
+      this.draw();
+    }
+  }
 
   private keydown = (ev: KeyboardEvent) => {
     if (!this.active) return;
-    if (ev.keyCode == 46) {
-      // Delete：刪除選取的積木（連同它的箭頭）或箭頭。
-      // 刪掉的位置留 null，其他積木的 index 才不會跑掉（箭頭是用 index 記住兩端積木的）
-      if (this.selNode != null) {
-        this.links.forEach((l, index) => {
-          if (l && (l.from == this.selNode || l.to == this.selNode)) this.links[index] = null;
-        });
-        this.nodes[this.selNode] = null;
-        this.selNode = null;
-        this.draw();
-      }
-      if (this.selLink != null) {
-        this.links[this.selLink] = null;
-        this.selLink = null;
-        this.draw();
-      }
-    }
+    if (ev.keyCode == 46) this.deleteSelected();
     if (ev.key == 'c' && ev.ctrlKey) {
       this.copyNode = this.selNode != null ? this.nodes[this.selNode] : null;
     }
@@ -837,15 +892,25 @@ export class Diagram {
 
   private dblclick = (ev: MouseEvent) => {
     if (!this.mine(ev)) return;
-    if (this.selNode != null) {
+    // 手指點兩下已經在 up 處理過了，瀏覽器補送的 dblclick 不要再來一次
+    if (Date.now() - this.lastTouch < 800) return;
+    this.editSelected(this.mouseCoords(ev));
+  };
+
+  /**
+   * 改選取的積木（開編輯視窗）或箭頭上的字（雙擊、手指點兩下、畫布上的「編輯」按鈕）。
+   * at：點在箭頭的折點上時是刪掉那個折點；按鈕按的沒有位置
+   */
+  editSelected(at?: Point) {
+    if (this.selNode != null && this.nodes[this.selNode]) {
       this.pause = true;
       this.hooks.editNode(this, this.selNode);
     }
     if (this.selLink != null) {
       // 雙擊折點：刪掉它（不是改箭頭上的字）
       const selLink = this.links[this.selLink];
-      const handle = selLink?.handleAt(this.mouseCoords(ev));
-      if (selLink && handle?.kind == 'point') {
+      const handle = at && selLink?.handleAt(at);
+      if (selLink && handle && handle.kind == 'point') {
         selLink.removePoint(handle.index);
         this.draw();
         return;
@@ -863,7 +928,8 @@ export class Diagram {
       if (!ed) {
         ed = document.createElement('textarea');
         ed.id = 'tmpTextEdit';
-        ed.addEventListener('keyup', () => {
+        // 用 input：平板、手機的螢幕鍵盤不一定會送 keyup
+        ed.addEventListener('input', () => {
           const l = this.selLink != null ? this.links[this.selLink] : null;
           if (l) l.text = ed!.value;
         });
@@ -875,6 +941,7 @@ export class Diagram {
         left: s.x + window.scrollX - 100 + 'px', top: s.y + window.scrollY - 10 + 'px', width: '200px', height: '20px',
       });
       ed.value = link.text;
+      ed.focus();
     }
-  };
+  }
 }

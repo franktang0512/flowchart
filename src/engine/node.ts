@@ -62,7 +62,7 @@ export class FlowNode {
   /** 依寬度把文字斷成好幾行：盡量在空白處斷，空白太前面就直接切 */
   private wrap(ctx: CanvasRenderingContext2D, maxWidth: number): string[] {
     const lines: string[] = [];
-    let rest = displayNodeText(this.text ?? '', this.figure).trim();
+    let rest = displayNodeText(this.text ?? '', this.figure, this.data).trim();
     while (rest.length) {
       let i = rest.length;
       while (i > 1 && ctx.measureText(rest.substring(0, i)).width > maxWidth) i--;
