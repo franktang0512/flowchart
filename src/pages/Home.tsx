@@ -5,6 +5,7 @@ import { COURSES, courseFits, questionHref, unitName, unitQuestions, type Course
 import { link, t, useLang } from '../i18n';
 import { loadQuestionByPath, questionIn, type Question } from '../questions';
 import { getChosenTarget, setTarget, targetName, useTarget, type Target } from '../target';
+import { Footer } from '../components/Footer';
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -20,14 +21,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <div className="home_main">{children}</div>
-      <div id="footer">
-        <div className="contact">
-          <p>{t('聯絡我們：', 'Contact: ')}<a href="mailto:785@syijh.tp.edu.tw">785@syijh.tp.edu.tw</a></p>
-        </div>
-        <div className="copyright">
-          <p>&copy; 2023 張煜. All rights reserved.</p>
-        </div>
-      </div>
+      <Footer />
     </div>
   );
 }

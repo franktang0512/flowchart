@@ -215,15 +215,22 @@ input, textarea, select, button {
 }
 
 #footer {
-    display: flex;
-    justify-content: space-between;
     background: var(--green);
     padding: 4px 20px;
     font-size: 0.85rem;
     flex-shrink: 0;
+    text-align: center;
 }
 #footer p {
     margin: 0;
+}
+/* 窄的畫面：分隔線不顯示，「擴充」換到下一行 */
+@media (max-width: 760px) {
+    .footer_sep {
+        display: block;
+        height: 0;
+        overflow: hidden;
+    }
 }
 
 /* ---------- 學習單主體 ---------- */

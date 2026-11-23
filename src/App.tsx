@@ -30,6 +30,7 @@ import { COURSES, courseFits } from './courses';
 import { useCommit } from './useCommit';
 import { savePdf } from './pdf';
 import { downloadWorkFile, makeWorkFile, parseWorkFile, pickTextFile, stashPendingImport, takePendingImport, type WorkContent, type WorkFile } from './workFile';
+import { Footer } from './components/Footer';
 
 /** 開發測試用：true 時不用填班級座號也能交作業 */
 const DEBUG_MODE = false;
@@ -1302,14 +1303,7 @@ export function App() {
 
       <PrintView visible={printing || pdfBusy} capture={pdfBusy && !printing} data={printData} imgSrc={printImg} modules={printModules} />
 
-      <div id="footer">
-        <div className="contact">
-          <p>{t('聯絡我們：', 'Contact: ')}<a href="mailto:785@syijh.tp.edu.tw">785@syijh.tp.edu.tw</a></p>
-        </div>
-        <div className="copyright">
-          <p>&copy; 2023 張煜. All rights reserved.</p>
-        </div>
-      </div>
+      <Footer />
     </div>
   );
 }
