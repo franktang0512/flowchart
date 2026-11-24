@@ -1,0 +1,363 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/ll_build",
+  "questionTitle": "基本操作｜linked list：用指標串起來",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "每讀一個數字就 new 一個節點放到最前面，最後從 head 沿著 next 走到 nullptr",
+    "hint": "n：幾個數字；x：讀到的數字；head：第一個節點；p：走到哪個節點",
+    "hint2": "從最前面到最後面的數字"
+  },
+  "variables": [
+    {
+      "desc": "幾個數字",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "讀到的數字",
+      "name": "x",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "指到第一個節點",
+      "name": "head",
+      "type": "指標",
+      "init": "Node"
+    },
+    {
+      "desc": "現在走到哪個節點",
+      "name": "p",
+      "type": "指標",
+      "init": "Node"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 120,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 90,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 x",
+        "figure": "Parallelogram",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 105,
+        "y": 550,
+        "w": 150,
+        "h": 80,
+        "text": " head 設為 new Node{x, head}",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "x",
+          "head"
+        ],
+        "data": ""
+      },
+      {
+        "x": 115,
+        "y": 730,
+        "w": 130,
+        "h": 80,
+        "text": " p 設為 head",
+        "figure": "Rectangle",
+        "variables": [
+          "head",
+          "p"
+        ],
+        "data": ""
+      },
+      {
+        "x": 80,
+        "y": 860,
+        "w": 200,
+        "h": 80,
+        "text": "p != nullptr",
+        "figure": "While_Loop",
+        "variables": [
+          "n",
+          "p"
+        ],
+        "data": "while"
+      },
+      {
+        "x": 110,
+        "y": 990,
+        "w": 140,
+        "h": 80,
+        "text": "輸出 p->val",
+        "figure": "Parallelogram",
+        "variables": [
+          "p"
+        ]
+      },
+      {
+        "x": 105,
+        "y": 1120,
+        "w": 150,
+        "h": 80,
+        "text": " p 設為 p->next",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "x",
+          "p"
+        ],
+        "data": ""
+      },
+      {
+        "x": 120,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 120,
+        "y": 1300,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 180,
+            "y": 655
+          },
+          {
+            "x": 60,
+            "y": 655
+          },
+          {
+            "x": 60,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 300,
+            "y": 330
+          },
+          {
+            "x": 300,
+            "y": 705
+          },
+          {
+            "x": 180,
+            "y": 705
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 180,
+            "y": 1225
+          },
+          {
+            "x": 50,
+            "y": 1225
+          },
+          {
+            "x": 50,
+            "y": 900
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 9,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 310,
+            "y": 900
+          },
+          {
+            "x": 310,
+            "y": 1275
+          },
+          {
+            "x": 180,
+            "y": 1275
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [
+    {
+      "id": 1,
+      "name": "Node",
+      "fields": [
+        {
+          "name": "val",
+          "type": "數字"
+        },
+        {
+          "name": "next",
+          "type": "指標",
+          "to": "Node"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    [
+      "4\n1 2 3 4",
+      "4\n3\n2\n1",
+      "每個都放到最前面，所以順序反過來"
+    ],
+    [
+      "1\n7",
+      "7",
+      "只有一個節點"
+    ],
+    [
+      "5\n10 -3 8 8 0",
+      "0\n8\n8\n-3\n10",
+      "數字可以重複，也可以是負數"
+    ]
+  ]
+}

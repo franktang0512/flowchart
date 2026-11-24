@@ -47,7 +47,7 @@
 | 課程 | 學習目標 | 內容 |
 | --- | --- | --- |
 | 生活中的解題 | 都可以 | 輸入輸出、判斷、迴圈、讀到結束為止（-1；C++、Python 還有讀到檔案結束）、清單、排序、搜尋 |
-| 生活中的演算法 | C++ | stack、queue、樹、圖、排序、搜尋、窮舉、貪心、動態規劃 |
+| 生活中的演算法 | C++ | 指標與 linked list、stack、queue、樹、圖、排序、搜尋、窮舉、貪心、動態規劃 |
 | 生活中的演算法（Python） | Python | stack、queue、排序、搜尋、窮舉、貪心、動態規劃、樹、圖（題目改成 Python 的說法、輸入照行排） |
 | 清單 | Scratch、Blockly | 清單的操作、清單搭配迴圈、插入刪除、文字 |
 | 信義國中 114 上學期、暖暖高中、113 上學期、題庫 | 都可以 | 各學校的課程題目 |
@@ -88,6 +88,7 @@
 | `map` | 選「鍵 → 值」的型別；`m[k] = v`、`m[k]`、`erase`、`clear`、`count(k)`；讀還沒有的鍵會先放 0 |
 | `struct` | 在變數表上面定義（欄位 int / float / string）；初始值可以填每個欄位；容器都可以裝（`set`、`priority_queue` 除外） |
 | `pair` | `pair<int,int>`、`pair<long long,int>`、`pair<int,string>`、`pair<string,int>`、`pair<float,int>`；用 `p.first`、`p.second` |
+| 指標 | 指到自己定義的 struct：`Node*`、`Node**`（變數表選，一開始是 `nullptr`）；struct 的欄位也可以是指標（`Node* next`）。計算積木選「指標」：存到 `p`、`p->next`、`p->val`、`*pp`，或 `delete p`。算式可以用 `p->val`、`*pp`、`&head`、`&p->next`、`nullptr`、`new Node`、`new Node{x, nullptr}`。執行時 nullptr 用 `->`、delete 過又用、delete 兩次都會說明；第四步列出 new 出來的每一筆（#地址）和指標指到哪裡 |
 
 勾「全域」的變數宣告在 main 外面，每個模組都用得到（遞迴的 DFS 靠它）。全域變數可以跟 main 的變數同名：main 用自己的，模組用全域的；main 裡要改被蓋住的全域變數，選 `::a（全域）`。
 
@@ -197,7 +198,7 @@
 - **照學習目標換說法**：`cpp_title`、`cpp_question` 是 C++ 看的，`py_title`、`py_question` 是 Python 看的（`en` 裡也可以加）；沒寫就用 `title`、`question`。這樣積木、C++、Python 各自只看到自己的說法。
 - **Python 的輸入**：Python 一次讀一整行，輸入要照行排時（例如一行一個），在測資加 `py_input`。
 - **限制可以選的容器**：加 `var_types`，例如「用 array 自己做 stack」寫 `"var_types": ["array"]`（數字、文字一定可以選）。
-  - C++：`vector`、`2d_vector`、`array`、`stack`、`queue`、`priority_queue`、`priority_queue_min`（小的先）、`set`、`map`、`struct`（含 pair）
+  - C++：`vector`、`2d_vector`、`array`、`stack`、`queue`、`priority_queue`、`priority_queue_min`（小的先）、`set`、`map`、`struct`（含 pair）、`pointer`（`Node*`）、`pointer2`（`Node**`）
   - Python：`list`、`2d_list`、`deque`、`heapq`、`set`、`dict`、`tuple`
 - **單元名稱照學習目標換**：在 `courses.ts` 的單元加 `byTarget`，例如 `byTarget: { cpp: { name: '陣列與 vector', nameEn: 'Arrays and vectors' } }`。
 - **只給 C++、Python 的題目**：在單元加 `codeOnly`，例如讀到檔案結束的題目 `codeOnly: ['life/eof1', 'life/eof2']`，Scratch、Blockly 的題目清單就不會列出來。

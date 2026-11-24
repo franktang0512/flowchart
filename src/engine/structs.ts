@@ -4,11 +4,13 @@
 
 export interface StructField {
   name: string;
-  /** 數字（C++ 的 int，float 時是 float）或文字（string） */
-  type: '數字' | '文字';
+  /** 數字（C++ 的 int，float 時是 float）、文字（string），或指標（例如 linked list 的 Node* next，to 是指到哪一種 struct） */
+  type: '數字' | '文字' | '指標';
   float?: boolean;
   /** long long（只有內建的 pair 會用到） */
   long?: boolean;
+  /** 指標欄位指到哪一種 struct（可以是自己這一種，例如 Node 的 next 是 Node*） */
+  to?: string;
 }
 
 export interface StructDef {
@@ -49,7 +51,7 @@ export const findStruct = (name: string | undefined) => (name ? current.find(s =
 export const allStructs = (): StructDef[] => [...current, ...PAIR_TYPES.map(n => pairOf(n)!)];
 
 /** 欄位的 C++ 型別 */
-export const fieldCppType = (f: StructField) => (f.type == '文字' ? 'string' : f.float ? 'float' : f.long ? 'long long' : 'int');
+export const fieldCppType = (f: StructField) => (f.type == '指標' ? `${f.to ?? ''}*` : f.type == '文字' ? 'string' : f.float ? 'float' : f.long ? 'long long' : 'int');
 
 /** 欄位一開始的值：數字是 0，文字是空的 */
-export const fieldInit = (f: StructField) => (f.type == '文字' ? '' : 0);
+export const fieldInit = (f: StructField) => (f.type == '指標' ? null : f.type == '文字' ? '' : 0);

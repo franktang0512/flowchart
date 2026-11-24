@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜linked list：加入、刪除、走訪",
+  "question": "跟上一題一樣用 struct Node（int val、Node* next）和指到第一個節點的 head 做 linked list，支援三種指令：\n1 x：用 new 建立一個存 x 的節點，放到串列的最前面\n2 x：刪掉第一個存 x 的節點（前一個節點的 next 改成指到它的下一個，再用 delete 把它還回去）；找不到就輸出 Not found!\n3：從 head 開始走到 nullptr，每個數字各輸出一行；串列是空的就輸出 Empty!\n第一行輸入 N，接下來輸入 N 個指令。\n提示：刪除時要改的可能是 head，也可能是前一個節點的 next。用一個指標的指標 Node** pp 指到「要改的那個指標」：一開始 pp = &head，往後走就是 pp = &(*pp)->next，找到之後改 *pp 就好，不用分開處理。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "7\n1 5\n1 8\n1 5\n3\n2 5\n3\n2 9",
+      "output": "5\n8\n5\n8\n5\nNot found!",
+      "note": "刪掉第一個 5（就是 head 指到的那個）"
+    },
+    {
+      "input": "6\n3\n1 4\n2 4\n3\n2 4\n1 2",
+      "output": "Empty!\nEmpty!\nNot found!",
+      "note": "唯一的節點刪掉之後又是空的"
+    },
+    {
+      "input": "8\n1 1\n1 2\n1 3\n2 2\n2 1\n1 6\n3\n2 3",
+      "output": "6\n3",
+      "note": "刪中間的 2，再刪最後面的 1"
+    }
+  ],
+  "en": {
+    "title": "Basics | linked list: add, delete, walk",
+    "question": "Like the last problem, make a linked list with struct Node (int val, Node* next) and a pointer head to the first node. It supports three commands:\n1 x: make a node holding x with new, and put it at the front\n2 x: delete the first node holding x (the next of the node before it now points to the node after it, then give it back with delete). If there is none, output Not found!\n3: walk from head to nullptr and output each number on its own line. If the list is empty, output Empty!\nFirst input N, then N commands.\nHint: when you delete, the pointer to change may be head or the next of the node before. Use a pointer to a pointer, Node** pp, that points to the pointer to change: start with pp = &head, move on with pp = &(*pp)->next, and when you find it, change *pp. Then head needs no special case.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "7\n1 5\n1 8\n1 5\n3\n2 5\n3\n2 9",
+        "output": "5\n8\n5\n8\n5\nNot found!",
+        "note": "Delete the first 5 (the one head points to)"
+      },
+      {
+        "input": "6\n3\n1 4\n2 4\n3\n2 4\n1 2",
+        "output": "Empty!\nEmpty!\nNot found!",
+        "note": "After deleting the only node it is empty again"
+      },
+      {
+        "input": "8\n1 1\n1 2\n1 3\n2 2\n2 1\n1 6\n3\n2 3",
+        "output": "6\n3",
+        "note": "Delete 2 in the middle, then 1 at the end"
+      }
+    ]
+  }
+}

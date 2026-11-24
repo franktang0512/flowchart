@@ -36,6 +36,8 @@ export interface Question extends QuestionText {
 
 const VAR_TYPE_KEYS: Record<string, VarType> = {
   vector: '清單', '2d_vector': '二維清單', array: '陣列', stack: '堆疊', queue: '佇列', struct: '結構', set: '集合', map: '對應表', priority_queue: '優先佇列', priority_queue_min: '優先佇列小',
+  // 指標：Node*、Node**（linked list）
+  pointer: '指標', pointer2: '指標的指標',
   // Python 的名稱
   list: '清單', '2d_list': '二維清單', deque: '佇列', heapq: '優先佇列小', dict: '對應表', tuple: '結構',
 };

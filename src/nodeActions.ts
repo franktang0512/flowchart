@@ -1,11 +1,11 @@
 // 對話框按「確認」之後：新增或修改積木。檢查條件的順序與舊版相同（會影響跳出哪個提示）。
 import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
-import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, scopedName, splitField, type VarStore } from './engine/decoder';
+import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, ptrDeleteOk, ptrTarget, ptrTargetOk, scopedName, splitField, type VarStore } from './engine/decoder';
 import { eofText, eofVar, NO_NEWLINE, parseSortKeys, sortKeyExpr, sortKeysText, splitOutput, splitRectangle, splitTarget } from './engine/labels';
 import { callText, parseCall, type ModuleInfo } from './engine/modules';
 import { forInit, forUpdate, parseExpr, pyFor, splitFor } from './engine/structure';
-import { isPython } from './target';
+import { getTarget, isPython } from './target';
 import { splitArgs } from './engine/modules';
 import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
@@ -31,6 +31,8 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   // 二維 vector 的某一列後面添加：「 g[u] 加入 v」
   const rowPush = f.rectKind == '二維清單' && f.rectAction == '加入';
   let text = f.rectAction == '跳出' ? ' break' : f.rectAction == '下一輪' ? ' continue'
+    // C++ 的指標：「 p->next 設為 head」「 *pp 設為 p->next」「 delete p」
+    : f.rectKind == '指標' ? (f.rectAction == '釋放' ? ` delete ${f.ptrTarget.trim()}` : ` ${f.ptrTarget.trim()} 設為 ${f.code}`)
     : field ? ` ${field} 設為 ${f.code}`
     // C++ 的 string 只改其中一個字：「 s[i] 設為 'a'」
     : letterTarget(vars, f) ? ` ${letterTarget(vars, f)} 設為 ${f.code}`
@@ -97,7 +99,7 @@ function changeForm(f: DialogForm): DialogForm {
 }
 
 /** 刪除第幾項、刪除所有項目、建立二維清單、pop、排序不用填值 */
-const hasValue = (f: DialogForm) => !['刪除', '清空', '建立', '取出', '排序', '跳出', '下一輪'].includes(f.rectAction);
+const hasValue = (f: DialogForm) => !['刪除', '清空', '建立', '取出', '排序', '跳出', '下一輪', '釋放'].includes(f.rectAction) && f.rectKind != '指標';
 
 function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (!f.rectKind) {
@@ -134,6 +136,16 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   }
   // break / continue：不用填什麼（只能用在迴圈裡，執行時檢查）
   if (f.rectKind == '迴圈控制') return true;
+  // C++ 的指標：存到 p、p->next、p->val、*pp；delete p
+  if (f.rectKind == '指標') {
+    if (f.rectAction == '釋放') return ptrDeleteOk(vars, f.ptrTarget);
+    if (!ptrTargetOk(vars, f.ptrTarget)) return false;
+    if (!f.code.trim()) {
+      alert(t('請填要放什麼，例如 new Node{x, nullptr}、head、p->next、nullptr。', 'Enter what to store, like new Node{x, nullptr}, head, p->next or nullptr.'));
+      return false;
+    }
+    return checkVar(vars, f.code, true) && checkValueType(vars, modules, f.ptrTarget.trim(), f.code, 'var');
+  }
   // struct 的欄位：要先選變數和欄位（容器還要填索引），值的型別要跟欄位一樣
   if (f.rectKind == '結構' && !f.rectField) {
     alert(t('請選要改哪個欄位。', 'Choose a field.'));
@@ -651,6 +663,11 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
     case 'Rectangle': {
       const { target, action, index, index2, expr } = splitRectangle(text);
       if (action == '跳出' || action == '下一輪') return { kind: 'Rectangle', initial: { rectKind: '迴圈控制', rectAction: action } };
+      // C++ 的指標：delete p、存到 p、*pp、p->next、p->val
+      if (action == '釋放') return { kind: 'Rectangle', initial: { rectKind: '指標', rectAction: '釋放', ptrTarget: target } };
+      if (action == '設為' && vars && getTarget() == 'cpp' && ptrTarget(vars, target)) {
+        return { kind: 'Rectangle', initial: { rectKind: '指標', rectAction: '設為', ptrTarget: target, code: expr } };
+      }
       // struct 的欄位：「 e.from 設為 x」「 edges[i].w 設為 x」
       const field = action == '設為' ? splitField(target) : null;
       if (field) {

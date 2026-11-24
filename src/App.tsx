@@ -78,7 +78,7 @@ const questionPath = `${urlParams.get('w')}/${urlParams.get('h')}`;
 
 let dialogSeq = 0;
 /** 存檔裡認得的變數型別 */
-const VAR_TYPES: VarType[] = ['數字', '文字', '清單', '二維清單', '陣列', '堆疊', '佇列', '結構', '集合', '對應表', '優先佇列', '優先佇列小'];
+const VAR_TYPES: VarType[] = ['數字', '文字', '清單', '二維清單', '陣列', '堆疊', '佇列', '結構', '集合', '對應表', '優先佇列', '優先佇列小', '指標', '指標的指標'];
 let varSeq = 0;
 
 /** 第一步、第二步的卡片：不是目前步驟時蓋上半透明灰色，點一下切過去 */
@@ -462,7 +462,7 @@ export function App() {
     return null;
   };
   /** 用到這個 struct 的變數（主流程和每個模組的區域變數） */
-  const holdsStructType = (type: VarType) => type == '結構' || isContainerType(type);
+  const holdsStructType = (type: VarType) => type == '結構' || type == '指標' || type == '指標的指標' || isContainerType(type);
   const structUsers = (sname: string) => [
     ...varsRef.current.filter(v => v.init == sname && holdsStructType(v.type)).map(v => v.name.trim() || t('（沒有名字的變數）', '(unnamed)')),
     ...modulesRef.current.flatMap(m => (m.info.locals ?? []).filter(v => v.init == sname && holdsStructType(v.type)).map(v => v.name.trim())),
@@ -473,6 +473,8 @@ export function App() {
       const fix = <T extends { init: string; type: VarType }>(v: T): T => (v.init == rename.from && holdsStructType(v.type) ? { ...v, init: rename.to } : v);
       setVars(varsRef.current.map(fix));
       setModules(modulesRef.current.map(m => (m.info.locals ? { ...m, info: { ...m.info, locals: m.info.locals.map(fix) } } : m)));
+      // 指到它的指標欄位（例如 Node* next）也跟著改
+      next = next.map(s => ({ ...s, fields: s.fields.map(f => (f.type == '指標' && f.to == rename.from ? { ...f, to: rename.to } : f)) }));
     }
     if (rename?.kind == 'field') {
       // 欄位改名：這種 struct 的變數，欄位初始值跟著改名
@@ -511,6 +513,9 @@ export function App() {
       fieldProblem={fieldProblem}
       deleteProblem={s => {
         const users = s.name.trim() ? structUsers(s.name.trim()) : [];
+        // 別的 struct 有指到它的指標欄位
+        const pointing = structsRef.current.filter(x => x.id != s.id && x.fields.some(f => f.type == '指標' && f.to == s.name.trim()));
+        if (pointing.length) return t(`struct ${pointing.map(x => x.name).join('、')} 有指到 ${s.name} 的指標欄位：請先把那些欄位改掉，再刪除。`, `The structs ${pointing.map(x => x.name).join(', ')} have pointer fields to ${s.name}. Change those fields first.`);
         return users.length ? t(`變數 ${users.join('、')} 還在用 struct ${s.name}：請先把它們的型別改掉，再刪除。`, `The variables ${users.join(', ')} still use struct ${s.name}. Change their types first.`) : null;
       }}
       fieldInUse={(_, field) => allDiagrams().some(d => d.nodes.some(n => n != null && usesField(n.text, field)))}
@@ -954,7 +959,10 @@ export function App() {
     setStructs((work.structs ?? []).map(s => ({
       id: ++varSeq,
       name: String(s.name ?? ''),
-      fields: (s.fields ?? []).map(f => ({ name: String(f.name ?? ''), type: f.type == '文字' ? '文字' as const : '數字' as const, ...(f.float && f.type != '文字' ? { float: true } : {}) })),
+      fields: (s.fields ?? []).map(f => (f.type == '指標'
+        // 指標欄位（例如 Node* next）：記得指到哪一種 struct
+        ? { name: String(f.name ?? ''), type: '指標' as const, to: String(f.to ?? '') }
+        : { name: String(f.name ?? ''), type: f.type == '文字' ? '文字' as const : '數字' as const, ...(f.float && f.type != '文字' ? { float: true } : {}) })),
     })));
     setVars(work.variables.map(v => ({
       id: ++varSeq,
@@ -1304,7 +1312,7 @@ export function App() {
           onWhich={n => { setWhich(n); runCase(n); }}
           cases={cases}
           varNames={[...vars.filter(v => v.name.trim()).map(runName), ...forLoopVars(main.nodes)]}
-          kinds={Object.fromEntries([...vars.map(v => ({ ...v, name: runName(v) })), ...modules.flatMap(m => m.info.locals ?? [])].filter(v => ['堆疊', '佇列', '陣列', '集合', '對應表', '優先佇列', '優先佇列小'].includes(v.type)).map(v => [v.name.trim(), v.type]))}
+          kinds={Object.fromEntries([...vars.map(v => ({ ...v, name: runName(v) })), ...modules.flatMap(m => m.info.locals ?? [])].filter(v => ['堆疊', '佇列', '陣列', '集合', '對應表', '優先佇列', '優先佇列小', '指標', '指標的指標'].includes(v.type)).map(v => [v.name.trim(), v.type]))}
           sheetName={modules.length ? sheetLabel(nowAt.sheet) : ''}
           moduleVars={modules.map((m, k) => ({
             sheet: k + 1,

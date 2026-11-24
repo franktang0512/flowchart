@@ -51,6 +51,12 @@ export function exprText(e: Expr, cond = false, parent = 0): string {
     case 'idx': return `${exprText(e.obj, cond, 9)}[${exprText(e.index, cond)}]`;
     case 'method': return `${exprText(e.obj, cond, 9)}.${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     case 'field': return `${exprText(e.obj, cond, 9)}.${e.name}`;
+    // C++ 的指標
+    case 'arrow': return `${exprText(e.obj, cond, 9)}->${e.name}`;
+    case 'deref': return wrap(`*${exprText(e.a, cond, 8)}`, 8, parent);
+    case 'addr': return wrap(`&${exprText(e.a, cond, 8)}`, 8, parent);
+    case 'null': return 'nullptr';
+    case 'new': return `new ${e.sname}${e.init ? `{${e.init.map(a => exprText(a, cond)).join(', ')}}` : ''}`;
     case 'fcall': return `${e.name}(${e.args.map(a => exprText(a, cond)).join(', ')})`;
     case 'neg': return `-${exprText(e.a, cond, 7)}`;
     // not 後面除了單一個值都加括號：not (a > 5)，不然會被當成 (not a) > 5
@@ -122,6 +128,7 @@ export function buildFlowchart(d: Diagram, program: Stmt[], vars: VarStore) {
           回傳: ` 回傳 ${v}`,
           放入: ` ${s.target} 放入 ${v}`,
           取出: ` ${s.target} 取出`,
+          釋放: ` delete ${s.target}`,
           // 排序、break、continue 是另一種結構，不會走到這裡
           排序: '',
           跳出: '',

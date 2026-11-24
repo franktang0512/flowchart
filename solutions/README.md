@@ -59,24 +59,27 @@ solutions/
 
 | 單元 | 檔案 | 代號 | 解法 |
 | --- | --- | --- | --- |
-| Stack（後進先出） | [01_基本操作｜stack：用 array 自己做.json](adv/cpp/01_基本操作｜stack：用%20array%20自己做.json) | st_array | 用 array 和 top 自己做 stack |
-|  | [02_基本操作｜stack：用函式庫 stack.json](adv/cpp/02_基本操作｜stack：用函式庫%20stack.json) | st_basic | 用函式庫的 stack：push、pop、top()、empty() |
-|  | [03_瀏覽器的上一頁.json](adv/cpp/03_瀏覽器的上一頁.json) | st1 | 打開一頁就 push；上一頁就 pop，再看 top() |
-|  | [04_計算機檢查括號.json](adv/cpp/04_計算機檢查括號.json) | st2 | 左括號 push；右括號要跟頂端的左括號配成一對才 pop，最後 stack 要是空的 |
-| Queue（先進先出） | [05_基本操作｜queue：用 array 自己做.json](adv/cpp/05_基本操作｜queue：用%20array%20自己做.json) | q_array | 用 array 和 head、tail 自己做 queue |
-|  | [06_基本操作｜queue：用函式庫 queue.json](adv/cpp/06_基本操作｜queue：用函式庫%20queue.json) | q_basic | 用函式庫的 queue：push、pop、front()、empty() |
-|  | [07_叫號機.json](adv/cpp/07_叫號機.json) | q1 | 來排隊就 push；叫號就輸出 front() 再 pop |
-|  | [08_傳炸彈遊戲.json](adv/cpp/08_傳炸彈遊戲.json) | q2 | 傳一次＝把最前面的人移到最後面；傳 k 次後最前面的人出局 |
-| 樹 | [09_基本操作｜樹：用 array 記上一層.json](adv/cpp/09_基本操作｜樹：用%20array%20記上一層.json) | t_parent | parent 先全部設成 -1；接上去就記 parent[c]；找下一層就從 0 看到 n - 1 |
-|  | [10_基本操作｜二元樹：用 array 一層一層存.json](adv/cpp/10_基本操作｜二元樹：用%20array%20一層一層存.json) | t_bin | 位置 i 的左孩子 2*i+1、右孩子 2*i+2，超過 n - 1 就是沒有；上一層 (i-1)/2 |
-|  | [11_族譜往上找.json](adv/cpp/11_族譜往上找.json) | t1 | 每個人記上一代是誰，從要查的人一路往上走到 -1 |
-| 圖 | [12_捷運最少坐幾站.json](adv/cpp/12_捷運最少坐幾站.json) | gr1 | BFS：從起點一層一層往外走，dist 記坐幾站到 |
-| 排序 | [13_整理手上的牌.json](adv/cpp/13_整理手上的牌.json) | so1 | 插入排序：從左邊找到第一個比新牌大的位置，插在那裡 |
-|  | [14_賽跑排名.json](adv/cpp/14_賽跑排名.json) | so2 | 把（秒數, 座號）放進 vector，由小到大排：秒數一樣就比座號 |
-| 搜尋 | [15_電腦猜你的數字.json](adv/cpp/15_電腦猜你的數字.json) | se1 | 二分搜尋：每次猜範圍正中間，太大就把最大改成猜的減 1，太小就把最小改成猜的加 1 |
-| 窮舉 | [16_自動販賣機投幣.json](adv/cpp/16_自動販賣機投幣.json) | b1 | 窮舉 50 元、10 元的枚數，5 元的枚數直接算出來看夠不夠 |
-|  | [17_忘記行李箱密碼.json](adv/cpp/17_忘記行李箱密碼.json) | b2 | 三層迴圈，右邊的從左邊的加 1 開始試，加起來是 s 就輸出 |
-| 貪心 | [18_收銀機找零.json](adv/cpp/18_收銀機找零.json) | g1 | 貪心：從大的硬幣開始，能找幾個就找幾個 |
-|  | [19_社團博覽會.json](adv/cpp/19_社團博覽會.json) | g2 | 貪心：照結束時間，開始時間不早於上一場結束就參加 |
-| 動態規劃 | [20_上樓梯.json](adv/cpp/20_上樓梯.json) | d1 | 走到第 i 階 = 從 i - 1 階走 1 階 + 從 i - 2 階走 2 階 |
-|  | [21_遊樂場代幣.json](adv/cpp/21_遊樂場代幣.json) | d2 | 湊出 i 點最少幾枚 = 最後一枚是 1、4 或 5 點，三種取最少 |
+| 指標與 linked list | [01_基本操作｜linked list：用指標串起來.json](adv/cpp/01_基本操作｜linked%20list：用指標串起來.json) | ll_build | 每讀一個數字就 new 一個節點放到最前面，最後從 head 沿著 next 走到 nullptr |
+|  | [02_基本操作｜linked list：加入、刪除、走訪.json](adv/cpp/02_基本操作｜linked%20list：加入、刪除、走訪.json) | ll_basic | 刪除用 Node** pp 指到「要改的那個指標」（一開始是 &head），找到後 *pp 改成下一個，再 delete |
+|  | [03_火車車廂.json](adv/cpp/03_火車車廂.json) | ll1 | 接到最後：pp 從 &head 走到 nullptr 再放新節點；插在 a 後面：找到 a，新節點的 next 是 a 原本的 next；拆掉：跟上一題的刪除一樣 |
+| Stack（後進先出） | [04_基本操作｜stack：用 array 自己做.json](adv/cpp/04_基本操作｜stack：用%20array%20自己做.json) | st_array | 用 array 和 top 自己做 stack |
+|  | [05_基本操作｜stack：用函式庫 stack.json](adv/cpp/05_基本操作｜stack：用函式庫%20stack.json) | st_basic | 用函式庫的 stack：push、pop、top()、empty() |
+|  | [06_瀏覽器的上一頁.json](adv/cpp/06_瀏覽器的上一頁.json) | st1 | 打開一頁就 push；上一頁就 pop，再看 top() |
+|  | [07_計算機檢查括號.json](adv/cpp/07_計算機檢查括號.json) | st2 | 左括號 push；右括號要跟頂端的左括號配成一對才 pop，最後 stack 要是空的 |
+| Queue（先進先出） | [08_基本操作｜queue：用 array 自己做.json](adv/cpp/08_基本操作｜queue：用%20array%20自己做.json) | q_array | 用 array 和 head、tail 自己做 queue |
+|  | [09_基本操作｜queue：用函式庫 queue.json](adv/cpp/09_基本操作｜queue：用函式庫%20queue.json) | q_basic | 用函式庫的 queue：push、pop、front()、empty() |
+|  | [10_叫號機.json](adv/cpp/10_叫號機.json) | q1 | 來排隊就 push；叫號就輸出 front() 再 pop |
+|  | [11_傳炸彈遊戲.json](adv/cpp/11_傳炸彈遊戲.json) | q2 | 傳一次＝把最前面的人移到最後面；傳 k 次後最前面的人出局 |
+| 樹 | [12_基本操作｜樹：用 array 記上一層.json](adv/cpp/12_基本操作｜樹：用%20array%20記上一層.json) | t_parent | parent 先全部設成 -1；接上去就記 parent[c]；找下一層就從 0 看到 n - 1 |
+|  | [13_基本操作｜二元樹：用 array 一層一層存.json](adv/cpp/13_基本操作｜二元樹：用%20array%20一層一層存.json) | t_bin | 位置 i 的左孩子 2*i+1、右孩子 2*i+2，超過 n - 1 就是沒有；上一層 (i-1)/2 |
+|  | [14_族譜往上找.json](adv/cpp/14_族譜往上找.json) | t1 | 每個人記上一代是誰，從要查的人一路往上走到 -1 |
+| 圖 | [15_捷運最少坐幾站.json](adv/cpp/15_捷運最少坐幾站.json) | gr1 | BFS：從起點一層一層往外走，dist 記坐幾站到 |
+| 排序 | [16_整理手上的牌.json](adv/cpp/16_整理手上的牌.json) | so1 | 插入排序：從左邊找到第一個比新牌大的位置，插在那裡 |
+|  | [17_賽跑排名.json](adv/cpp/17_賽跑排名.json) | so2 | 把（秒數, 座號）放進 vector，由小到大排：秒數一樣就比座號 |
+| 搜尋 | [18_電腦猜你的數字.json](adv/cpp/18_電腦猜你的數字.json) | se1 | 二分搜尋：每次猜範圍正中間，太大就把最大改成猜的減 1，太小就把最小改成猜的加 1 |
+| 窮舉 | [19_自動販賣機投幣.json](adv/cpp/19_自動販賣機投幣.json) | b1 | 窮舉 50 元、10 元的枚數，5 元的枚數直接算出來看夠不夠 |
+|  | [20_忘記行李箱密碼.json](adv/cpp/20_忘記行李箱密碼.json) | b2 | 三層迴圈，右邊的從左邊的加 1 開始試，加起來是 s 就輸出 |
+| 貪心 | [21_收銀機找零.json](adv/cpp/21_收銀機找零.json) | g1 | 貪心：從大的硬幣開始，能找幾個就找幾個 |
+|  | [22_社團博覽會.json](adv/cpp/22_社團博覽會.json) | g2 | 貪心：照結束時間，開始時間不早於上一場結束就參加 |
+| 動態規劃 | [23_上樓梯.json](adv/cpp/23_上樓梯.json) | d1 | 走到第 i 階 = 從 i - 1 階走 1 階 + 從 i - 2 階走 2 階 |
+|  | [24_遊樂場代幣.json](adv/cpp/24_遊樂場代幣.json) | d2 | 湊出 i 點最少幾枚 = 最後一枚是 1、4 或 5 點，三種取最少 |

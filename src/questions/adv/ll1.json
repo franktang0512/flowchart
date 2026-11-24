@@ -1,0 +1,44 @@
+{
+  "title": "火車車廂",
+  "question": "火車調車場要用 linked list 記錄一列火車的車廂順序（車頭不算）。一開始沒有車廂，每節車廂有一個不會重複的編號。有三種指令：\n1 x：把車廂 x 接到火車的最後面\n2 a x：把車廂 x 接在車廂 a 的後面（車廂 a 一定在火車上）\n3 x：把車廂 x 拆下來（車廂 x 一定在火車上）\n第一行輸入 N，接下來輸入 N 個指令。最後從第一節車廂開始，每節車廂的編號各輸出一行；沒有車廂就輸出 Empty!\n用 array 的話，在中間插入或拆掉一節，後面的每一格都要搬；用 linked list 只要改幾個指標。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "6\n1 3\n1 5\n2 3 9\n1 7\n3 5\n2 7 1",
+      "output": "3\n9\n7\n1",
+      "note": "9 插在 3 後面；拆掉 5；1 接在最後一節 7 的後面"
+    },
+    {
+      "input": "2\n1 4\n3 4",
+      "output": "Empty!",
+      "note": "唯一的車廂拆掉了"
+    },
+    {
+      "input": "5\n1 1\n2 1 2\n2 1 3\n3 1\n2 3 4",
+      "output": "3\n4\n2",
+      "note": "拆掉第一節車廂"
+    }
+  ],
+  "en": {
+    "title": "Train Cars",
+    "question": "A rail yard keeps the order of the cars of a train in a linked list (the engine does not count). At first there are no cars. Each car has a number, and no two are the same. There are three commands:\n1 x: put car x at the end of the train\n2 a x: put car x right after car a (car a is always on the train)\n3 x: take car x off (car x is always on the train)\nFirst input N, then N commands. At the end, output the number of each car from the first one, each on its own line. If there are no cars, output Empty!\nWith an array, putting a car in the middle or taking one off means moving every item after it. With a linked list you only change a few pointers.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "6\n1 3\n1 5\n2 3 9\n1 7\n3 5\n2 7 1",
+        "output": "3\n9\n7\n1",
+        "note": "9 goes after 3; 5 comes off; 1 goes after the last car 7"
+      },
+      {
+        "input": "2\n1 4\n3 4",
+        "output": "Empty!",
+        "note": "The only car comes off"
+      },
+      {
+        "input": "5\n1 1\n2 1 2\n2 1 3\n3 1\n2 3 4",
+        "output": "3\n4\n2",
+        "note": "The first car comes off"
+      }
+    ]
+  }
+}

@@ -79,12 +79,16 @@ export function StructTable({ structs, onChange, structProblem, fieldProblem, de
                     </td>
                     <td>
                       <select
-                        className="var_input" value={f.type == '文字' ? 'string' : f.float ? 'float' : 'int'}
-                        onChange={e => setField(e.target.value == 'string' ? { type: '文字', float: undefined } : { type: '數字', float: e.target.value == 'float' || undefined })}
+                        className="var_input" value={f.type == '指標' ? 'ptr:' + (f.to ?? '') : f.type == '文字' ? 'string' : f.float ? 'float' : 'int'}
+                        onChange={e => setField(e.target.value.startsWith('ptr:') ? { type: '指標', to: e.target.value.slice(4), float: undefined }
+                          : e.target.value == 'string' ? { type: '文字', float: undefined, to: undefined } : { type: '數字', float: e.target.value == 'float' || undefined, to: undefined })}
                       >
                         <option value="int">{t('int（整數）', 'int')}</option>
                         <option value="float">{t('float（小數）', 'float')}</option>
                         <option value="string">{t('string（文字）', 'string')}</option>
+                        {/* 指標欄位：指到某一種 struct（可以是自己，例如 linked list 的 Node* next） */}
+                        {structs.filter(x => x.name.trim()).map(x => <option key={x.id} value={'ptr:' + x.name}>{x.name}*（{t('指標', 'pointer')}）</option>)}
+                        {f.type == '指標' && !structs.some(x => x.name == f.to) && <option value={'ptr:' + (f.to ?? '')} disabled>{f.to}*（{t('不存在', 'missing')}）</option>}
                       </select>
                     </td>
                     <td>

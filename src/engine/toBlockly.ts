@@ -62,8 +62,8 @@ export function toBlockly(program: Stmt[], varList: VarInfo[], mode: BlockMode, 
     switch (e.t) {
       case 'num': return literal(e.v, true);
       case 'str': return literal(e.v, false);
-      // {a, b} 只有 C++ 有（「看程式」會先擋下來）
-      case 'brace': return literal('', false);
+      // {a, b}、指標只有 C++ 有（「看程式」會先擋下來）
+      case 'brace': case 'arrow': case 'deref': case 'addr': case 'null': case 'new': return literal('', false);
       // 只有 Python 有的寫法（「看程式」只有 Python 會用到，這裡只是寫完整）
       case 'bool': return { type: 'logic_boolean', fields: { BOOL: e.v ? 'TRUE' : 'FALSE' } };
       case 'list': return literal('', false);

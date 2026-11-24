@@ -53,6 +53,8 @@ export function toPython(program: Stmt[], varList: VarInfo[], modules: ModulePro
       case 'var': return e.name.replace(/^::/, '');
       case 'brace': return `(${e.items.map(a => expr(a)).join(', ')}${e.items.length == 1 ? ',' : ''})`;
       case 'raw': return e.text;
+      // 指標只有 C++ 有
+      case 'arrow': case 'deref': case 'addr': case 'null': case 'new': return 'None';
       case 'idx': return `${expr(e.obj, 10)}[${expr(e.index)}]`;
       case 'slice': return `${expr(e.obj, 10)}[${e.start ? expr(e.start) : ''}:${e.stop ? expr(e.stop) : ''}${e.step ? ':' + expr(e.step) : ''}]`;
       case 'method': return `${expr(e.obj, 10)}.${e.name}(${e.args.map(a => expr(a)).join(', ')})`;

@@ -304,7 +304,7 @@ function rectStmt(text: string): Stmt {
     kind: 'rect', action, target, round,
     index: index ? parseExpr(index) : undefined,
     ...(index2 ? { index2: parseExpr(index2) } : {}),
-    value: action == '刪除' || action == '清空' || action == '建立' || action == '取出' ? undefined : parseExpr(expr),
+    value: action == '刪除' || action == '清空' || action == '建立' || action == '取出' || action == '釋放' ? undefined : parseExpr(expr),
   };
 }
 
@@ -340,6 +340,17 @@ export type Expr =
   | { t: 'neg'; a: Expr }
   /** 大括號 {a, b}：一整筆 pair / struct（例如 q.push({x, y})），欄位照順序 */
   | { t: 'brace'; items: Expr[] }
+  // ---- C++ 的指標（linked list）；at 是重要的 token 是第幾個（執行時要換掉那些 token，見 decoder 的 rewrites） ----
+  /** p->next：指標指到的那一筆的欄位；at：[obj 的第一個 token, - 的位置]（後面是 >、欄位名稱） */
+  | { t: 'arrow'; obj: Expr; name: string; at?: [number, number] }
+  /** *pp：指標指到的東西（Node** 是那個指標、Node* 是那一筆）；at：[* 的位置, 後面那段結束的位置] */
+  | { t: 'deref'; a: Expr; at?: [number, number] }
+  /** &head、&p->next：指到這個指標的指標（Node**）；at：[& 的位置, 後面那段結束的位置] */
+  | { t: 'addr'; a: Expr; at?: [number, number] }
+  /** nullptr（也可以寫 NULL）：沒有指到任何東西 */
+  | { t: 'null'; at?: number }
+  /** new Node、new Node{5, nullptr}：要一筆新的 struct，得到指到它的指標；at：[new, struct 名稱, 結尾的 } 或 )（沒有是 -1）] */
+  | { t: 'new'; sname: string; init?: Expr[]; at?: [number, number, number] }
   /** 看不懂的寫法：原樣保留 */
   | { t: 'raw'; text: string };
 
@@ -431,14 +442,26 @@ class Parser {
   or(): Expr {
     const from = this.k;
     let a = this.and();
-    while (this.is('or', '或')) { const at = this.k; this.take(); a = this.mark(from, { t: 'bin', op: 'or', a, b: this.and() }, [at]); }
+    while (this.is('or', '或') || this.isPair('|')) {
+      const at = this.k;
+      if (this.take().text == '|') this.take();
+      a = this.mark(from, { t: 'bin', op: 'or', a, b: this.and() }, [at]);
+    }
     return a;
   }
   private and(): Expr {
     const from = this.k;
     let a = this.not();
-    while (this.is('and', '且')) { const at = this.k; this.take(); a = this.mark(from, { t: 'bin', op: 'and', a, b: this.not() }, [at]); }
+    while (this.is('and', '且') || this.isPair('&')) {
+      const at = this.k;
+      if (this.take().text == '&') this.take();
+      a = this.mark(from, { t: 'bin', op: 'and', a, b: this.not() }, [at]);
+    }
     return a;
+  }
+  /** C++ 的 &&、||（符號是一個一個字元切開的） */
+  private isPair(c: string) {
+    return !this.py && this.peek()?.type == 'op' && this.peek()?.text == c && this.peek(1)?.text == c;
   }
   private not(): Expr {
     const from = this.k;
@@ -511,6 +534,37 @@ class Parser {
   private unaryInner(): Expr {
     if (this.is('-')) { this.take(); return { t: 'neg', a: this.unary() }; }
     if (this.is('+')) { this.take(); return this.unary(); }
+    if (!this.py) {
+      // C++：!x、*p（指標指到的東西）、&head（指到 head 的指標）、new Node{…}
+      if (this.is('!') && this.peek(1)?.text != '=') { this.take(); return { t: 'not', a: this.unary() }; }
+      if (this.is('*') || (this.is('&') && this.peek(1)?.text != '&')) {
+        const at = this.k;
+        const star = this.take().text == '*';
+        const a = this.unary();
+        return star ? { t: 'deref', a, at: [at, this.k] } : { t: 'addr', a, at: [at, this.k] };
+      }
+      if (this.peek()?.type == 'name' && this.peek()?.text == 'new' && this.peek(1)?.type == 'name') {
+        const at = this.k;
+        this.take();
+        const sname = this.take().text;
+        if (this.is('(') && this.peek(1)?.text == ')') {
+          this.take();
+          const close = this.k;
+          this.take();
+          return { t: 'new', sname, at: [at, at + 1, close] };
+        }
+        if (!this.is('{')) return { t: 'new', sname, at: [at, at + 1, -1] };
+        this.take();
+        const init: Expr[] = [];
+        if (!this.is('}')) {
+          init.push(this.or());
+          while (this.is(',')) { this.take(); init.push(this.or()); }
+        }
+        const close = this.k;
+        this.expect('}');
+        return { t: 'new', sname, init, at: [at, at + 1, close] };
+      }
+    }
     const from = this.k;
     const e = this.postfix();
     // Python 的次方：2 ** 3（右邊先算：2 ** 3 ** 2 是 2 ** 9；-2 ** 2 是 -(2 ** 2)）
@@ -524,8 +578,17 @@ class Parser {
   private postfix(): Expr {
     const from = this.k;
     let e = this.primary();
-    while (this.is('[', '.')) {
+    while (this.is('[', '.') || (!this.py && this.is('-') && this.peek(1)?.text == '>')) {
       const dot = this.k;
+      // C++ 的 p->next：- 和 > 是分開的兩個 token
+      if (this.is('-')) {
+        this.take();
+        this.take();
+        const name = this.take();
+        if (name.type != 'name') throw new Error('arrow');
+        e = { t: 'arrow', obj: e, name: name.text, at: [from, dot] };
+        continue;
+      }
       if (this.take().text == '.') {
         // s.top()：點後面是函式名稱，再接空的括號；沒有括號是 struct 的欄位（e.from）
         const name = this.take();
@@ -593,6 +656,7 @@ class Parser {
       return { t: 'var', name: '::' + name.text };
     }
     if (tk.type == 'number') return { t: 'num', v: tk.text };
+    if (!this.py && tk.type == 'name' && (tk.text == 'nullptr' || tk.text == 'NULL')) return { t: 'null', at: from };
     if (tk.type == 'string') {
       const v = tk.text.slice(1, -1);
       // 'a'：單引號裡一個字（C++ 的 char）
@@ -663,7 +727,9 @@ class Parser {
  */
 export type VarType = '數字' | '文字' | '清單' | '二維清單' | '陣列' | '堆疊' | '佇列' | '結構'
   /** C++ 的 set（不重複、由小到大）、map（鍵 → 值）、priority_queue（大的先出來；「小」是小的先出來） */
-  | '集合' | '對應表' | '優先佇列' | '優先佇列小';
+  | '集合' | '對應表' | '優先佇列' | '優先佇列小'
+  /** C++ 的指標：Node*、Node**（初始值欄是指到哪一種 struct；一開始是 nullptr） */
+  | '指標' | '指標的指標';
 
 /** 容器：初始值欄是「裡面裝什麼」，不是一個值 */
 export const isContainerType = (type: VarType | undefined) => type == '清單' || type == '二維清單' || type == '陣列' || type == '堆疊' || type == '佇列'
@@ -699,14 +765,48 @@ export interface VarInfo {
   global?: boolean;
 }
 
-/** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用）；struct 是一整筆資料（例如 e、edges[i]） */
-export type ExprType = 'num' | 'str' | 'char' | 'bool' | 'list' | 'struct';
+/** 運算式最後是什麼型別（判斷要怎麼寫成 C++ / 積木用）；struct 是一整筆資料（例如 e、edges[i]）；ptr 是指標（見 ptrOf） */
+export type ExprType = 'num' | 'str' | 'char' | 'bool' | 'list' | 'struct' | 'ptr';
+
+/**
+ * 運算式是哪一種指標：指到哪一種 struct、幾層（1 是 Node*，2 是 Node**）；nullptr 是 'null'（放得進每一種指標）；
+ * 不是指標回傳 null
+ */
+export function ptrOf(e: Expr, vars: Map<string, VarInfo>): { s: string; level: 1 | 2 } | 'null' | null {
+  switch (e.t) {
+    case 'null': return 'null';
+    case 'new': return { s: e.sname, level: 1 };
+    case 'var': {
+      const v = vars.get(e.name);
+      return v?.type == '指標' ? { s: v.init, level: 1 } : v?.type == '指標的指標' ? { s: v.init, level: 2 } : null;
+    }
+    case 'arrow':
+    case 'field': {
+      const f = fieldOf(e, vars);
+      return f?.type == '指標' && f.to ? { s: f.to, level: 1 } : null;
+    }
+    case 'deref': {
+      const a = ptrOf(e.a, vars);
+      return a && a != 'null' && a.level == 2 ? { s: a.s, level: 1 } : null;
+    }
+    case 'addr': {
+      const a = ptrOf(e.a, vars);
+      return a && a != 'null' && a.level == 1 ? { s: a.s, level: 2 } : null;
+    }
+    default: return null;
+  }
+}
 
 /**
  * 運算式是哪一種 struct 的一整筆資料：struct 變數 e、裝 struct 的 array / vector 的一格 edges[i]、
  * 二維 vector 的一格 g[u][k]、stack / queue 的 s.top()、q.front()；不是的話 null
  */
 export function structOf(e: Expr, vars: Map<string, VarInfo>): string | null {
+  // *p：Node* 指到的那一筆
+  if (e.t == 'deref') {
+    const p = ptrOf(e.a, vars);
+    return p && p != 'null' && p.level == 1 && findStruct(p.s) ? p.s : null;
+  }
   if (e.t == 'var') {
     const v = vars.get(e.name);
     return v?.type == '結構' && findStruct(v.init) ? v.init : null;
@@ -735,8 +835,12 @@ export function structOf(e: Expr, vars: Map<string, VarInfo>): string | null {
   return null;
 }
 
-/** struct 欄位 e.from 的定義；前面不是 struct 或沒有這個欄位時 undefined */
-export function fieldOf(e: Expr & { t: 'field' }, vars: Map<string, VarInfo>): StructField | undefined {
+/** struct 欄位 e.from（或指標指到的 p->next）的定義；前面不是 struct（或指到 struct 的指標）、沒有這個欄位時 undefined */
+export function fieldOf(e: Expr & { t: 'field' | 'arrow' }, vars: Map<string, VarInfo>): StructField | undefined {
+  if (e.t == 'arrow') {
+    const p = ptrOf(e.obj, vars);
+    return p && p != 'null' && p.level == 1 ? findStruct(p.s)?.fields.find(f => f.name == e.name) : undefined;
+  }
   return findStruct(structOf(e.obj, vars) ?? undefined)?.fields.find(f => f.name == e.name);
 }
 
@@ -749,6 +853,7 @@ export function tupleField(e: Expr, vars: Map<string, VarInfo>): StructField | u
 
 export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInfo[] = []): ExprType {
   if (structOf(e, vars)) return 'struct';
+  if (ptrOf(e, vars)) return 'ptr';
   const tf = isPython() ? tupleField(e, vars) : undefined;
   if (tf) return tf.type == '文字' ? 'str' : 'num';
   switch (e.t) {
@@ -757,7 +862,8 @@ export function exprType(e: Expr, vars: Map<string, VarInfo>, modules: ModuleInf
     case 'chain': return 'bool';
     case 'slice': return exprType(e.obj, vars, modules) == 'str' ? 'str' : 'list';
     case 'brace': return 'struct';
-    case 'field': return fieldOf(e, vars)?.type == '文字' ? 'str' : 'num';
+    case 'field':
+    case 'arrow': return fieldOf(e, vars)?.type == '文字' ? 'str' : 'num';
     case 'fcall': return modules.find(m => m.name == e.name)?.returns == '文字' ? 'str' : 'num';
     case 'num': return 'num';
     // C++ 的 'a' 是一個字（char）
@@ -845,7 +951,8 @@ export function isFloatExpr(e: Expr, vars: Map<string, VarInfo>, modules: Module
       const v = vars.get(e.name);
       return v?.type == '數字' && !!v.float;
     }
-    case 'field': return !!fieldOf(e, vars)?.float;
+    case 'field':
+    case 'arrow': return !!fieldOf(e, vars)?.float;
     case 'idx': {
       const o = e.obj.t == 'idx' ? e.obj.obj : e.obj;
       return o.t == 'var' && holdsFloat(o.name);

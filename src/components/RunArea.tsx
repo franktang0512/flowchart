@@ -71,6 +71,21 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
     const v = now?.[name];
     const extra = kind == 'module' ? ' is_param' : kind == 'idle' ? ' is_idle' : '';
     const isRecord = (x: unknown): x is Record<string, unknown> => x != null && typeof x == 'object' && !Array.isArray(x);
+    // 指標：→ #3（new 出來的第 3 筆），後面接著沿 next 走下去的樣子；nullptr
+    const pointer = ptrText(v);
+    const isPtrVar = kinds[name] == '指標' || kinds[name] == '指標的指標';
+    if (kind != 'idle' && (pointer || (v === null && isPtrVar))) {
+      const chain = pointer && kinds[name] != '指標的指標' ? chainText(v, now?.__heap) : '';
+      return (
+        <div key={name} className={'var_box' + extra}>
+          <span className="var_box_name">{name}</span>
+          <span className="var_box_value">
+            {pointer ?? 'nullptr'}
+            {chain && <span className="ptr_chain">{chain}</span>}
+          </span>
+        </div>
+      );
+    }
     const isList = Array.isArray(v);
     const isGrid = isList && v.length > 0 && Array.isArray(v[0]);
     // struct：一筆（e）或裝 struct 的 vector、array（edges）
@@ -222,6 +237,8 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
             {values && varNames.length == 0 && <span className="muted">{t('（沒有變數）', '(none)')}</span>}
           </div>
           {values && moduleVars.map(moduleSection)}
+          {/* C++ 的指標：new 出來的每一筆（地址 #1、#2…）、裡面的值、指到哪裡 */}
+          {values && Array.isArray(values.__heap) && <HeapView heap={values.__heap as HeapItem[]} prev={prevValues?.__heap as HeapItem[] | undefined} />}
         </div>
 
         {/* 輸出放在變數下面：先看這一步變數變成什麼，再看印出了什麼 */}
@@ -249,8 +266,81 @@ function changedIndex(items: unknown[], prev: unknown): number {
 
 /** 二維 vector 一格的字：裝 struct 的寫成「to=2 w=7」 */
 function cellText(cell: unknown): string {
-  if (cell && typeof cell == 'object' && !Array.isArray(cell)) return Object.entries(cell).map(([k, v]) => `${k}=${v}`).join(' ');
+  if (ptrText(cell)) return ptrText(cell)!;
+  if (cell && typeof cell == 'object' && !Array.isArray(cell)) return Object.entries(cell).map(([k, v]) => `${k}=${valText(v)}`).join(' ');
   return String(cell);
+}
+
+/** 指標的值：→ #3（指到 new 出來的第 3 筆）、→ head（Node** 指到指標變數 head）、→ #3 的 next（指到第 3 筆的 next）；不是指標回傳 null */
+function ptrText(v: unknown): string | null {
+  if (v && typeof v == 'object' && typeof (v as { __ptr?: unknown }).__ptr == 'number') return `→ #${(v as { __ptr: number }).__ptr}`;
+  if (v && typeof v == 'object' && typeof (v as { __ref?: unknown }).__ref == 'string') {
+    const ref = (v as { __ref: string }).__ref;
+    const field = /^#(\d+)\.(.+)$/.exec(ref);
+    return field ? t(`→ #${field[1]} 的 ${field[2]}`, `→ ${field[2]} of #${field[1]}`) : `→ ${ref}`;
+  }
+  return null;
+}
+/** struct 欄位的值（指標欄位是 → #3 或 nullptr） */
+const valText = (v: unknown) => ptrText(v) ?? (v === null ? 'nullptr' : String(v));
+
+/** new 出來的一筆（decoder 的 __H）：哪一種 struct、欄位的值、已經 delete 了嗎 */
+interface HeapItem {
+  s: string;
+  v: Record<string, unknown>;
+  del: boolean;
+}
+const isPtrValue = (x: unknown) => x === null || (x != null && typeof x == 'object' && typeof (x as { __ptr?: unknown }).__ptr == 'number');
+
+/** 從指標開始沿著指標欄位（例如 next）走下去：#2(3) → #1(5) → nullptr；最多 12 筆，繞回來的標出來 */
+function chainText(start: unknown, heapRaw: unknown): string {
+  const heap = Array.isArray(heapRaw) ? heapRaw as HeapItem[] : [];
+  const parts: string[] = [];
+  const seen = new Set<number>();
+  let p = start as { __ptr: number } | null;
+  while (p && typeof p.__ptr == 'number') {
+    if (seen.has(p.__ptr)) return parts.join(' → ') + ` → #${p.__ptr}（${t('繞回來了', 'loops back')}）`;
+    if (parts.length >= 12) return parts.join(' → ') + ' → …';
+    seen.add(p.__ptr);
+    const node = heap[p.__ptr - 1];
+    if (!node) break;
+    const keys = Object.keys(node.v);
+    const data = keys.find(k => !isPtrValue(node.v[k]));
+    parts.push(`#${p.__ptr}${node.del ? t('（已 delete）', ' (deleted)') : data ? `(${String(node.v[data])})` : ''}`);
+    const link = keys.find(k => isPtrValue(node.v[k]));
+    if (!link) return parts.join(' → ');
+    p = node.v[link] as { __ptr: number } | null;
+  }
+  return parts.length ? parts.join(' → ') + ' → nullptr' : '';
+}
+
+/** 記憶體：new 出來的每一筆，一列一筆（#地址、每個欄位）；這一步改到的格子標出來，delete 掉的變淡 */
+function HeapView({ heap, prev }: { heap: HeapItem[]; prev?: HeapItem[] }) {
+  const fields = [...new Set(heap.flatMap(h => Object.keys(h.v)))];
+  return (
+    <div className="run_heap">
+      <p className="section_label">{t('記憶體：用 new 建立的每一筆（#地址）', 'Memory: everything made with new (#address)')}</p>
+      <span className="grid_value">
+        <table>
+          <thead>
+            <tr><th>#</th>{fields.map(f => <th key={f}>{f}</th>)}</tr>
+          </thead>
+          <tbody>
+            {heap.map((h, k) => (
+              <tr key={k} className={h.del ? 'heap_deleted' : ''} title={h.del ? t('已經 delete 了', 'Deleted') : h.s}>
+                <th>#{k + 1}{h.del ? t('（已 delete）', ' (deleted)') : ''}</th>
+                {fields.map(f => {
+                  const before = prev?.[k];
+                  const changed = before != null && JSON.stringify(before.v[f]) !== JSON.stringify(h.v[f]);
+                  return <td key={f} className={changed || before == null ? 'changed' : ''}>{f in h.v ? valText(h.v[f]) : ''}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </span>
+    </div>
+  );
 }
 
 /** 二維清單的值：畫成表格，上面和左邊標索引（從 0 開始）；這一步改到的格子標出來，太大可以捲動 */
@@ -313,7 +403,7 @@ function RecordTable({ rows: raw, prev: rawPrev, indexed = false, kind }: { rows
           {rows.map((row, r) => (
             <tr key={r}>
               {indexed && <th>{tag(r)}</th>}
-              {fields.map(f => <td key={f} className={prev && prev.length == rows.length && before(r, f) !== row[f] ? 'changed' : ''}>{String(row[f])}</td>)}
+              {fields.map(f => <td key={f} className={prev && prev.length == rows.length && JSON.stringify(before(r, f)) !== JSON.stringify(row[f]) ? 'changed' : ''}>{valText(row[f])}</td>)}
             </tr>
           ))}
         </tbody>

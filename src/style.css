@@ -928,6 +928,26 @@ input, textarea, select, button {
     flex: 1 1 100%;
     min-width: 0;
 }
+/* 指標：→ #2，下面一行是沿著 next 走下去的樣子 */
+.var_box_value .ptr_chain {
+    display: block;
+    font-size: 0.78rem;
+    color: #666;
+    margin-top: 2px;
+    white-space: normal;
+}
+.var_box_value:has(.ptr_chain) {
+    flex-direction: column;
+}
+/* 記憶體（new 出來的每一筆）：delete 掉的變淡 */
+.run_heap {
+    margin-top: 10px;
+}
+.run_heap tr.heap_deleted td,
+.run_heap tr.heap_deleted th {
+    opacity: 0.45;
+    text-decoration: line-through;
+}
 .var_box_value.is_list {
     flex: 0 1 auto;
     min-width: 0;

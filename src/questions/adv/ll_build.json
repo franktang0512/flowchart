@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜linked list：用指標串起來",
+  "question": "linked list（串列）用指標把資料一筆一筆串起來：每一筆叫做節點，存一個數字 val，還有一個指標 next 指到下一個節點；最後一個節點的 next 是 nullptr（沒有指到任何東西）。另外用一個指標 head 指到第一個節點，串列是空的時候 head 是 nullptr。\n先定義 struct Node，有 int val 和 Node* next 兩個欄位。\n輸入 N，再輸入 N 個整數。每讀到一個數字，就用 new 建立一個新的節點，放到串列的最前面：新節點的 next 指到原本的 head，再讓 head 指到新節點。\n全部放好之後，從 head 開始沿著 next 一個一個往下走，走到 nullptr 為止，每個數字各輸出一行。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "4\n1 2 3 4",
+      "output": "4\n3\n2\n1",
+      "note": "每個都放到最前面，所以順序反過來"
+    },
+    {
+      "input": "1\n7",
+      "output": "7",
+      "note": "只有一個節點"
+    },
+    {
+      "input": "5\n10 -3 8 8 0",
+      "output": "0\n8\n8\n-3\n10",
+      "note": "數字可以重複，也可以是負數"
+    }
+  ],
+  "en": {
+    "title": "Basics | linked list: link nodes with pointers",
+    "question": "A linked list links data with pointers. Each item is a node. It holds a number val and a pointer next to the next node. The next of the last node is nullptr (it points to nothing). A pointer head points to the first node. When the list is empty, head is nullptr.\nFirst define struct Node with two fields: int val and Node* next.\nInput N, then N whole numbers. For each number, make a new node with new and put it at the front of the list: the next of the new node points to the old head, then head points to the new node.\nThen start at head and follow next until you reach nullptr. Output each number on its own line.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "4\n1 2 3 4",
+        "output": "4\n3\n2\n1",
+        "note": "Each goes to the front, so the order is reversed"
+      },
+      {
+        "input": "1\n7",
+        "output": "7",
+        "note": "Only one node"
+      },
+      {
+        "input": "5\n10 -3 8 8 0",
+        "output": "0\n8\n8\n-3\n10",
+        "note": "Numbers can repeat or be negative"
+      }
+    ]
+  }
+}

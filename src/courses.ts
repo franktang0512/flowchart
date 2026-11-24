@@ -70,6 +70,8 @@ export const COURSES: Course[] = [
     name: '生活中的演算法', nameEn: 'Algorithms in Everyday Life',
     target: 'cpp',
     units: [
+      // 指標與 linked list 放最前面：課綱的「串列」，也先學會用指標把資料串起來
+      { name: '指標與 linked list', nameEn: 'Pointers and linked lists', questions: ['adv/ll_build', 'adv/ll_basic', 'adv/ll1'] },
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st_array', 'adv/st_basic', 'adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q_array', 'adv/q_basic', 'adv/q1', 'adv/q2'] },
       // 樹、圖放在排序前面：heap sort 會用到樹，圖的 BFS 接著 queue 用

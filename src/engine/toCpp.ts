@@ -75,7 +75,8 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
         if (e.fn == 'max' || e.fn == 'min') return e.args.length == 1 ? e.args[0].t == 'var' && isIntType(elemType(e.args[0].name)) : e.args.every(isInt);
         return e.fn == 'len' || e.fn == 'find' || e.fn == 'stoi';
       case 'method': return e.name == 'size' || e.name == 'length' || e.name == 'count' || (e.name != 'empty' && e.name != 'substr' && e.obj.t == 'var' && isIntType(elemType(e.obj.name)));
-      case 'field': {
+      case 'field':
+      case 'arrow': {
         const f = fieldOf(e, vars);
         return f?.type == '數字' && !f.float;
       }
@@ -116,6 +117,12 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       case 'idx': return `${expr(e.obj, 9)}[${expr(e.index)}]`;
       case 'method': return `${expr(e.obj, 9)}.${e.name}(${e.args.map(a => expr(a)).join(', ')})`;
       case 'field': return `${expr(e.obj, 9)}.${e.name}`;
+      // 指標：p->next、*pp、&head、nullptr、new Node{5, nullptr}
+      case 'arrow': return `${expr(e.obj, 9)}->${e.name}`;
+      case 'deref': return wrap(`*${expr(e.a, 8)}`, 8, parent);
+      case 'addr': return wrap(`&${expr(e.a, 8)}`, 8, parent);
+      case 'null': return 'nullptr';
+      case 'new': return `new ${e.sname}${e.init ? `{${e.init.map(a => expr(a)).join(', ')}}` : ''}`;
       case 'fcall': return `${e.name}(${e.args.map((a, k) => argCode(e.name, a, k)).join(', ')})`;
       case 'neg': return `-${expr(e.a, 7)}`;
       case 'not': return `!${expr(e.a, 7)}`;
@@ -351,6 +358,7 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
             break;
           }
           case '清空': emit(depth, `${s.target}.clear();`); break;
+          case '釋放': emit(depth, `delete ${s.target};`); break;
           case '放入': emit(depth, vars.get(s.target)?.type == '集合' ? `${s.target}.insert(${value});` : `${s.target}.push(${value});`); break;
           case '取出': emit(depth, `${s.target}.pop();`); break;
         }
@@ -491,6 +499,9 @@ export function toCpp(program: Stmt[], varList: VarInfo[], modules: ModuleProgra
       return `${pad}${v.init} ${v.name} = {${values.join(', ')}};`;
     }
     if (v.type == '佇列') return `${pad}queue<${elemType(v.name)}> ${v.name};`;
+    // 指標：一開始是 nullptr
+    if (v.type == '指標') return `${pad}${v.init}* ${v.name} = nullptr;`;
+    if (v.type == '指標的指標') return `${pad}${v.init}** ${v.name} = nullptr;`;
     if (v.type == '集合') return `${pad}set<${elemType(v.name)}> ${v.name};`;
     if (v.type == '對應表') return `${pad}map<${mapKeyCppType(v.init)}, ${elemType(v.name)}> ${v.name};`;
     if (v.type == '優先佇列') return `${pad}priority_queue<${elemType(v.name)}> ${v.name};`;

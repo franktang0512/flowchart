@@ -201,6 +201,9 @@ function structInitText(row: VarRow): string {
 
 /** 型別選單裡 struct 的值：「struct:Edge」 */
 const STRUCT_PREFIX = 'struct:';
+/** 指標的選項：ptr:Node 是 Node*、ptr2:Node 是 Node** */
+const PTR_PREFIX = 'ptr:';
+const PTR2_PREFIX = 'ptr2:';
 
 export const typeValue = (type: string, float?: boolean, long?: boolean, char?: boolean) => (type == '數字' && isCode() ? (float ? 'float' : long && !isPython() ? 'long' : type)
   : type == '文字' && char && getTarget() == 'cpp' ? 'char' : type);
@@ -374,8 +377,17 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
       </td>
       <td>
         <select
-          className="var_input" value={row.type == '結構' ? STRUCT_PREFIX + row.init : typeValue(row.type, row.float, row.long, row.char)}
+          className="var_input"
+          value={row.type == '結構' ? STRUCT_PREFIX + row.init : row.type == '指標' ? PTR_PREFIX + row.init : row.type == '指標的指標' ? PTR2_PREFIX + row.init : typeValue(row.type, row.float, row.long, row.char)}
           onChange={e => {
+            // 指標：Node*、Node**（初始值欄記指到哪一種 struct，一開始是 nullptr）
+            for (const [prefix, type] of [[PTR2_PREFIX, '指標的指標'], [PTR_PREFIX, '指標']] as const) {
+              if (e.target.value.startsWith(prefix)) {
+                onChange(row.id, { type, init: e.target.value.slice(prefix.length), float: undefined, long: undefined, char: undefined, fieldInit: undefined });
+                onCommit();
+                return;
+              }
+            }
             // 選了某個 struct（例如 Edge）：型別是 struct，初始值欄記是哪一個
             const structName = e.target.value.startsWith(STRUCT_PREFIX) ? e.target.value.slice(STRUCT_PREFIX.length) : null;
             if (structName != null) {
@@ -390,7 +402,7 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
             // map：鍵→值，預設 string → int
             let init = type == '對應表' ? (row.init.includes('→') ? row.init : '文字→數字')
               : isListType(type) ? (row.init == '文字' || row.init == '小數' || row.init == '長整數' || keepStruct ? row.init : '數字')
-              : row.type == '結構' ? (type == '數字' ? '0' : '')
+              : row.type == '結構' || row.type == '指標' || row.type == '指標的指標' ? (type == '數字' ? '0' : '')
               : isListType(row.type) ? (type == '數字' ? '0' : '')
               : type == '文字' && row.init == '0' ? '' : type == '數字' && row.init == '' ? '0' : row.init;
             if (type == '數字' && !float && /^\s*-?\d+\.\d*\s*$/.test(init)) init = String(Math.trunc(Number(init)));
@@ -429,6 +441,16 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
                     {getStructs().map(s => <option key={s.name} value={STRUCT_PREFIX + s.name}>{s.name}（struct）</option>)}
                   </optgroup>
                 )}
+                {/* 指標（linked list）：指到自己定義的 struct，Node* 或 Node** */}
+                {(!allowed || allowed.includes('指標') || row.type == '指標' || row.type == '指標的指標') && getStructs().length > 0 && (
+                  <optgroup label={t('指標', 'Pointers')}>
+                    {getStructs().flatMap(s => [
+                      <option key={'p' + s.name} value={PTR_PREFIX + s.name}>{s.name}*（{t('指標', 'pointer')}）</option>,
+                      <option key={'pp' + s.name} value={PTR2_PREFIX + s.name}>{s.name}**（{t('指標的指標', 'pointer to pointer')}）</option>,
+                    ])}
+                  </optgroup>
+                )}
+                {(row.type == '指標' || row.type == '指標的指標') && !findStruct(row.init) && <option value={(row.type == '指標' ? PTR_PREFIX : PTR2_PREFIX) + row.init} disabled>{row.init || 'struct'}{row.type == '指標' ? '*' : '**'}（{t('不存在', 'missing')}）</option>}
                 {/* 選的 struct 被刪掉或改名了：照樣列出來，才看得出原本是什麼 */}
                 {row.type == '結構' && !findStruct(row.init) && <option value={STRUCT_PREFIX + row.init} disabled>{row.init || 'struct'}（{t('不存在', 'missing')}）</option>}
               </>
@@ -466,6 +488,9 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
               </span>
             </details>
           )
+          : row.type == '指標' || row.type == '指標的指標'
+          // 指標一開始沒有指到任何東西
+          ? <span className="muted" title={t('指標一開始是 nullptr（沒有指到任何東西）', 'A pointer starts as nullptr (pointing to nothing)')}>nullptr</span>
           : row.type == '對應表'
           ? (
             // map：鍵是什麼、值是什麼（例如 string → int：用名字找分數）

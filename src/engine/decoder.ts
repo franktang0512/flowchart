@@ -24,8 +24,8 @@ import { displayLinkText, displayNodeText, eofVar, parseSortKeys, sortKeyExpr, s
 import { charInit, cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { isEnterLink, isExitLink, isWhileMode } from './loops';
-import { entriesInto, exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
-import { allStructs, fieldCppType, fieldInit, findStruct, getStructs } from './structs';
+import { entriesInto, exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, ptrOf, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
+import { allStructs, fieldCppType, fieldInit, findStruct, getStructs, isPair, type StructField } from './structs';
 
 /** 第三步「變數」表格整理出來的變數清單 */
 export interface VarStore {
@@ -38,6 +38,8 @@ export interface VarStore {
     number: string[]; text: string[]; array: string[]; grid: string[]; fixed: string[]; stack: string[]; queue: string[]; record: string[];
     /** C++ 的 map、set、priority_queue（pqMin 是小的先出來的，也在 pq 裡） */
     map: string[]; set: string[]; pq: string[]; pqMin: string[];
+    /** C++ 的指標 Node*、指標的指標 Node**（初始值欄是指到哪一種 struct） */
+    ptr: string[]; ptr2: string[];
   };
   /** 陣列的大小（變數表填的） */
   sizes?: Record<string, string>;
@@ -77,14 +79,14 @@ export function localTypes(locals: LocalVar[] = []): VarStore['type_var_list'] {
   const named = locals.filter(v => v.name.trim() != '');
   const of = (type: VarType) => named.filter(v => v.type == type).map(v => v.name.trim());
   return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列'), record: of('結構'),
-    map: of('對應表'), set: of('集合'), pq: [...of('優先佇列'), ...of('優先佇列小')], pqMin: of('優先佇列小') };
+    map: of('對應表'), set: of('集合'), pq: [...of('優先佇列'), ...of('優先佇列小')], pqMin: of('優先佇列小'), ptr: of('指標'), ptr2: of('指標的指標') };
 }
 
 /** 變數表的每一列（名稱、型別）→ 依型別分好的名稱 */
 export function typeLists(rows: { name: string; type: VarType }[]): VarStore['type_var_list'] {
   const of = (type: VarType) => rows.filter(r => r.type == type).map(r => r.name);
   return { number: of('數字'), text: of('文字'), array: [...of('清單'), ...of('陣列')], grid: of('二維清單'), fixed: of('陣列'), stack: of('堆疊'), queue: of('佇列'), record: of('結構'),
-    map: of('對應表'), set: of('集合'), pq: [...of('優先佇列'), ...of('優先佇列小')], pqMin: of('優先佇列小') };
+    map: of('對應表'), set: of('集合'), pq: [...of('優先佇列'), ...of('優先佇列小')], pqMin: of('優先佇列小'), ptr: of('指標'), ptr2: of('指標的指標') };
 }
 
 /** 兩組依型別分好的名稱接起來 */
@@ -93,13 +95,14 @@ export function joinTypes(a: VarStore['type_var_list'], b: VarStore['type_var_li
     number: [...a.number, ...b.number], text: [...a.text, ...b.text], array: [...a.array, ...b.array], grid: [...a.grid, ...b.grid],
     fixed: [...a.fixed, ...b.fixed], stack: [...a.stack, ...b.stack], queue: [...a.queue, ...b.queue], record: [...a.record, ...b.record],
     map: [...a.map, ...b.map], set: [...a.set, ...b.set], pq: [...a.pq, ...b.pq], pqMin: [...a.pqMin, ...b.pqMin],
+    ptr: [...a.ptr, ...b.ptr], ptr2: [...a.ptr2, ...b.ptr2],
   };
 }
 
 /** 每一種依型別分好的名稱都套用 f（例如把模組裡看不到的拿掉） */
 export function mapTypes(a: VarStore['type_var_list'], f: (list: string[]) => string[]): VarStore['type_var_list'] {
   return { number: f(a.number), text: f(a.text), array: f(a.array), grid: f(a.grid), fixed: f(a.fixed), stack: f(a.stack), queue: f(a.queue), record: f(a.record),
-    map: f(a.map), set: f(a.set), pq: f(a.pq), pqMin: f(a.pqMin) };
+    map: f(a.map), set: f(a.set), pq: f(a.pq), pqMin: f(a.pqMin), ptr: f(a.ptr), ptr2: f(a.ptr2) };
 }
 
 /**
@@ -194,7 +197,7 @@ export function withParams(vars: VarStore, params: ParamInfo[], locals: LocalVar
 
 export const createVarStore = (): VarStore => ({
   var_list: { name: [], value: [] },
-  type_var_list: { number: [], text: [], array: [], grid: [], fixed: [], stack: [], queue: [], record: [], map: [], set: [], pq: [], pqMin: [] },
+  type_var_list: { number: [], text: [], array: [], grid: [], fixed: [], stack: [], queue: [], record: [], map: [], set: [], pq: [], pqMin: [], ptr: [], ptr2: [] },
 });
 
 /** 變數（或容器）裡裝的 struct 名稱：struct 變數、裝 struct 的 array / vector；不是的話 undefined */
@@ -402,6 +405,14 @@ export function checkVar(vars: VarStore, str: string | undefined, can_number: bo
       return false;
     }
     if (tokens[k - 1]?.text == '.' && tokens[k - 1].type == 'op') continue;
+    // C++ 的指標：p->next 的 next 是欄位（最後一起檢查）；nullptr、new Node 的 Node 是 struct 的名稱
+    if (getTarget() == 'cpp' && tokens[k - 1]?.text == '>' && tokens[k - 2]?.text == '-') continue;
+    if (getTarget() == 'cpp' && tk.type == 'name' && ['nullptr', 'NULL', 'new'].includes(tk.text) && !defined(tk.text)) continue;
+    if (getTarget() == 'cpp' && tk.type == 'name' && tokens[k - 1]?.text == 'new') {
+      if (findStruct(tk.text) && !isPair(tk.text)) continue;
+      alert(t(`new 後面要寫 struct 的名稱，例如 new Node；「${tk.text}」不是自己定義的 struct。`, `Write a struct name after new, like new Node. "${tk.text}" is not one of your structs.`));
+      return false;
+    }
     if (tk.type != 'name' || defined(tk.text) || LOGIC_WORDS.includes(tk.text) || (isPython() && tk.text == 'in') || isFunc(tk.text) || vars.calls?.includes(tk.text)) continue;
     alert(t(`「${tk.text}」沒有定義：請先在變數表新增這個變數。如果是文字，要用 "雙引號" 括起來。`, `"${tk.text}" is not a variable yet. Add it to the variable table first. For words, use "quotes".`));
     return false;
@@ -449,10 +460,65 @@ function fieldsOk(vars: VarStore, e: Expr): boolean {
       case 'call': case 'fcall': return x.args.every(visit);
       case 'bin': return visit(x.a) && visit(x.b);
       case 'not': case 'neg': return visit(x.a);
+      case 'brace': return x.items.every(visit);
+      // ---- C++ 的指標 ----
+      case 'arrow': case 'deref': case 'addr': case 'null': case 'new':
+        if (getTarget() != 'cpp') {
+          alert(t('指標（->、*、&、nullptr、new）只有 C++ 可以用。', 'Pointers (->, *, &, nullptr, new) work only in C++.'));
+          return false;
+        }
+        return ptrExprOk(x, map, visit);
       default: return true;
     }
   };
   return visit(e);
+}
+
+/** 指標的寫法對不對：-> 前面要是指到 struct 的指標、* 後面要是指標、& 後面要是指標變數或指標欄位、new 後面要是 struct；不行時跳出提示 */
+function ptrExprOk(x: Expr, map: Map<string, VarInfo>, visit: (x: Expr) => boolean): boolean {
+  switch (x.t) {
+    case 'arrow': {
+      if (!visit(x.obj)) return false;
+      const p = ptrOf(x.obj, map);
+      if (!p || p == 'null' || p.level != 1) {
+        const hint = p && p != 'null' && p.level == 2 ? t('（它是指標的指標，要先用 * 拿到指標，例如 (*pp)->' + x.name + '）', ' (it is a pointer to a pointer: use * first, like (*pp)->' + x.name + ')') : '';
+        alert(t(`「->${x.name}」前面要是指到 struct 的指標，例如 p->${x.name}（p 是 Node*）${hint}。`, `Put a pointer to a struct before "->${x.name}", like p->${x.name} (p is a Node*)${hint}.`));
+        return false;
+      }
+      if (!fieldOf(x, map)) {
+        alert(t(`struct ${p.s} 沒有「${x.name}」這個欄位，它的欄位有：${fieldList(p.s)}。`, `The struct ${p.s} has no field "${x.name}". Its fields are: ${fieldList(p.s)}.`));
+        return false;
+      }
+      return true;
+    }
+    case 'deref': {
+      if (!visit(x.a)) return false;
+      const p = ptrOf(x.a, map);
+      if (!p || p == 'null') {
+        alert(t('「*」後面要是指標，例如 *pp（pp 是 Node**，*pp 就是它指到的那個指標）。', 'Put a pointer after "*", like *pp (pp is a Node**, and *pp is the pointer it points to).'));
+        return false;
+      }
+      return true;
+    }
+    case 'addr': {
+      if (!visit(x.a)) return false;
+      const p = ptrOf(x.a, map);
+      const lvalue = x.a.t == 'var' || x.a.t == 'arrow';
+      if (!lvalue || !p || p == 'null' || p.level != 1) {
+        alert(t('「&」後面要是一個指標變數或指標欄位，例如 &head、&p->next，得到的是指到它的指標（Node**）。', 'Put a pointer variable or a pointer field after "&", like &head or &p->next. You get a pointer to it (a Node**).'));
+        return false;
+      }
+      return true;
+    }
+    case 'new': {
+      if (!findStruct(x.sname) || isPair(x.sname)) {
+        alert(t(`new 後面要寫 struct 的名稱，例如 new Node；「${x.sname}」不是自己定義的 struct。`, `Write a struct name after new, like new Node. "${x.sname}" is not one of your structs.`));
+        return false;
+      }
+      return !x.init || (x.init.every(visit) && braceOk(x.sname, x.init.length, `new ${x.sname}{…}`));
+    }
+    default: return true;
+  }
 }
 
 /** 存值到 struct 的欄位：前面要是 struct 變數或「裝 struct 的容器[索引]」，而且有這個欄位 */
@@ -612,7 +678,7 @@ export function checkCall(vars: VarStore, modules: ModuleInfo[], name: string, a
     catch {
       continue;
     }
-    const what = { str: t('文字', 'text'), char: t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct') }[type];
+    const what = { str: t('文字', 'text'), char: t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct'), ptr: t('指標', 'a pointer') }[type];
     if ((p.type == '數字' && type != 'num') || (p.type == '文字' && (type == 'list' || type == 'struct'))) {
       alert(t(`參數「${p.name}」是${p.type}，但填的「${args[k].trim()}」是${what}：請改成${p.type}。`, `"${p.name}" is ${p.type == '數字' ? 'a number' : 'text'}, but "${args[k].trim()}" is ${what}. Change it.`));
       return false;
@@ -638,8 +704,30 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   }
   const cpp = isCode();
   const floats = vars.floats ?? [];
-  const what = { str: t('文字', 'text'), char: cpp ? t('一個字（char）', 'one letter (char)') : t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct') }[type];
+  const what = { str: t('文字', 'text'), char: cpp ? t('一個字（char）', 'one letter (char)') : t('文字', 'text'), list: t('清單', 'a list'), bool: t('判斷式（是或否）', 'a true/false condition'), num: t('數字', 'a number'), struct: t('一整筆 struct 資料', 'a whole struct'), ptr: t('指標', 'a pointer') }[type];
   const v = value.trim();
+  // C++ 的指標：存到 p、*pp 要放同一種指標（或 nullptr）；存到 p->next、p->val 照欄位的型別
+  const pt = where == 'var' && getTarget() == 'cpp' ? ptrTarget(vars, target) : null;
+  if (pt && 'ptr' in pt) {
+    const vp = ptrOf(parseExpr(value), varInfoMap(vars));
+    if (vp == 'null') return true;
+    if (!vp || vp.s != pt.ptr.s || vp.level != pt.ptr.level) {
+      const fix = vp && vp.s == pt.ptr.s
+        ? (vp.level == 1 ? t('要指到這個指標本身，請在前面加 &（例如 &head）。', ' To point to the pointer itself, put & in front (like &head).') : t('要拿到它指到的那個指標，請在前面加 *（例如 *pp）。', ' To get the pointer it points to, put * in front (like *pp).'))
+        : '';
+      alert(t(`「${target.trim()}」是 ${ptrName(pt.ptr)}，只能放 ${ptrName(pt.ptr)} 或 nullptr，但「${v}」是${vp ? ' ' + ptrName(vp) : what}。`, `"${target.trim()}" is a ${ptrName(pt.ptr)}. It holds a ${ptrName(pt.ptr)} or nullptr, but "${v}" is ${vp ? 'a ' + ptrName(vp) : what}.`) + fix);
+      return false;
+    }
+    return true;
+  }
+  if (pt && 'field' in pt) {
+    const f = pt.field;
+    if ((f.type == '數字' && type != 'num') || (f.type == '文字' && type != 'str' && type != 'char' && type != 'num')) {
+      alert(t(`欄位「${target.trim()}」是 ${fieldCppType(f)}，但「${v}」是${what}，不能存進去。`, `"${target.trim()}" is ${fieldCppType(f)}, but "${v}" is ${what}. It cannot go in.`));
+      return false;
+    }
+    return true;
+  }
   // 存到 ::a：照全域 a 的型別
   const scoped = where == 'var' ? scopedName(target) : null;
   if (scoped != null && vars.globalVars) {
@@ -749,6 +837,55 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   return true;
 }
 
+/** 指標型別的名稱：Node*、Node** */
+const ptrName = (p: { s: string; level: 1 | 2 }) => p.s + '*'.repeat(p.level);
+
+/**
+ * C++ 的指標：計算積木要存到的地方是哪一種——指標變數 p、*pp（存一個指標）、p->next（指標欄位）或 p->val（一般欄位）；
+ * 不是這些寫法回傳 null
+ */
+export function ptrTarget(vars: VarStore, target: string): { ptr: { s: string; level: 1 | 2 } } | { field: StructField } | null {
+  const map = varInfoMap(vars);
+  const e = parseExpr(target);
+  if (e.t == 'arrow') {
+    const f = fieldOf(e, map);
+    if (!f) return null;
+    return f.type == '指標' && f.to ? { ptr: { s: f.to, level: 1 } } : { field: f };
+  }
+  if (e.t != 'var' && e.t != 'deref') return null;
+  const p = ptrOf(e, map);
+  return p && p != 'null' ? { ptr: p } : null;
+}
+
+/** 計算積木「指標」要存到的地方寫得對不對（p、p->next、p->val、*pp）；不行時跳出提示 */
+export function ptrTargetOk(vars: VarStore, target: string): boolean {
+  if (!target.trim()) {
+    alert(t('請填要存到哪裡，例如 p、p->next、*pp。', 'Enter where to store it, like p, p->next or *pp.'));
+    return false;
+  }
+  if (!checkVar(vars, target, true)) return false;
+  if (!ptrTarget(vars, target)) {
+    alert(t(`「${target.trim()}」不能存值：要寫指標變數（例如 p）、指標指到的欄位（例如 p->next、p->val），或 *pp（pp 指到的那個指標）。`, `You cannot store into "${target.trim()}". Write a pointer variable (like p), a field through a pointer (like p->next or p->val), or *pp (the pointer pp points to).`));
+    return false;
+  }
+  return true;
+}
+
+/** delete 後面要是 new 出來的那一筆的指標（Node*）；不行時跳出提示 */
+export function ptrDeleteOk(vars: VarStore, target: string): boolean {
+  if (!target.trim()) {
+    alert(t('請填要 delete 哪一個指標，例如 p。', 'Enter the pointer to delete, like p.'));
+    return false;
+  }
+  if (!checkVar(vars, target, true)) return false;
+  const p = ptrOf(parseExpr(target), varInfoMap(vars));
+  if (!p || p == 'null' || p.level != 1) {
+    alert(t(`delete 後面要是指到 new 出來那一筆的指標（例如 Node* p），「${target.trim()}」不是。`, `After delete, put a pointer to something made with new (like a Node* p). "${target.trim()}" is not one.`));
+    return false;
+  }
+  return true;
+}
+
 /** Python：小數存進 int 變數的說明 */
 export const pyFloatToInt = (target: string, v: string) => t(
   `「${target}」是 int（整數），可是「${v}」算出來是小數（float）：Python 的 / 一定算出小數，例如 6 / 2 是 3.0。要整數請用 //（例如 a // b），或用 int( ) 去掉小數；或到第三步把「${target}」改成 float。`,
@@ -800,6 +937,8 @@ function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   add(vars.type_var_list.set, '集合');
   add(vars.type_var_list.pq.filter(n => !vars.type_var_list.pqMin.includes(n)), '優先佇列');
   add(vars.type_var_list.pqMin, '優先佇列小');
+  add(vars.type_var_list.ptr, '指標');
+  add(vars.type_var_list.ptr2, '指標的指標');
   // ::a：全域的 a（照全域變數那一份的型別）
   if (vars.globalVars) for (const [name, info] of varInfoMap(vars.globalVars)) map.set('::' + name, { ...info, name: '::' + name });
   return map;
@@ -923,6 +1062,15 @@ const runtimeMessages = () => ({
   noReturn: t('模組「{name}」要回傳值，可是這次走到「結束」都沒有經過「回傳」：每一條路在「結束」前都要有「回傳」。', 'The module "{name}" must return a value, but it reached "End" without "Return". Every path needs a "Return" before "End".'),
   argCount: t('執行模組「{name}」時給了 {got} 個值，可是它有 {n} 個參數。', 'The module "{name}" got {got} values, but it has {n} parameters.'),
   tooDeep: t('模組一直執行自己（或互相執行）停不下來：檢查模組裡是不是在某個時候就不再執行自己。', 'A module keeps running itself and never stops. Check that it stops at some point.'),
+  // C++ 的指標
+  nullDeref: t('「{name}」是 nullptr（沒有指到任何東西），不能用 -> 或 * 拿它指到的東西：可以先檢查 {name} != nullptr。', '"{name}" is nullptr (it points to nothing), so you cannot use -> or * on it. Check {name} != nullptr first.'),
+  useAfterDelete: t('「{name}」指到的那一筆（#{id}）已經 delete 了，不能再用。', 'What "{name}" points to (#{id}) was already deleted. You cannot use it any more.'),
+  doubleDelete: t('「{name}」指到的那一筆（#{id}）已經 delete 過了，不能再 delete 一次。', 'What "{name}" points to (#{id}) was already deleted. You cannot delete it again.'),
+  notPtr: t('「{name}」不是指標。', '"{name}" is not a pointer.'),
+  needPtr: t('「{name}」是 {s}*，只能放指到 {s} 的指標或 nullptr。', '"{name}" is a {s}*. It holds a pointer to a {s}, or nullptr.'),
+  needPtr2: t('「{name}」是 {s}**，只能放指到 {s}* 的指標（例如 &head）或 nullptr。', '"{name}" is a {s}**. It holds a pointer to a {s}* (like &head), or nullptr.'),
+  tooManyNew: t('new 太多次了（超過 100000 筆）：是不是迴圈停不下來？', 'Too many new (over 100000). Does a loop never stop?'),
+  showPtr: t('指標不能直接輸出（印出來的會是記憶體地址）：請輸出它指到的欄位，例如 p->val。', 'A pointer cannot be printed (you would get a memory address). Print a field it points to, like p->val.'),
   ...(isPython() ? PY_MESSAGES() : {}),
 });
 
@@ -1146,12 +1294,12 @@ function __rec(v, i, name, sname) {
     var o = {};
     for (var k = 0; k < keys.length; k++) {
       var x = v.__brace[k], ty = types[keys[k]];
-      o[keys[k]] = ty == 'string' ? __text(x, i, name) : ty == 'int' ? __int(x, i, name) : ty == 'long long' ? __long(x, i, name) : __num(x, i, name);
+      o[keys[k]] = ty.slice(-1) == '*' ? __ptr(x, i, name, ty.slice(0, -1)) : ty == 'string' ? __text(x, i, name) : ty == 'int' ? __int(x, i, name) : ty == 'long long' ? __long(x, i, name) : __num(x, i, name);
     }
     return o;
   }
   if (v && typeof v == 'object' && !Array.isArray(v) && !Object.keys(v).length) return v;
-  return JSON.parse(JSON.stringify(v));
+  return __canon(JSON.parse(JSON.stringify(v)), sname);
 }
 // 比大小（set、map 的鍵、priority_queue）：pair / struct 先比第一個欄位，一樣再比下一個
 function __cmp(a, b) {
@@ -1526,6 +1674,7 @@ function __show(v) {
     return v.__map.map(function (p) { return p[0] + ' ' + p[1]; }).join('\\n');
   }
   if (v && v.__set) v = v.__set;
+  if (__isPtr(v) || (v && v.__ref)) __err('showPtr', -1, {});
   if (v && typeof v == 'object' && !Array.isArray(v)) __err('showStruct', -1, {});
   if (!Array.isArray(v)) return v;
   if (v.some(function (x) { return x === undefined; })) __err('unsetShow', -1, {});
@@ -1533,6 +1682,68 @@ function __show(v) {
   if (v.some(function (row) { return Array.isArray(row) && row.some(function (x) { return x && typeof x == 'object'; }); })) __err('showStruct', -1, {});
   if (v.length && Array.isArray(v[0])) return v.map(function (row) { return row.join(' '); }).join('\\n');
   return v.join(' ');
+}
+// ---- C++ 的指標（linked list）----
+// new 出來的每一筆放在 __H（第幾格就是地址 #幾）。指標的值是 __P[地址]：指到同一筆的永遠是同一個物件，== 才比得出一樣；
+// nullptr 是 null。指標的指標（Node**）是 {__ref: 名稱, g: 讀, s: 存}，指到某個指標變數或某一筆的指標欄位
+var __H = [null], __P = [null];
+function __isPtr(v) { return v !== null && typeof v == 'object' && typeof v.__ptr == 'number'; }
+function __alloc(i, sname, init) {
+  if (__H.length > 100000) __err('tooManyNew', i, {});
+  var o = init ? __rec(init, i, 'new ' + sname, sname) : __new(sname);
+  var id = __H.length;
+  __H.push({ s: sname, v: o, del: false });
+  __P.push({ __ptr: id });
+  return __P[id];
+}
+// p 指到的那一筆：p 不能是 nullptr，也不能已經 delete 了
+function __d(p, i, name) {
+  if (p === null || p === undefined) __err('nullDeref', i, { name: name });
+  if (!__isPtr(p) || !__H[p.__ptr]) __err('notPtr', i, { name: name });
+  var h = __H[p.__ptr];
+  if (h.del) __err('useAfterDelete', i, { name: name, id: p.__ptr });
+  return h.v;
+}
+// *x：Node** 拿到它指到的那個指標；Node* 是它指到的那一筆
+function __star(x, i, name) {
+  if (x && typeof x == 'object' && x.__ref) return x.g();
+  return __d(x, i, name);
+}
+// *pp = v
+function __put(x, i, name, v) {
+  if (x === null || x === undefined) __err('nullDeref', i, { name: name });
+  if (!(x && x.__ref)) __err('notPtr', i, { name: name });
+  x.s(v);
+}
+// &head（變數）、&p->next（某一筆的指標欄位）
+function __vref(g, s, name) { return { __ref: name, g: g, s: s }; }
+function __fref(p, i, name, f) {
+  var o = __d(p, i, name);
+  return { __ref: '#' + p.__ptr + '.' + f, g: function () { return o[f]; }, s: function (v) { o[f] = v; } };
+}
+// 存進 Node* 的值要是指到同一種 struct 的指標或 nullptr
+function __ptr(v, i, name, sname) {
+  if (v === null || v === undefined) return null;
+  if (!__isPtr(v) || !__H[v.__ptr] || __H[v.__ptr].s != sname) __err('needPtr', i, { name: name, s: sname });
+  return v;
+}
+function __pref(v, i, name, sname) {
+  if (v === null || v === undefined) return null;
+  if (!(v && typeof v == 'object' && v.__ref)) __err('needPtr2', i, { name: name, s: sname });
+  return v;
+}
+function __free(p, i, name) {
+  if (p === null || p === undefined) return;
+  if (!__isPtr(p) || !__H[p.__ptr]) __err('notPtr', i, { name: name });
+  var h = __H[p.__ptr];
+  if (h.del) __err('doubleDelete', i, { name: name, id: p.__ptr });
+  h.del = true;
+}
+// 複製 struct 之後，指標欄位換回同一個物件（== 才比得出一樣）
+function __canon(o, sname) {
+  var types = __FTYPES[sname] || {};
+  for (var k in types) if (types[k].slice(-1) == '*' && o && o[k]) o[k] = __P[o[k].__ptr];
+  return o;
 }
 `;
 
@@ -1740,7 +1951,8 @@ class CodeGenerator {
     switch (e.t) {
       case 'num': return !e.v.includes('.');
       case 'method': return e.name == 'size' || e.name == 'length' || (e.name != 'empty' && e.name != 'substr' && e.obj.t == 'var' && holdsInt(e.obj.name));
-      case 'field': {
+      case 'field':
+      case 'arrow': {
         const f = fieldOf(e, varInfoMap(this.vars));
         return f?.type == '數字' && !f.float;
       }
@@ -1787,6 +1999,9 @@ class CodeGenerator {
     if (getTarget() != 'cpp') return { pre, post, ops };
     const { e: root, spans } = parseExprSpans(text);
     const map = varInfoMap(this.vars);
+    const toks = tokenize(text);
+    /** 第 a 到 b - 1 個 token 的原文（錯誤說明裡用，例如「p->next」） */
+    const src = (a: number, b: number) => toks.slice(a, b).map(x => x.text).join('');
     const add = (m: typeof pre, k: number, x: { len: number; s: string }) => { if (!m.has(k)) m.set(k, []); m.get(k)!.push(x); };
     /** 第 from 到 to - 1 個 token 包起來 */
     const wrap = (from: number, to: number, open: string, close: string) => {
@@ -1828,6 +2043,66 @@ class CodeGenerator {
         case 'neg': visit(e.a); ord(e.a); break;
         case 'not': visit(e.a); break;
         case 'brace': e.items.forEach(visit); break;
+        // ---- C++ 的指標：p->next → __d(p, 積木, "p").next（nullptr、delete 過的會出錯） ----
+        case 'arrow':
+          visit(e.obj);
+          if (e.at) {
+            const [from, dash] = e.at;
+            wrap(from, dash, '__d(', `, ${i}, ${JSON.stringify(src(from, dash))})`);
+            ops.set(dash, '.');
+            ops.set(dash + 1, '');
+          }
+          break;
+        // *pp → __star(pp, 積木, "pp")
+        case 'deref':
+          visit(e.a);
+          if (e.at) {
+            const [star, end] = e.at;
+            ops.set(star, '');
+            wrap(star + 1, end, '__star(', `, ${i}, ${JSON.stringify(src(star + 1, end))})`);
+          }
+          break;
+        // &head → 讀、存 head 的一對函式；&p->next → __fref(p, 積木, "p", "next")
+        case 'addr': {
+          if (!e.at) break;
+          const [amp, end] = e.at;
+          const a = e.a;
+          if (a.t == 'var' && end == amp + 2) {
+            ops.set(amp, '__vref(function () { return ');
+            add(post, amp + 1, { len: 1, s: `; }, function (__v) { ${a.name} = __v; }, ${JSON.stringify(a.name)})` });
+          }
+          else if (a.t == 'arrow' && a.at) {
+            visit(a.obj);
+            const [from, dash] = a.at;
+            ops.set(amp, '__fref(');
+            ops.set(dash, `, ${i}, ${JSON.stringify(src(from, dash))}, `);
+            ops.set(dash + 1, '');
+            ops.set(dash + 2, JSON.stringify(a.name) + ')');
+          }
+          break;
+        }
+        case 'null':
+          if (e.at != null) ops.set(e.at, 'null');
+          break;
+        // new Node → __alloc(積木, "Node")；new Node{5, nullptr} → __alloc(積木, "Node", {__brace: [5, null]})
+        case 'new': {
+          e.init?.forEach(visit);
+          if (!e.at) break;
+          const [nw, nm, close] = e.at;
+          ops.set(nw, `__alloc(${i}, `);
+          if (e.init) {
+            ops.set(nm, JSON.stringify(e.sname) + ', ');
+            add(post, close, { len: close - nw + 1, s: ')' });
+          }
+          else {
+            ops.set(nm, JSON.stringify(e.sname) + ')');
+            if (close >= 0) {
+              ops.set(nm + 1, '');
+              ops.set(close, '');
+            }
+          }
+          break;
+        }
       }
     };
     visit(root);
@@ -2078,7 +2353,8 @@ class CodeGenerator {
       let closes = '';
       for (let j = k; j <= k + skip; j++) closes += (div.post.get(j) ?? []).sort((a, b) => a.len - b.len).map(x => x.s).join('');
       piece = opens + piece + closes;
-      out += (word && prevWord ? ' ' : '') + piece;
+      // 前面是名稱（例如 and）、這裡包了起來（例如 __d(）：中間要空一格，不然會黏成 and__d(
+      out += ((word || opens != '') && prevWord ? ' ' : '') + piece;
       prevWord = word && closes == '';
       k += skip;
     }
@@ -2111,6 +2387,17 @@ class CodeGenerator {
       const conv = g?.type_var_list.text.includes(scoped) ? '__text'
         : (g?.longs ?? []).includes(scoped) ? '__long' : (g?.floats ?? []).includes(scoped) ? '__num' : '__int';
       return `__GL[${JSON.stringify(scoped)}] = ${conv}(${value}, ${i}, ${JSON.stringify(target.trim())});\n`;
+    }
+    // C++ 的指標：p、*pp（放指標）、p->next（指標欄位）、p->val（一般欄位）
+    const pt = getTarget() == 'cpp' ? ptrTarget(this.vars, target) : null;
+    if (pt) {
+      const name = JSON.stringify(target.trim());
+      const conv = !('ptr' in pt)
+        ? `${pt.field.type == '文字' ? '__text' : pt.field.float ? '__num' : '__int'}(${value}, ${i}, ${name})`
+        : pt.ptr.level == 1 ? `__ptr(${value}, ${i}, ${name}, ${JSON.stringify(pt.ptr.s)})` : `__pref(${value}, ${i}, ${name}, ${JSON.stringify(pt.ptr.s)})`;
+      // *pp = 值：存到 pp 指到的那個指標
+      if (parseExpr(target).t == 'deref') return `__put(${this.expr(target.trim().replace(/^\*/, ''), i)}, ${i}, ${name}, ${conv});\n`;
+      return `${this.expr(target, i)} = ${conv};\n`;
     }
     // struct 的欄位：e.from、edges[i].w（照欄位的型別檢查）
     const field = splitField(target);
@@ -2350,6 +2637,12 @@ class CodeGenerator {
           return { code: code + 'total_step ++;' + update, next };
         }
         const name = JSON.stringify(target);
+        // C++ 的 delete p：p 指到的那一筆標成已經 delete（之後再用會出錯）
+        if (action == '釋放') {
+          const code = `__free(${expr(target)}, ${i}, ${name});\n`;
+          this.checkSyntax(node, code);
+          return { code: code + 'total_step ++;' + update, next: this.nextOf(node) };
+        }
         const kind = this.containerKind(target);
         // array 大小固定；stack、queue 只能 push、pop（積木是用對話框選的，這裡擋舊作品或型別改過的情況）
         if (this.isFixed(target) && ['加入', '插入', '刪除', '清空'].includes(action)) {
@@ -2785,6 +3078,11 @@ export const MAX_STEPS = 3000;
 
 /** 變數的初始值：清單一開始是空的；文字變數沒加引號時自動加上；數字變數要是數字 */
 function initialValue(vars: VarStore, name: string, raw: string | undefined): string {
+  // 指標：一開始是 nullptr（沒有指到任何東西）
+  if (vars.type_var_list.ptr.includes(name) || vars.type_var_list.ptr2.includes(name)) {
+    if (!findStruct(raw)) throw new FlowError(t(`指標「${name}」指到的 struct「${raw ?? ''}」不存在：請到第三步重新選型別。`, `The struct "${raw ?? ''}" that the pointer "${name}" points to does not exist. Choose the type again in step 3.`));
+    return 'null';
+  }
   // struct 變數：每個欄位是 0（string 是空的），跟 Edge e = {}; 一樣
   if (vars.type_var_list.record.includes(name)) {
     const s = findStruct(raw);
@@ -2943,7 +3241,7 @@ export function buildRun(diagram: Diagram, vars: VarStore, inputText: string, mo
   code += 'var __mainSnap = null;\n';
   code += 'function __globals(){ var o = {' + topNames.map(n => JSON.stringify(shadowed.has(n) ? shadowLabel(n) : n) + ': ' + n).join(',') + '}; if (__mainSnap) { var m = __mainSnap(); for (var k in m) o[k] = m[k]; } return o; }\n';
   // 每一步都記下來給第四步看；步驟太多時（大的測資、排序）只記前 MAX_STEPS 步，之後只記住最後一步，執行完再補上，瀏覽器才不會卡住
-  code += 'function __record(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nif (b && typeof b == "object" && __frames.length) b.__frames = __frames.slice(-20).map(function (f, k, all) { return { sheet: f.sheet, depth: __frames.length - all.length + k + 1, vals: f.get() }; });\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
+  code += 'function __record(a,b){\nstep_list.output.push(output_result);\nstep_list.step.push(a);\nif (b && typeof b == "object" && __frames.length) b.__frames = __frames.slice(-20).map(function (f, k, all) { return { sheet: f.sheet, depth: __frames.length - all.length + k + 1, vals: f.get() }; });\nif (__H.length > 1 && b && typeof b == "object") b.__heap = __H.slice(1);\nstep_list.var.push(typeof b=="object" ? JSON.parse(JSON.stringify(b)) : b);\nstep_list.stack.push(__stack.slice());\n}\n';
   code += `var __skipped = 0;\nvar __last = null;\nfunction Update_output(a,b){\nif (step_list.step.length < ${MAX_STEPS}) { __record(a, b); return; }\n__skipped++;\n__last = [a, b];\n}\n`;
   const infos = modules.map(m => m.info);
   const mainGen = new CodeGenerator(diagram, vars, 0, infos);

@@ -33,7 +33,9 @@ export interface DialogForm {
    * 接收（執行有回傳值的模組，把回傳值存進變數：「a 設為 aaa(x)」，模組和參數用 moduleName、moduleArgs）；
    * '' = 還沒選。選了清單、二維清單再選 rectAction（添加、插入…）
    */
-  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列' | '結構' | '迴圈控制' | '集合' | '對應表' | '優先佇列';
+  rectKind: '' | '變數' | '清單' | '二維清單' | '回傳' | '接收' | '陣列' | '堆疊' | '佇列' | '結構' | '迴圈控制' | '集合' | '對應表' | '優先佇列' | '指標';
+  /** C++ 的指標（rectKind 是 '指標'）：要存到哪裡（p、p->next、p->val、*pp），或 delete 哪一個 */
+  ptrTarget: string;
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 變數：true 是「改變」（Scratch「變數改變」、Blockly「將變數的值加」），code 填加多少；存成「x 設為 x + 多少」 */
@@ -111,6 +113,7 @@ const RECT_HINT: Record<RectAction, () => string> = {
   排序: () => byTarget(t('sort：把 vector 或 array 由小到大（或由大到小）排好...', 'sort: put a vector or array in order, small to large (or large to small)...'), t('sort：把 vector 或 array 由小到大（或由大到小）排好...', 'sort: put a vector or array in order, small to large (or large to small)...'), t('sort()：把 list 由小到大（或由大到小）排好...', 'sort(): put the list in order, small to large (or large to small)...')),
   跳出: () => t('break：馬上跳出最近的迴圈（這個積木後面不用接箭頭）...', 'break: leave the nearest loop right away (no arrow after this block)...'),
   下一輪: () => t('continue：這一輪後面的不做了，直接進入下一輪（這個積木後面不用接箭頭）...', 'continue: skip the rest of this round and go to the next round (no arrow after this block)...'),
+  釋放: () => t('delete：把 new 出來的那一筆還回去（之後不能再用它）...', 'delete: give back what you made with new (you cannot use it after this)...'),
 };
 
 /** 「第幾項」欄位前面的字（沒有這欄的是 null）；C++ 說「索引」 */
@@ -128,6 +131,7 @@ const RECT_INDEX: Record<RectAction, (() => string) | null> = {
   排序: null,
   跳出: null,
   下一輪: null,
+  釋放: null,
 };
 
 /** 「第幾項」欄位後面的字：積木是「項」，C++ 沒有 */
@@ -148,6 +152,7 @@ const RECT_VERB: Record<RectAction, (() => string) | null> = {
   排序: null,
   跳出: null,
   下一輪: null,
+  釋放: null,
 };
 
 const DEFAULT_RADIO: Partial<Record<DialogKind, string>> = {
@@ -179,6 +184,7 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   rectIndex: '',
   rectIndex2: '',
   rectField: '',
+  ptrTarget: '',
   sortDesc: false,
   sortKeys: [],
   forInit: '',
@@ -290,7 +296,10 @@ const caretInside = (text: string, pair: '[]' | '()') => (text.includes(pair) ? 
  * inputId 是要填進去的輸入框（記得游標在哪裡）
  */
 function ExprHelper({ inputId, types, holds, value, onChange }: { inputId: string; types: VarTypes; holds: Record<string, string>; value: string; onChange: (v: string) => void }) {
-  const items: [string, keyof typeof METHODS | 'array' | 'struct' | 'grid'][] = [
+  const items: [string, keyof typeof METHODS | 'array' | 'struct' | 'grid' | 'ptr' | 'ptr2'][] = [
+    // 指標（linked list）放最前面
+    ...types.ptr.map(n => [n, 'ptr'] as [string, 'ptr']),
+    ...types.ptr2.map(n => [n, 'ptr2'] as [string, 'ptr2']),
     ...types.record.map(n => [n, 'struct'] as [string, 'struct']),
     ...types.stack.map(n => [n, 'stack'] as [string, 'stack']),
     ...types.queue.map(n => [n, 'queue'] as [string, 'queue']),
@@ -319,6 +328,28 @@ function ExprHelper({ inputId, types, holds, value, onChange }: { inputId: strin
   if (kind == 'pq') hints.top = t('最大的（小的先出來的是最小的）', 'The largest (or the smallest, for smallest-first)');
   let snippets: Snippet[];
   if (isPython()) snippets = pySnippets(name, kind, !!struct);
+  else if (kind == 'ptr') {
+    // Node* p：指到的欄位 p->val、有沒有指到東西、要一筆新的、指到 p 的指標 &p
+    const fields = struct?.fields ?? [];
+    snippets = [
+      ...fields.map(f => ({ key: `arrow:${f.name}`, text: `${name}->${f.name}`, hint: t(`${name} 指到的那一筆的 ${f.name}`, `The ${f.name} of what ${name} points to`) })),
+      { key: 'notnull', text: `${name} != nullptr`, hint: t(`${name} 有沒有指到東西（真／假）`, `Does ${name} point to something? (true / false)`) },
+      { key: 'null', text: 'nullptr', hint: t('沒有指到任何東西', 'Points to nothing') },
+      ...(struct ? [{ key: 'new', text: `new ${struct.name}{}`, label: `new ${struct.name}{ ${fields.map(f => f.name).join(', ')} }`, caret: `new ${struct.name}{`.length, hint: t(`要一筆新的 ${struct.name}：照順序填每個欄位，得到指到它的指標`, `Make a new ${struct.name}: fill each field in order. You get a pointer to it`) }] : []),
+      { key: 'addr', text: `&${name}`, hint: t(`指到 ${name} 這個指標的指標（${struct?.name ?? ''}**）`, `A pointer to the pointer ${name} (${struct?.name ?? ''}**)`) },
+      ...fields.filter(f => f.type == '指標').map(f => ({ key: `addr:${f.name}`, text: `&${name}->${f.name}`, hint: t(`指到 ${name}->${f.name} 這個指標的指標`, `A pointer to the pointer ${name}->${f.name}`) })),
+    ];
+  }
+  else if (kind == 'ptr2') {
+    // Node** pp：它指到的那個指標 *pp、再往下的欄位 (*pp)->val、往後走 &(*pp)->next
+    const fields = struct?.fields ?? [];
+    snippets = [
+      { key: 'deref', text: `*${name}`, hint: t(`${name} 指到的那個指標（${struct?.name ?? ''}*）`, `The pointer ${name} points to (${struct?.name ?? ''}*)`) },
+      ...fields.map(f => ({ key: `arrow:${f.name}`, text: `(*${name})->${f.name}`, hint: t(`*${name} 指到的那一筆的 ${f.name}`, `The ${f.name} of what *${name} points to`) })),
+      ...fields.filter(f => f.type == '指標').map(f => ({ key: `addr:${f.name}`, text: `&(*${name})->${f.name}`, hint: t(`往後走一個：指到下一個 ${f.name} 指標`, `Move on: point to the next ${f.name} pointer`) })),
+      { key: 'notnull', text: `*${name} != nullptr`, hint: t(`*${name} 有沒有指到東西（真／假）`, `Does *${name} point to something? (true / false)`) },
+    ];
+  }
   else if (kind == 'struct') {
     // struct 變數：每個欄位 e.from
     snippets = (struct?.fields ?? []).map(f => ({ key: `field:${f.name}`, text: `${name}.${f.name}`, hint: fieldHint }));
@@ -380,13 +411,14 @@ function ExprHelper({ inputId, types, holds, value, onChange }: { inputId: strin
       el?.setSelectionRange(caret, caret);
     });
   };
-  const kindName = (k: string) => (isPython() ? pyKindName(k) : k == 'grid' ? t('二維 vector', '2D vector') : k == 'pq' ? 'priority_queue' : k);
+  const kindName = (k: string, n: string) => (isPython() ? pyKindName(k) : k == 'grid' ? t('二維 vector', '2D vector') : k == 'pq' ? 'priority_queue'
+    : k == 'ptr' ? `${holds[n] ?? ''}*` : k == 'ptr2' ? `${holds[n] ?? ''}**` : k);
   return (
     <p className="expr_helper">
       <span className="muted">{t('點一下填入：', 'Click to insert: ')}</span>
       {items.length > 1 && (
         <select className="var_select" value={name} onChange={e => setPick(e.target.value)} aria-label={t('選一個變數', 'Choose a variable')}>
-          {items.map(([n, k]) => <option key={n} value={n}>{n}（{kindName(k)}）</option>)}
+          {items.map(([n, k]) => <option key={n} value={n}>{n}（{kindName(k, n)}）</option>)}
         </select>
       )}
       {snippets.map(s => (
@@ -1099,7 +1131,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       const pickKind = (k: DialogForm['rectKind']) => set({
         rectKind: k,
         varChange: false,
-        rectAction: k == '迴圈控制' ? '跳出' : k == '變數' || k == '接收' || k == '結構' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' || k == '對應表' ? '替換' : k == '堆疊' || k == '佇列' || k == '集合' || k == '優先佇列' ? '放入' : '加入',
+        rectAction: k == '迴圈控制' ? '跳出' : k == '變數' || k == '接收' || k == '結構' || k == '指標' ? '設為' : k == '回傳' ? '回傳' : k == '二維清單' ? '建立' : k == '陣列' || k == '對應表' ? '替換' : k == '堆疊' || k == '佇列' || k == '集合' || k == '優先佇列' ? '放入' : '加入',
         rectField: '',
         ...([...namesFor(k), ...(k == '變數' || k == '接收' ? paramNames : [])].includes(f.varSelect) ? {} : { varSelect: '' }),
       });
@@ -1108,7 +1140,10 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
       );
       body = (
         <>
-          <p id="hint">{change ? t('將數字變數的值加上多少（減少就填負數）...', 'Add an amount to a number variable (use a negative number to take away)...') : kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : makeArray && py ? t('建立 n 格的 list：a = [0] * n（每一格先放 0，裝文字的放 ""）...', 'Make a list with n items: a = [0] * n (each starts as 0, or "" for text)...') : makeArray ? t('建立 array：決定大小，例如輸入 n 之後，建立大小 n...', 'Make the array: set its size, like size n after you input n...') : dsHint ? dsHint : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
+          <p id="hint">{kind == '指標' ? (f.rectAction == '釋放'
+            ? t('delete：把 new 出來的那一筆還回去，之後就不能再用它（用了會出錯）...', 'delete: give back what you made with new. You cannot use it after this...')
+            : t('用指標改：例如 head 設為 new Node{x, head}、p 設為 p->next、*pp 設為 p->next...', 'Change with pointers: like head to new Node{x, head}, p to p->next, *pp to p->next...'))
+            : change ? t('將數字變數的值加上多少（減少就填負數）...', 'Add an amount to a number variable (use a negative number to take away)...') : kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : makeArray && py ? t('建立 n 格的 list：a = [0] * n（每一格先放 0，裝文字的放 ""）...', 'Make a list with n items: a = [0] * n (each starts as 0, or "" for text)...') : makeArray ? t('建立 array：決定大小，例如輸入 n 之後，建立大小 n...', 'Make the array: set its size, like size n after you input n...') : dsHint ? dsHint : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
           <p className="io_choice rect_kind">
             {t('要改：', 'Change: ')}
             <label><input type="radio" name="rect_kind" checked={kind == '變數'} onChange={() => pickKind('變數')} />{t('變數', 'A variable')}</label>
@@ -1139,6 +1174,10 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
             )}
             {!py && hasKind('record', kind == '結構') && (
               <label><input type="radio" name="rect_kind" checked={kind == '結構'} onChange={() => pickKind('結構')} />{t('struct 的欄位', 'A struct field')}</label>
+            )}
+            {/* C++ 的指標（linked list）：變數表有指標才出現 */}
+            {getTarget() == 'cpp' && (allTypes.ptr.length + allTypes.ptr2.length > 0 || kind == '指標') && (
+              <label><input type="radio" name="rect_kind" checked={kind == '指標'} onChange={() => pickKind('指標')} />{t('指標（->、*、delete）', 'Pointers (->, *, delete)')}</label>
             )}
             {(allTypes.grid.length > 0 || kind == '二維清單') && (
               <label><input type="radio" name="rect_kind" checked={kind == '二維清單'} onChange={() => pickKind('二維清單')} />{py ? t('二維 list', 'A 2D list') : t('二維清單', 'A 2D list')}</label>
@@ -1271,13 +1310,31 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
               {actionRadio('建立', t('建立（設定大小）', 'Make (set the size)'))}
             </p>
           )}
+          {kind == '指標' && (
+            <>
+              <p className="rect_action">
+                {t('怎麼改：', 'How: ')}
+                {actionRadio('設為', t('存一個值（=）', 'Store a value (=)'))}
+                {actionRadio('釋放', t('delete（還回去）', 'delete (give it back)'))}
+              </p>
+              <p>
+                {f.rectAction == '釋放' ? 'delete ' : t('存到：', 'Store into: ')}
+                <input
+                  id="ptr_target" style={{ width: '50%' }} value={f.ptrTarget}
+                  placeholder={f.rectAction == '釋放' ? 'p' : t('例如 p、p->next、*pp', 'like p, p->next, *pp')}
+                  onChange={e => set({ ptrTarget: e.target.value })}
+                />
+              </p>
+              {helper('ptr_target', f.ptrTarget, v => set({ ptrTarget: v }))}
+            </>
+          )}
           {kind == '迴圈控制' && (
             <p className="rect_action">
               {actionRadio('跳出', t('break（跳出迴圈）', 'break (leave the loop)'))}
               {actionRadio('下一輪', t('continue（直接進入下一輪）', 'continue (next round)'))}
             </p>
           )}
-          {kind && kind != '回傳' && kind != '迴圈控制' && (
+          {kind && kind != '回傳' && kind != '迴圈控制' && kind != '指標' && (
             <>
               {kind == '變數' ? t('變數：', 'Variable: ') : kind == '接收' ? t('回傳值存到變數：', 'Save it in: ') : kind == '二維清單' ? t('二維清單：', '2D list: ')
                 : kind == '陣列' ? 'array：' : kind == '堆疊' ? 'stack：' : kind == '佇列' ? kindWord('queue：', 'deque：') : kind == '優先佇列' ? kindWord('priority_queue：', 'heapq：') : kind == '集合' ? 'set：' : kind == '對應表' ? kindWord('map：', 'dict：') : kind == '結構' ? 'struct：' : byTarget(t('清單：', 'List: '), 'vector：', 'list：')}
@@ -1384,12 +1441,12 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
               <br /><br /> {verb()} {codeInput}{' '}
               {helper('code', f.code, v => set({ code: v }))}
               <br /><br />
-              <p>{t('捨去進位？', 'Round?')}{' '}
+              {kind != '指標' && <p>{t('捨去進位？', 'Round?')}{' '}
                 {radio('', t('不需要', 'No'))}{' '}
                 {radio('Math.round', t('四捨五入', 'Round'))}{' '}
                 <br />{radio('Math.floor', t('無條件捨去', 'Round down'))}{' '}
                 {radio('Math.ceil', t('無條件進位', 'Round up'))}{' '}
-              </p>
+              </p>}
             </>
           )}
           <p><br />{buttons}</p>
