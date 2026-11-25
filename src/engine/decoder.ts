@@ -24,7 +24,7 @@ import { displayLinkText, displayNodeText, eofVar, parseSortKeys, sortKeyExpr, s
 import { charInit, cppNameProblem, elemCppType, GLOBAL_PREFIX, mapKeyCppType, mapParts, parseCall, pyTypeName, sheetId, splitArgs, type LocalVar, type ModuleInfo, type ModuleSource, type ParamInfo } from './modules';
 import type { FlowNode } from './node';
 import { isEnterLink, isExitLink, isWhileMode } from './loops';
-import { entriesInto, exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, ptrOf, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
+import { entriesInto, exprType, fieldOf, forInit, forLoopVars, forUpdate, isFloatExpr, parseExpr, parseExprSpans, INT_PTR, isIntDeref, ptrOf, PY_CALLS, pyFor, splitFor, structOf, tupleField, type Expr, type ExprType, type VarInfo, type VarType } from './structure';
 import { allStructs, fieldCppType, fieldInit, findStruct, getStructs, isPair, type StructField } from './structs';
 
 /** 第三步「變數」表格整理出來的變數清單 */
@@ -475,11 +475,18 @@ function fieldsOk(vars: VarStore, e: Expr): boolean {
 }
 
 /** 指標的寫法對不對：-> 前面要是指到 struct 的指標、* 後面要是指標、& 後面要是指標變數或指標欄位、new 後面要是 struct；不行時跳出提示 */
+/** 提示裡寫出指標是哪一個：變數就寫名稱 */
+const exprSrc = (e: Expr) => (e.t == 'var' ? e.name : 'p');
+
 function ptrExprOk(x: Expr, map: Map<string, VarInfo>, visit: (x: Expr) => boolean): boolean {
   switch (x.t) {
     case 'arrow': {
       if (!visit(x.obj)) return false;
       const p = ptrOf(x.obj, map);
+      if (p && p != 'null' && p.level == 1 && p.s == INT_PTR) {
+        alert(t(`「${exprSrc(x.obj)}」是 int*，指到的是一個整數，沒有欄位：要拿到那個整數請用 *${exprSrc(x.obj)}，不能用 ->。`, `"${exprSrc(x.obj)}" is an int*. It points to a whole number, which has no fields. Use *${exprSrc(x.obj)} to get the number, not ->.`));
+        return false;
+      }
       if (!p || p == 'null' || p.level != 1) {
         const hint = p && p != 'null' && p.level == 2 ? t('（它是指標的指標，要先用 * 拿到指標，例如 (*pp)->' + x.name + '）', ' (it is a pointer to a pointer: use * first, like (*pp)->' + x.name + ')') : '';
         alert(t(`「->${x.name}」前面要是指到 struct 的指標，例如 p->${x.name}（p 是 Node*）${hint}。`, `Put a pointer to a struct before "->${x.name}", like p->${x.name} (p is a Node*)${hint}.`));
@@ -502,10 +509,15 @@ function ptrExprOk(x: Expr, map: Map<string, VarInfo>, visit: (x: Expr) => boole
     }
     case 'addr': {
       if (!visit(x.a)) return false;
-      const p = ptrOf(x.a, map);
       const lvalue = x.a.t == 'var' || x.a.t == 'arrow';
-      if (!lvalue || !p || p == 'null' || p.level != 1) {
-        alert(t('「&」後面要是一個指標變數或指標欄位，例如 &head、&p->next，得到的是指到它的指標（Node**）。', 'Put a pointer variable or a pointer field after "&", like &head or &p->next. You get a pointer to it (a Node**).'));
+      const a = ptrOf(x.a, map);
+      if (lvalue && a && a != 'null' && a.level == 2) {
+        alert(t(`「${exprSrc(x.a)}」已經是指標的指標了，這裡最多只到兩層（**），不能再用 &。`, `"${exprSrc(x.a)}" is already a pointer to a pointer. Two levels (**) is the most here, so you cannot use & on it.`));
+        return false;
+      }
+      const p = ptrOf(x, map);
+      if (!lvalue || !p || p == 'null') {
+        alert(t('「&」後面要是 int 變數、指標變數或指標欄位：&x（x 是 int，得到 int*）、&head、&p->next（得到 Node**）。float、long long、文字變數不能用。', 'Put an int variable, a pointer variable or a pointer field after "&": &x (x is an int, you get an int*), &head, &p->next (you get a Node**). Not float, long long or text variables.'));
         return false;
       }
       return true;
@@ -713,7 +725,10 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
     if (vp == 'null') return true;
     if (!vp || vp.s != pt.ptr.s || vp.level != pt.ptr.level) {
       const fix = vp && vp.s == pt.ptr.s
-        ? (vp.level == 1 ? t('要指到這個指標本身，請在前面加 &（例如 &head）。', ' To point to the pointer itself, put & in front (like &head).') : t('要拿到它指到的那個指標，請在前面加 *（例如 *pp）。', ' To get the pointer it points to, put * in front (like *pp).'))
+        ? (vp.level == 1
+          ? (/^[\p{L}_][\p{L}\p{N}_]*$/u.test(v.trim()) ? t(`要指到 ${v.trim()} 這個指標本身，請在前面加 &（&${v.trim()}）。`, ` To point to the pointer ${v.trim()} itself, put & in front (&${v.trim()}).`) : '')
+          : (/^[\p{L}_][\p{L}\p{N}_]*$/u.test(v.trim()) ? t(`要拿到它指到的那個指標，請在前面加 *（*${v.trim()}）。`, ` To get the pointer it points to, put * in front (*${v.trim()}).`) : ''))
+        : !vp && pt.ptr.s == INT_PTR && pt.ptr.level == 1 && type == 'num' ? t(`要指到變數 ${v.trim()}，請在前面加 &（例如 &${v.trim()}）。`, ` To point to the variable ${v.trim()}, put & in front (like &${v.trim()}).`)
         : '';
       alert(t(`「${target.trim()}」是 ${ptrName(pt.ptr)}，只能放 ${ptrName(pt.ptr)} 或 nullptr，但「${v}」是${vp ? ' ' + ptrName(vp) : what}。`, `"${target.trim()}" is a ${ptrName(pt.ptr)}. It holds a ${ptrName(pt.ptr)} or nullptr, but "${v}" is ${vp ? 'a ' + ptrName(vp) : what}.`) + fix);
       return false;
@@ -723,7 +738,7 @@ export function checkValueType(vars: VarStore, modules: ModuleInfo[], target: st
   if (pt && 'field' in pt) {
     const f = pt.field;
     if ((f.type == '數字' && type != 'num') || (f.type == '文字' && type != 'str' && type != 'char' && type != 'num')) {
-      alert(t(`欄位「${target.trim()}」是 ${fieldCppType(f)}，但「${v}」是${what}，不能存進去。`, `"${target.trim()}" is ${fieldCppType(f)}, but "${v}" is ${what}. It cannot go in.`));
+      alert(t(`${target.trim().startsWith('*') ? '' : '欄位'}「${target.trim()}」是 ${fieldCppType(f)}，但「${v}」是${what}，不能存進去。`, `"${target.trim()}" is ${fieldCppType(f)}, but "${v}" is ${what}. It cannot go in.`));
       return false;
     }
     return true;
@@ -853,6 +868,8 @@ export function ptrTarget(vars: VarStore, target: string): { ptr: { s: string; l
     return f.type == '指標' && f.to ? { ptr: { s: f.to, level: 1 } } : { field: f };
   }
   if (e.t != 'var' && e.t != 'deref') return null;
+  // *p：p 是 int*，存到它指到的那個 int
+  if (isIntDeref(e, map)) return { field: { name: '', type: '數字' } };
   const p = ptrOf(e, map);
   return p && p != 'null' ? { ptr: p } : null;
 }
@@ -865,7 +882,7 @@ export function ptrTargetOk(vars: VarStore, target: string): boolean {
   }
   if (!checkVar(vars, target, true)) return false;
   if (!ptrTarget(vars, target)) {
-    alert(t(`「${target.trim()}」不能存值：要寫指標變數（例如 p）、指標指到的欄位（例如 p->next、p->val），或 *pp（pp 指到的那個指標）。`, `You cannot store into "${target.trim()}". Write a pointer variable (like p), a field through a pointer (like p->next or p->val), or *pp (the pointer pp points to).`));
+    alert(t(`「${target.trim()}」不能存值：要寫指標變數（例如 p）、指標指到的欄位（例如 p->next、p->val）、*pp（pp 指到的那個指標），或 *p（p 是 int*，它指到的那個 int）。`, `You cannot store into "${target.trim()}". Write a pointer variable (like p), a field through a pointer (like p->next or p->val), *pp (the pointer pp points to), or *p (the int an int* p points to).`));
     return false;
   }
   return true;
@@ -879,6 +896,10 @@ export function ptrDeleteOk(vars: VarStore, target: string): boolean {
   }
   if (!checkVar(vars, target, true)) return false;
   const p = ptrOf(parseExpr(target), varInfoMap(vars));
+  if (p && p != 'null' && p.s == INT_PTR) {
+    alert(t(`「${target.trim()}」是 ${ptrName(p)}，指到的是變數，不是 new 出來的，不能 delete。`, `"${target.trim()}" is an ${ptrName(p)}. It points to a variable, not something made with new, so you cannot delete it.`));
+    return false;
+  }
   if (!p || p == 'null' || p.level != 1) {
     alert(t(`delete 後面要是指到 new 出來那一筆的指標（例如 Node* p），「${target.trim()}」不是。`, `After delete, put a pointer to something made with new (like a Node* p). "${target.trim()}" is not one.`));
     return false;
@@ -924,7 +945,8 @@ function varInfoMap(vars: VarStore): Map<string, VarInfo> {
   const map = new Map<string, VarInfo>();
   const floats = vars.floats ?? [];
   const chars = vars.chars ?? [];
-  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '', ...(floats.includes(name) ? { float: true } : {}), ...(type == '文字' && chars.includes(name) ? { char: true } : {}) }));
+  const longs = vars.longs ?? [];
+  const add = (list: string[], type: VarInfo['type']) => list.forEach(name => map.set(name, { name, type, init: vars.var_list.value[vars.var_list.name.indexOf(name)] ?? '', ...(floats.includes(name) ? { float: true } : {}), ...(type == '數字' && longs.includes(name) ? { long: true } : {}), ...(type == '文字' && chars.includes(name) ? { char: true } : {}) }));
   add(vars.type_var_list.number, '數字');
   add(vars.type_var_list.text, '文字');
   add(vars.type_var_list.array, '清單');
@@ -1070,7 +1092,9 @@ const runtimeMessages = () => ({
   needPtr: t('「{name}」是 {s}*，只能放指到 {s} 的指標或 nullptr。', '"{name}" is a {s}*. It holds a pointer to a {s}, or nullptr.'),
   needPtr2: t('「{name}」是 {s}**，只能放指到 {s}* 的指標（例如 &head）或 nullptr。', '"{name}" is a {s}**. It holds a pointer to a {s}* (like &head), or nullptr.'),
   tooManyNew: t('new 太多次了（超過 100000 筆）：是不是迴圈停不下來？', 'Too many new (over 100000). Does a loop never stop?'),
-  showPtr: t('指標不能直接輸出（印出來的會是記憶體地址）：請輸出它指到的欄位，例如 p->val。', 'A pointer cannot be printed (you would get a memory address). Print a field it points to, like p->val.'),
+  showPtr: t('指標不能直接輸出（印出來的會是記憶體地址）：請輸出它指到的東西，例如 p->val，或 *p（p 是 int*）。', 'A pointer cannot be printed (you would get a memory address). Print what it points to, like p->val, or *p (p is an int*).'),
+  needIntPtr: t('「{name}」是 int*，只能放 int 變數的地址（例如 &x）或 nullptr。', '"{name}" is an int*. It holds the address of an int variable (like &x), or nullptr.'),
+  needIntPtr2: t('「{name}」是 int**，只能放 int* 變數的地址（例如 &p）或 nullptr。', '"{name}" is an int**. It holds the address of an int* variable (like &p), or nullptr.'),
   ...(isPython() ? PY_MESSAGES() : {}),
 });
 
@@ -1716,10 +1740,17 @@ function __put(x, i, name, v) {
   x.s(v);
 }
 // &head（變數）、&p->next（某一筆的指標欄位）
-function __vref(g, s, name) { return { __ref: name, g: g, s: s }; }
+// 指到同一個地方的永遠是同一個物件（== 才比得出一樣），例如 p == &x、pp == &head
+var __R = {};
+function __sameRef(key, g, s) {
+  var r = __R[key] || (__R[key] = { __ref: key });
+  r.g = g; r.s = s;
+  return r;
+}
+function __vref(g, s, name) { return __sameRef(name, g, s); }
 function __fref(p, i, name, f) {
   var o = __d(p, i, name);
-  return { __ref: '#' + p.__ptr + '.' + f, g: function () { return o[f]; }, s: function (v) { o[f] = v; } };
+  return __sameRef('#' + p.__ptr + '.' + f, function () { return o[f]; }, function (v) { o[f] = v; });
 }
 // 存進 Node* 的值要是指到同一種 struct 的指標或 nullptr
 function __ptr(v, i, name, sname) {
@@ -1730,6 +1761,12 @@ function __ptr(v, i, name, sname) {
 function __pref(v, i, name, sname) {
   if (v === null || v === undefined) return null;
   if (!(v && typeof v == 'object' && v.__ref)) __err('needPtr2', i, { name: name, s: sname });
+  return v;
+}
+// 存進 int*、int** 的值要是地址（&x、&p）或 nullptr
+function __iptr(v, i, name, level) {
+  if (v === null || v === undefined) return null;
+  if (!(v && typeof v == 'object' && v.__ref)) __err(level == 1 ? 'needIntPtr' : 'needIntPtr2', i, { name: name });
   return v;
 }
 function __free(p, i, name) {
@@ -1977,6 +2014,8 @@ class CodeGenerator {
         return m?.returns == '數字' && !m.returnsFloat;
       }
       case 'neg': return this.isIntExpr(e.a);
+      // *p：p 是 int*
+      case 'deref': return isIntDeref(e, varInfoMap(this.vars));
       case 'bin': return ['+', '-', '*', '/', '%'].includes(e.op) && this.isIntExpr(e.a) && this.isIntExpr(e.b);
       default: return false;
     }
@@ -2394,6 +2433,7 @@ class CodeGenerator {
       const name = JSON.stringify(target.trim());
       const conv = !('ptr' in pt)
         ? `${pt.field.type == '文字' ? '__text' : pt.field.float ? '__num' : '__int'}(${value}, ${i}, ${name})`
+        : pt.ptr.s == INT_PTR ? `__iptr(${value}, ${i}, ${name}, ${pt.ptr.level})`
         : pt.ptr.level == 1 ? `__ptr(${value}, ${i}, ${name}, ${JSON.stringify(pt.ptr.s)})` : `__pref(${value}, ${i}, ${name}, ${JSON.stringify(pt.ptr.s)})`;
       // *pp = 值：存到 pp 指到的那個指標
       if (parseExpr(target).t == 'deref') return `__put(${this.expr(target.trim().replace(/^\*/, ''), i)}, ${i}, ${name}, ${conv});\n`;
@@ -3080,7 +3120,7 @@ export const MAX_STEPS = 3000;
 function initialValue(vars: VarStore, name: string, raw: string | undefined): string {
   // 指標：一開始是 nullptr（沒有指到任何東西）
   if (vars.type_var_list.ptr.includes(name) || vars.type_var_list.ptr2.includes(name)) {
-    if (!findStruct(raw)) throw new FlowError(t(`指標「${name}」指到的 struct「${raw ?? ''}」不存在：請到第三步重新選型別。`, `The struct "${raw ?? ''}" that the pointer "${name}" points to does not exist. Choose the type again in step 3.`));
+    if (!findStruct(raw) && raw != INT_PTR) throw new FlowError(t(`指標「${name}」指到的 struct「${raw ?? ''}」不存在：請到第三步重新選型別。`, `The struct "${raw ?? ''}" that the pointer "${name}" points to does not exist. Choose the type again in step 3.`));
     return 'null';
   }
   // struct 變數：每個欄位是 0（string 是空的），跟 Edge e = {}; 一樣

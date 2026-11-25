@@ -3,7 +3,7 @@ import type { DialogForm, DialogKind } from './components/NodeDialog';
 import { createConnectors } from './engine/connector';
 import { checkCall, checkMapKey, checkValueType, checkVar, getCodeVar, ptrDeleteOk, ptrTarget, ptrTargetOk, scopedName, splitField, type VarStore } from './engine/decoder';
 import { eofText, eofVar, NO_NEWLINE, parseSortKeys, sortKeyExpr, sortKeysText, splitOutput, splitRectangle, splitTarget } from './engine/labels';
-import { callText, parseCall, type ModuleInfo } from './engine/modules';
+import { callText, newExprText, parseCall, splitNew, type ModuleInfo } from './engine/modules';
 import { forInit, forUpdate, parseExpr, pyFor, splitFor } from './engine/structure';
 import { getTarget, isPython } from './target';
 import { splitArgs } from './engine/modules';
@@ -11,7 +11,7 @@ import type { Diagram } from './engine/diagram';
 import type { FlowNode } from './engine/node';
 import { isWhileMode } from './engine/loops';
 import { t } from './i18n';
-import { findStruct } from './engine/structs';
+import { findStruct, getStructs } from './engine/structs';
 
 const ROUNDING_TEXT: Record<string, string> = {
   'Math.round': '(取四捨五入)',
@@ -20,6 +20,40 @@ const ROUNDING_TEXT: Record<string, string> = {
 };
 
 const sharedConnectors = createConnectors();
+
+/** 「建立新的一筆」建立哪一種 struct：選過的；沒選就照存到的指標（跟對話框一樣），只有一種 struct 就是那一種 */
+function newStruct(vars: VarStore, f: DialogForm): string {
+  if (f.ptrStruct) return f.ptrStruct;
+  const pt = ptrTarget(vars, f.ptrTarget);
+  if (pt && 'ptr' in pt && pt.ptr.level == 1 && findStruct(pt.ptr.s)) return pt.ptr.s;
+  const all = getStructs();
+  return all.length == 1 ? all[0].name : '';
+}
+
+/**
+ * 「建立新的一筆」：要選 struct，存到的地方要是指到這種 struct 的指標，每個填了的欄位型別要對
+ * （沒填的欄位放預設值，之後可以再用「存一個值」改，例如 p->val 設為 x）
+ */
+function newNodeOk(vars: VarStore, modules: ModuleInfo[], f: DialogForm): boolean {
+  const s = findStruct(newStruct(vars, f));
+  const target = f.ptrTarget.trim();
+  if (!s) {
+    alert(t('請選要建立哪一種 struct。', 'Choose which struct to make.'));
+    return false;
+  }
+  const pt = ptrTarget(vars, target);
+  if (!pt || !('ptr' in pt) || pt.ptr.level != 1 || pt.ptr.s != s.name) {
+    const kind = pt && 'ptr' in pt ? `${pt.ptr.s}${'*'.repeat(pt.ptr.level)}` : null;
+    alert(t(`新的一筆 ${s.name} 要用 ${s.name}* 的指標記住，「${target}」${kind ? `是 ${kind}` : '不是指標'}。`, `A new ${s.name} must be kept in a ${s.name}* pointer. "${target}" ${kind ? `is a ${kind}` : 'is not a pointer'}.`));
+    return false;
+  }
+  // 每個欄位：當成存到「target->欄位」來檢查（*pp 要加括號：(*pp)->val）
+  const base = /^[\p{L}_][\p{L}\p{N}_]*$/u.test(target) ? target : `(${target})`;
+  return s.fields.every((field, k) => {
+    const v = f.ptrFields[k]?.trim() ?? '';
+    return !v || (checkVar(vars, v, true) && checkValueType(vars, modules, `${base}->${field.name}`, v, 'var'));
+  });
+}
 
 /** 計算積木的文字（格式見 splitRectangle）以及它用到的變數 */
 function rectangleText(vars: VarStore, f: DialogForm) {
@@ -32,7 +66,10 @@ function rectangleText(vars: VarStore, f: DialogForm) {
   const rowPush = f.rectKind == '二維清單' && f.rectAction == '加入';
   let text = f.rectAction == '跳出' ? ' break' : f.rectAction == '下一輪' ? ' continue'
     // C++ 的指標：「 p->next 設為 head」「 *pp 設為 p->next」「 delete p」
-    : f.rectKind == '指標' ? (f.rectAction == '釋放' ? ` delete ${f.ptrTarget.trim()}` : ` ${f.ptrTarget.trim()} 設為 ${f.code}`)
+    // 建立新的一筆：「 p 設為 new Node{x, nullptr}」（沒填的欄位放 0、""、nullptr）
+    : f.rectKind == '指標' ? (f.rectAction == '釋放' ? ` delete ${f.ptrTarget.trim()}`
+      : f.rectAction == '建立' ? ` ${f.ptrTarget.trim()} 設為 ${newExprText(newStruct(vars, f), f.ptrFields)}`
+      : ` ${f.ptrTarget.trim()} 設為 ${f.code}`)
     : field ? ` ${field} 設為 ${f.code}`
     // C++ 的 string 只改其中一個字：「 s[i] 設為 'a'」
     : letterTarget(vars, f) ? ` ${letterTarget(vars, f)} 設為 ${f.code}`
@@ -140,6 +177,7 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
   if (f.rectKind == '指標') {
     if (f.rectAction == '釋放') return ptrDeleteOk(vars, f.ptrTarget);
     if (!ptrTargetOk(vars, f.ptrTarget)) return false;
+    if (f.rectAction == '建立') return newNodeOk(vars, modules, f);
     if (!f.code.trim()) {
       alert(t('請填要放什麼，例如 new Node{x, nullptr}、head、p->next、nullptr。', 'Enter what to store, like new Node{x, nullptr}, head, p->next or nullptr.'));
       return false;
@@ -666,6 +704,9 @@ export function editDialogFor(node: FlowNode, modules: ModuleInfo[] = [], vars?:
       // C++ 的指標：delete p、存到 p、*pp、p->next、p->val
       if (action == '釋放') return { kind: 'Rectangle', initial: { rectKind: '指標', rectAction: '釋放', ptrTarget: target } };
       if (action == '設為' && vars && getTarget() == 'cpp' && ptrTarget(vars, target)) {
+        // new Node{…}：打開「建立新的一筆」，每個欄位放回它的格子
+        const made = splitNew(expr);
+        if (made && findStruct(made.sname)) return { kind: 'Rectangle', initial: { rectKind: '指標', rectAction: '建立', ptrTarget: target, ptrStruct: made.sname, ptrFields: made.values } };
         return { kind: 'Rectangle', initial: { rectKind: '指標', rectAction: '設為', ptrTarget: target, code: expr } };
       }
       // struct 的欄位：「 e.from 設為 x」「 edges[i].w 設為 x」

@@ -3,6 +3,8 @@
 import { getLang } from '../i18n';
 import { isPython, itemWord } from '../target';
 import type { FigureName } from './figures';
+import { fieldDefaultText, splitNew } from './modules';
+import { findStruct } from './structs';
 
 const ROUNDING: [string, string][] = [
   ['(取四捨五入)', ' (round)'],
@@ -183,6 +185,13 @@ function rectangleLabel(text: string, en: boolean): string {
         : `排序 ${target}${first ? `（${first}）` : ''} 依 ${keys.map(k => `${k.field} ${dirText(k.desc)}`).join('，再依 ')}`;
     }
     return en ? `sort ${target}${first} (${dirText(expr == '由大到小')})` : `排序 ${target}${first ? `（${first}）` : ''} ${dirText(expr == '由大到小')}`;
+  }
+  // C++ 的指標：「p 指到新的 Node（val = x，next = nullptr）」，看得出每個欄位放什麼
+  const made = action == '設為' && !isPython() ? splitNew(expr) : null;
+  if (made) {
+    const s = findStruct(made.sname);
+    const parts = s ? s.fields.map((f, k) => `${f.name} = ${made.values[k]?.trim() || fieldDefaultText(f.type)}`) : made.values;
+    return en ? `${target} → new ${made.sname} (${parts.join(', ')})` : `${target} 指到新的 ${made.sname}（${parts.join('，')}）`;
   }
   // stack、queue：照 C++ 的寫法
   if (action == '放入') return `${target}.push(${value})`;

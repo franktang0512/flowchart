@@ -940,6 +940,17 @@ input, textarea, select, button {
     flex-direction: column;
 }
 /* 記憶體（new 出來的每一筆）：delete 掉的變淡 */
+/* 計算積木「建立新的一筆」：每個欄位一列 */
+.new_fields th {
+  font-weight: normal;
+  padding: 2px 8px 2px 0;
+  white-space: nowrap;
+}
+.new_fields input {
+  width: 8em;
+  margin-right: 4px;
+}
+
 .run_heap {
     margin-top: 10px;
 }

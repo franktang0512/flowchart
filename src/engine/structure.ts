@@ -791,10 +791,35 @@ export function ptrOf(e: Expr, vars: Map<string, VarInfo>): { s: string; level: 
     }
     case 'addr': {
       const a = ptrOf(e.a, vars);
-      return a && a != 'null' && a.level == 1 ? { s: a.s, level: 2 } : null;
+      if (a && a != 'null' && a.level == 1) return { s: a.s, level: 2 };
+      // &x、&p->val：int 變數、int 欄位的地址是 int*
+      return intLvalue(e.a, vars) ? { s: INT_PTR, level: 1 } : null;
     }
     default: return null;
   }
+}
+
+/** int*、int** 指到的是 int（指標型別的「指到哪一種」寫 int，不是 struct 的名稱） */
+export const INT_PTR = 'int';
+
+/** 可以取地址的 int：int 變數 x、指標指到的 int 欄位 p->val（float、long long、char 不算） */
+export function intLvalue(e: Expr, vars: Map<string, VarInfo>): boolean {
+  if (e.t == 'var') {
+    const v = vars.get(e.name);
+    return v?.type == '數字' && !v.float && !v.long;
+  }
+  if (e.t == 'arrow') {
+    const f = fieldOf(e, vars);
+    return f?.type == '數字' && !f.float && !f.long;
+  }
+  return false;
+}
+
+/** *p：p 是 int*，拿到的是它指到的 int */
+export function isIntDeref(e: Expr, vars: Map<string, VarInfo>): boolean {
+  if (e.t != 'deref') return false;
+  const p = ptrOf(e.a, vars);
+  return !!p && p != 'null' && p.level == 1 && p.s == INT_PTR;
 }
 
 /**

@@ -75,7 +75,10 @@ export function RunArea({ visible, panes, run, error, partial, step, onStep, whi
     const pointer = ptrText(v);
     const isPtrVar = kinds[name] == '指標' || kinds[name] == '指標的指標';
     if (kind != 'idle' && (pointer || (v === null && isPtrVar))) {
-      const chain = pointer && kinds[name] != '指標的指標' ? chainText(v, now?.__heap) : '';
+      // int*：→ x，後面寫 *p 現在是多少
+      const ref = v && typeof v == 'object' ? (v as { __ref?: unknown }).__ref : undefined;
+      const pointee = typeof ref == 'string' && !ref.startsWith('#') && now && typeof now[ref] == 'number' ? `*${name} = ${now[ref]}` : '';
+      const chain = pointee || (pointer && kinds[name] != '指標的指標' ? chainText(v, now?.__heap) : '');
       return (
         <div key={name} className={'var_box' + extra}>
           <span className="var_box_name">{name}</span>

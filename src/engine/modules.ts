@@ -231,8 +231,8 @@ export function splitArgs(s: string): string[] {
       if (ch == quote) quote = '';
     }
     else if (ch == '"' || ch == "'") quote = ch;
-    else if (ch == '(' || ch == '[') depth++;
-    else if (ch == ')' || ch == ']') depth--;
+    else if (ch == '(' || ch == '[' || ch == '{') depth++;
+    else if (ch == ')' || ch == ']' || ch == '}') depth--;
     else if (ch == ',' && depth == 0) {
       out.push(cur.trim());
       cur = '';
@@ -242,6 +242,22 @@ export function splitArgs(s: string): string[] {
   }
   if (cur.trim() || out.length) out.push(cur.trim());
   return out;
+}
+
+/** new Node{x, nullptr} → struct 的名稱和每個欄位的值（new Node 沒有大括號時 values 是空的）；不是 new 回傳 null */
+export function splitNew(text: string): { sname: string; values: string[] } | null {
+  const m = /^\s*new\s+([\p{L}_][\p{L}\p{N}_]*)\s*(?:\{(.*)\})?\s*$/su.exec(text);
+  return m ? { sname: m[1], values: m[2] != null ? splitArgs(m[2]) : [] } : null;
+}
+
+/** 欄位沒填時放的值：數字 0、文字 ""、指標 nullptr（跟 new Node{} 一樣） */
+export const fieldDefaultText = (type: '數字' | '文字' | '指標') => (type == '指標' ? 'nullptr' : type == '文字' ? '""' : '0');
+
+/** 「建立新的一筆」：照欄位的順序寫成 new Node{x, nullptr}，沒填的欄位放預設值 */
+export function newExprText(sname: string, values: string[]): string {
+  const s = findStruct(sname);
+  const parts = (s?.fields ?? []).map((f, k) => values[k]?.trim() || fieldDefaultText(f.type));
+  return `new ${sname}{${parts.join(', ')}}`;
 }
 
 /** 「模組名稱(引數, 引數)」→ 名稱和引數；不是這種寫法回傳 null */

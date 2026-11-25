@@ -1,7 +1,7 @@
 // 第三步左邊的「變數」表格
 import { useEffect, useRef, useState } from 'react';
 import type { LocalVar, ParamInfo } from '../engine/modules';
-import { isContainerType, type VarType } from '../engine/structure';
+import { INT_PTR, isContainerType, type VarType } from '../engine/structure';
 import { findStruct, getStructs, isPair, PAIR_TYPES } from '../engine/structs';
 import { charInit, mapParts, pyElemName } from '../engine/modules';
 import { t, useLang } from '../i18n';
@@ -442,15 +442,18 @@ function VarRowView({ row, allowed, canGlobal = false, onChange, onCommit, onDel
                   </optgroup>
                 )}
                 {/* 指標（linked list）：指到自己定義的 struct，Node* 或 Node** */}
-                {(!allowed || allowed.includes('指標') || row.type == '指標' || row.type == '指標的指標') && getStructs().length > 0 && (
+                {/* int*、int**：指到 int 變數（&x）；Node*、Node**：指到自己定義的 struct（linked list） */}
+                {(!allowed || allowed.includes('指標') || row.type == '指標' || row.type == '指標的指標') && (
                   <optgroup label={t('指標', 'Pointers')}>
+                    <option value={PTR_PREFIX + INT_PTR}>int*（{t('指到 int 變數', 'points to an int')}）</option>
+                    <option value={PTR2_PREFIX + INT_PTR}>int**（{t('指到 int*', 'points to an int*')}）</option>
                     {getStructs().flatMap(s => [
                       <option key={'p' + s.name} value={PTR_PREFIX + s.name}>{s.name}*（{t('指標', 'pointer')}）</option>,
                       <option key={'pp' + s.name} value={PTR2_PREFIX + s.name}>{s.name}**（{t('指標的指標', 'pointer to pointer')}）</option>,
                     ])}
                   </optgroup>
                 )}
-                {(row.type == '指標' || row.type == '指標的指標') && !findStruct(row.init) && <option value={(row.type == '指標' ? PTR_PREFIX : PTR2_PREFIX) + row.init} disabled>{row.init || 'struct'}{row.type == '指標' ? '*' : '**'}（{t('不存在', 'missing')}）</option>}
+                {(row.type == '指標' || row.type == '指標的指標') && !findStruct(row.init) && row.init != INT_PTR && <option value={(row.type == '指標' ? PTR_PREFIX : PTR2_PREFIX) + row.init} disabled>{row.init || 'struct'}{row.type == '指標' ? '*' : '**'}（{t('不存在', 'missing')}）</option>}
                 {/* 選的 struct 被刪掉或改名了：照樣列出來，才看得出原本是什麼 */}
                 {row.type == '結構' && !findStruct(row.init) && <option value={STRUCT_PREFIX + row.init} disabled>{row.init || 'struct'}（{t('不存在', 'missing')}）</option>}
               </>

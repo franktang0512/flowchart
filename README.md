@@ -88,7 +88,7 @@
 | `map` | 選「鍵 → 值」的型別；`m[k] = v`、`m[k]`、`erase`、`clear`、`count(k)`；讀還沒有的鍵會先放 0 |
 | `struct` | 在變數表上面定義（欄位 int / float / string）；初始值可以填每個欄位；容器都可以裝（`set`、`priority_queue` 除外） |
 | `pair` | `pair<int,int>`、`pair<long long,int>`、`pair<int,string>`、`pair<string,int>`、`pair<float,int>`；用 `p.first`、`p.second` |
-| 指標 | 指到自己定義的 struct：`Node*`、`Node**`（變數表選，一開始是 `nullptr`）；struct 的欄位也可以是指標（`Node* next`）。計算積木選「指標」：存到 `p`、`p->next`、`p->val`、`*pp`，或 `delete p`。算式可以用 `p->val`、`*pp`、`&head`、`&p->next`、`nullptr`、`new Node`、`new Node{x, nullptr}`。執行時 nullptr 用 `->`、delete 過又用、delete 兩次都會說明；第四步列出 new 出來的每一筆（#地址）和指標指到哪裡 |
+| 指標 | `int*`、`int**`（指到 int 變數，例如 `p = &x`、`*p = 5`、`**pp`），或指到自己定義的 struct：`Node*`、`Node**`（變數表選，一開始是 `nullptr`）；struct 的欄位也可以是指標（`Node* next`）。計算積木選「指標」：「建立新的一筆」選 struct、一格一格填欄位（沒填的放 0、`nullptr`），存成 `p = new Node{x, nullptr}`；「存一個值」存到 `p`、`p->next`、`p->val`、`*pp`、`*p`，可以從「指到」選單選 `nullptr`、`head`、`&x`…；或 `delete p`。算式可以用 `p->val`、`*pp`、`&head`、`&p->next`、`nullptr`、`new Node`、`new Node{x, nullptr}`。執行時 nullptr 用 `->`、delete 過又用、delete 兩次都會說明；第四步列出 new 出來的每一筆（#地址）和指標指到哪裡 |
 
 勾「全域」的變數宣告在 main 外面，每個模組都用得到（遞迴的 DFS 靠它）。全域變數可以跟 main 的變數同名：main 用自己的，模組用全域的；main 裡要改被蓋住的全域變數，選 `::a（全域）`。
 
