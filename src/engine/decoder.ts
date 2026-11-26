@@ -877,7 +877,7 @@ export function ptrTarget(vars: VarStore, target: string): { ptr: { s: string; l
 /** 計算積木「指標」要存到的地方寫得對不對（p、p->next、p->val、*pp）；不行時跳出提示 */
 export function ptrTargetOk(vars: VarStore, target: string): boolean {
   if (!target.trim()) {
-    alert(t('請填要存到哪裡，例如 p、p->next、*pp。', 'Enter where to store it, like p, p->next or *pp.'));
+    alert(t('請選要改哪一個（例如 p、p->next、*pp、*p）。', 'Choose what to change (like p, p->next, *pp, *p).'));
     return false;
   }
   if (!checkVar(vars, target, true)) return false;
@@ -891,7 +891,7 @@ export function ptrTargetOk(vars: VarStore, target: string): boolean {
 /** delete 後面要是 new 出來的那一筆的指標（Node*）；不行時跳出提示 */
 export function ptrDeleteOk(vars: VarStore, target: string): boolean {
   if (!target.trim()) {
-    alert(t('請填要 delete 哪一個指標，例如 p。', 'Enter the pointer to delete, like p.'));
+    alert(t('請選要還回去（delete）哪一個指標指到的那一筆。', 'Choose the pointer whose target to delete.'));
     return false;
   }
   if (!checkVar(vars, target, true)) return false;

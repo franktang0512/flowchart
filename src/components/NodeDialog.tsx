@@ -39,6 +39,11 @@ export interface DialogForm {
   /** C++ 的指標「建立新的一筆」：建立哪一種 struct、每個欄位放什麼（空的放 0、""、nullptr） */
   ptrStruct: string;
   ptrFields: string[];
+  /** 指標「=」分成兩種：改指標存的位址（p = &x），或改指標指到的東西（*p = 5、p->val = 5）；空的照存到的地方決定 */
+  ptrMode: '' | 'addr' | 'value';
+  /** 存到的地方、要放的值不在選單裡：自己寫 */
+  ptrCustom: boolean;
+  ptrCustomValue: boolean;
   /** 計算積木：「設為」一般的設定，其他是清單的操作（見 RectAction） */
   rectAction: RectAction;
   /** 變數：true 是「改變」（Scratch「變數改變」、Blockly「將變數的值加」），code 填加多少；存成「x 設為 x + 多少」 */
@@ -190,6 +195,9 @@ export const defaultForm = (kind: DialogKind): DialogForm => ({
   ptrTarget: '',
   ptrStruct: '',
   ptrFields: [],
+  ptrMode: '',
+  ptrCustom: false,
+  ptrCustomValue: false,
   sortDesc: false,
   sortKeys: [],
   forInit: '',
@@ -283,6 +291,15 @@ const vectorsOf = (ty: VarTypes) => ty.array.filter(n => !ty.fixed.includes(n));
  * 點按鈕就把 s.top()、q.front()、v.size()、a[ ] 這些寫法填到游標的位置，不用自己打。
  * inputId 是要填進去的輸入框（記得游標在哪裡）
  */
+/** 指標積木選單的一項：填進去的字、選單上的說明 */
+interface PtrPlace {
+  text: string;
+  label: string;
+}
+
+/** 選單裡的「其他（自己寫）」 */
+const CUSTOM = '__custom__';
+
 /** 「點一下填入」的一個按鈕：填進去的字、按鈕上的字、填完游標停在第幾個字（沒有就是最後面）、說明 */
 interface Snippet {
   key: string;
@@ -677,39 +694,66 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
    * 「指到」選單：這種指標可以指到哪些地方（nullptr、同一種的指標變數、指標欄位、&x…），
    * 選了就填進值的欄位；自己（存到的地方）不列
    */
-  const ptrChoices = (tp: { s: string; level: 1 | 2 }, self: string): { text: string; label: string }[] => {
-    const out: { text: string; label: string }[] = [{ text: 'nullptr', label: t('nullptr（不指到任何東西）', 'nullptr (points to nothing)') }];
+  const ptrChoices = (tp: { s: string; level: 1 | 2 }, self: string): PtrPlace[] => {
+    const out: PtrPlace[] = [{ text: 'nullptr', label: t('nullptr：不指到任何東西', 'nullptr: points to nothing') }];
     const add = (text: string, label: string) => {
-      if (text != self && !out.some(c => c.text == text)) out.push({ text, label: `${text}（${label}）` });
+      if (text != self && !out.some(c => c.text == text)) out.push({ text, label: `${text}：${label}` });
     };
     const ptrs = allTypes.ptr.filter(n => holds[n] == tp.s);
     const ptr2s = allTypes.ptr2.filter(n => holds[n] == tp.s);
     /** Node* 變數 v 指到的那一筆裡，型別是 to* 的欄位（例如 next） */
     const linkFields = (v: string) => (findStruct(holds[v])?.fields ?? []).filter(x => x.type == '指標' && x.to == tp.s);
     if (tp.s == INT_PTR && tp.level == 1) {
-      allTypes.number.forEach(n => add('&' + n, t(`指到變數 ${n}`, `points to the variable ${n}`)));
-      ptrs.forEach(n => add(n, t(`跟 ${n} 指到同一個`, `same as ${n}`)));
-      ptr2s.forEach(n => add('*' + n, t(`${n} 指到的那個 int*`, `the int* that ${n} points to`)));
+      allTypes.number.forEach(n => add('&' + n, t(`變數 ${n} 的位址（取址）`, `the address of ${n}`)));
+      ptrs.forEach(n => add(n, t(`${n} 存的位址（跟 ${n} 指到同一個）`, `the address in ${n} (same place as ${n})`)));
+      ptr2s.forEach(n => add('*' + n, t(`${n} 指到的那個 int* 存的位址`, `the address in the int* that ${n} points to`)));
       allTypes.ptr.filter(n => findStruct(holds[n])).forEach(v => (findStruct(holds[v])?.fields ?? []).filter(x => x.type == '數字' && !x.float && !x.long)
-        .forEach(x => add(`&${v}->${x.name}`, t(`指到 ${v} 那一筆的 ${x.name}`, `points to ${x.name} of what ${v} points to`))));
+        .forEach(x => add(`&${v}->${x.name}`, t(`${v} 那一筆的 ${x.name} 的位址`, `the address of ${x.name} in what ${v} points to`))));
     }
     else if (tp.s == INT_PTR) {
-      allTypes.ptr.filter(n => holds[n] == INT_PTR).forEach(n => add('&' + n, t(`指到指標 ${n}`, `points to the pointer ${n}`)));
-      ptr2s.forEach(n => add(n, t(`跟 ${n} 指到同一個`, `same as ${n}`)));
+      allTypes.ptr.filter(n => holds[n] == INT_PTR).forEach(n => add('&' + n, t(`指標 ${n} 的位址（取址）`, `the address of the pointer ${n}`)));
+      ptr2s.forEach(n => add(n, t(`${n} 存的位址（跟 ${n} 指到同一個）`, `the address in ${n} (same place as ${n})`)));
     }
     else if (tp.level == 1) {
-      ptrs.forEach(n => add(n, t(`跟 ${n} 指到同一筆`, `same as ${n}`)));
-      allTypes.ptr.forEach(v => linkFields(v).forEach(x => add(`${v}->${x.name}`, t(`${v} 那一筆的 ${x.name}`, `the ${x.name} of what ${v} points to`))));
-      ptr2s.forEach(n => add('*' + n, t(`${n} 指到的那個指標`, `the pointer ${n} points to`)));
+      ptrs.forEach(n => add(n, t(`${n} 存的位址（跟 ${n} 指到同一筆）`, `the address in ${n} (same one as ${n})`)));
+      allTypes.ptr.forEach(v => linkFields(v).forEach(x => add(`${v}->${x.name}`, t(`${v} 那一筆的 ${x.name} 存的位址（往後走一個）`, `the address in ${x.name} of what ${v} points to (move on)`))));
+      ptr2s.forEach(n => add('*' + n, t(`${n} 指到的那個指標存的位址`, `the address in the pointer ${n} points to`)));
     }
     else {
-      allTypes.ptr.filter(n => holds[n] == tp.s).forEach(n => add('&' + n, t(`指到指標 ${n}`, `points to the pointer ${n}`)));
-      allTypes.ptr.forEach(v => linkFields(v).forEach(x => add(`&${v}->${x.name}`, t(`指到 ${v} 那一筆的 ${x.name}`, `points to ${x.name} of what ${v} points to`))));
-      ptr2s.forEach(n => add(n, t(`跟 ${n} 指到同一個`, `same as ${n}`)));
+      allTypes.ptr.filter(n => holds[n] == tp.s).forEach(n => add('&' + n, t(`指標 ${n} 的位址（取址）`, `the address of the pointer ${n}`)));
+      allTypes.ptr.forEach(v => linkFields(v).forEach(x => add(`&${v}->${x.name}`, t(`${v} 那一筆的 ${x.name} 這個指標的位址`, `the address of the pointer ${x.name} in what ${v} points to`))));
+      ptr2s.forEach(n => add(n, t(`${n} 存的位址（跟 ${n} 指到同一個）`, `the address in ${n} (same place as ${n})`)));
       ptr2s.forEach(pp => (findStruct(tp.s)?.fields ?? []).filter(x => x.type == '指標' && x.to == tp.s)
-        .forEach(x => add(`&(*${pp})->${x.name}`, t(`往後走一個：指到下一個 ${x.name}`, `move on to the next ${x.name}`))));
+        .forEach(x => add(`&(*${pp})->${x.name}`, t(`往後走一個：下一筆的 ${x.name} 這個指標的位址`, `move on: the address of the next ${x.name} pointer`))));
     }
     return out;
+  };
+  /**
+   * 指標積木可以改的地方：addr 是指標本身（改它存的位址：p、head->next、*pp），
+   * value 是指標指到的東西（取值之後改：*p、**pp、p->val、(*pp)->val）
+   */
+  const ptrPlaces = (): { addr: PtrPlace[]; value: PtrPlace[] } => {
+    const addr: PtrPlace[] = [], value: PtrPlace[] = [];
+    for (const p of allTypes.ptr) {
+      const sname = holds[p] ?? '';
+      addr.push({ text: p, label: `${p}（${sname}*）` });
+      if (sname == INT_PTR) value.push({ text: '*' + p, label: t(`*${p}：${p} 指到的那個 int`, `*${p}: the int ${p} points to`) });
+      for (const x of findStruct(sname)?.fields ?? []) {
+        if (x.type == '指標') addr.push({ text: `${p}->${x.name}`, label: t(`${p}->${x.name}：${p} 那一筆的 ${x.name}（${x.to}*）`, `${p}->${x.name}: ${x.name} of what ${p} points to (${x.to}*)`) });
+        else value.push({ text: `${p}->${x.name}`, label: t(`${p}->${x.name}：${p} 指到那一筆的 ${x.name}`, `${p}->${x.name}: ${x.name} of what ${p} points to`) });
+      }
+    }
+    for (const pp of allTypes.ptr2) {
+      const sname = holds[pp] ?? '';
+      addr.push({ text: pp, label: `${pp}（${sname}**）` });
+      addr.push({ text: '*' + pp, label: t(`*${pp}：${pp} 指到的那個 ${sname}*`, `*${pp}: the ${sname}* that ${pp} points to`) });
+      if (sname == INT_PTR) value.push({ text: '**' + pp, label: t(`**${pp}：${pp} 最後指到的那個 int`, `**${pp}: the int ${pp} finally points to`) });
+      for (const x of findStruct(sname)?.fields ?? []) {
+        if (x.type == '指標') addr.push({ text: `(*${pp})->${x.name}`, label: t(`(*${pp})->${x.name}：*${pp} 那一筆的 ${x.name}`, `(*${pp})->${x.name}: ${x.name} of what *${pp} points to`) });
+        else value.push({ text: `(*${pp})->${x.name}`, label: t(`(*${pp})->${x.name}：*${pp} 指到那一筆的 ${x.name}`, `(*${pp})->${x.name}: ${x.name} of what *${pp} points to`) });
+      }
+    }
+    return { addr, value };
   };
   const [f, setF] = useState<DialogForm>(() => {
     const form = { ...defaultForm(kind), ...request.initial };
@@ -1185,7 +1229,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
         : byKey ? () => (kind == '集合' ? t('要刪除的值', 'Value to erase') : t('鍵', 'Key'))
         : kind == '集合' || kind == '對應表' || kind == '指標' ? null : RECT_INDEX[f.rectAction];
       const index2Label = !kind ? null : f.rectAction == '建立' && kind == '二維清單' ? t('行數', 'Columns') : cell ? t('行（索引）', 'Column index') : null;
-      const verb = !kind || kind == '接收' || (kind == '指標' && f.rectAction == '建立') ? null
+      const verb = !kind || kind == '接收' || kind == '指標' ? null
         : kind == '集合' && f.rectAction == '放入' ? () => (py ? 'add' : 'insert')
         : py && kind == '佇列' && f.rectAction == '放入' ? () => 'append'
         : py && kind == '優先佇列' && f.rectAction == '放入' ? () => 'heappush'
@@ -1219,7 +1263,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           <p id="hint">{kind == '指標' ? (f.rectAction == '釋放'
             ? t('delete：把 new 出來的那一筆還回去，之後就不能再用它（用了會出錯）...', 'delete: give back what you made with new. You cannot use it after this...')
             : f.rectAction == '建立' ? t('建立新的一筆（new）：選一種 struct，填每個欄位，再用一個指標記住它...', 'Make a new one (new): choose a struct, fill its fields, and keep it in a pointer...')
-            : t('用指標改：例如 head 設為 new Node{x, head}、p 設為 p->next、*pp 設為 p->next...', 'Change with pointers: like head to new Node{x, head}, p to p->next, *pp to p->next...'))
+            : t('指標裡面存的是位址（指到哪裡）。用 & 取址（&x 是 x 的位址），用 * 或 -> 取值（*p 是 p 指到的東西）。先選要做什麼：', 'A pointer keeps an address (where it points). & takes an address (&x is the address of x). * and -> go through it (*p is what p points to). Choose what to do:'))
             : change ? t('將數字變數的值加上多少（減少就填負數）...', 'Add an amount to a number variable (use a negative number to take away)...') : kind == '接收' ? t('執行有回傳值的模組，把回傳的值存進變數...', 'Run a module and save the value it returns...') : makeArray && py ? t('建立 n 格的 list：a = [0] * n（每一格先放 0，裝文字的放 ""）...', 'Make a list with n items: a = [0] * n (each starts as 0, or "" for text)...') : makeArray ? t('建立 array：決定大小，例如輸入 n 之後，建立大小 n...', 'Make the array: set its size, like size n after you input n...') : dsHint ? dsHint : kind ? RECT_HINT[f.rectAction]() : t('要改什麼？先選一種：', 'What do you want to change? Choose one:')}</p>{' '}
           <p className="io_choice rect_kind">
             {t('要改：', 'Change: ')}
@@ -1390,30 +1434,84 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
           {kind == '指標' && (() => {
             const making = f.rectAction == '建立';
             const freeing = f.rectAction == '釋放';
+            const places = ptrPlaces();
             const tp = ptrTypeOf(f.ptrTarget);
+            // 「=」是哪一種：選過的；沒選過照存到的地方（是指標就是改位址）
+            const mode = f.ptrMode || (f.ptrTarget.trim() && !tp ? 'value' : 'addr');
+            const setting = !making && !freeing;
+            /** new、delete 用的指標：指到 struct 的那幾種（Node*） */
+            const structPlaces = places.addr.filter(x => {
+              const p = ptrTypeOf(x.text);
+              return p && p.level == 1 && p.s != INT_PTR;
+            });
+            const targets = making || freeing ? structPlaces : mode == 'addr' ? places.addr : places.value;
+            const customTarget = f.ptrCustom || (!!f.ptrTarget.trim() && !targets.some(x => x.text == f.ptrTarget.trim()));
             // 建立哪一種 struct：選過的；沒選過就照存到的指標（Node* 就是 Node）；只有一種就是那一種
             const structs = getStructs();
             const sname = f.ptrStruct || (tp && tp.level == 1 && findStruct(tp.s) ? tp.s : structs.length == 1 ? structs[0].name : '');
             const made = findStruct(sname);
-            const choices = !making && !freeing && tp ? ptrChoices(tp, f.ptrTarget.trim()) : [];
+            const choices = setting && mode == 'addr' && tp ? ptrChoices(tp, f.ptrTarget.trim()) : [];
+            const customValue = f.ptrCustomValue || (!!f.code.trim() && !choices.some(c => c.text == f.code.trim()));
             const setField = (k: number, v: string) => set({ ptrStruct: sname, ptrFields: (made?.fields ?? []).map((_, j) => (j == k ? v : f.ptrFields[j] ?? '')) });
+            const pickMode = (m: 'addr' | 'value') => set({ rectAction: '設為', ptrMode: m, ptrCustom: false, ptrCustomValue: false, ...(m == mode && setting ? {} : { ptrTarget: '', code: '' }) });
+            /** 下拉選單：選一項，或選「其他（自己寫）」 */
+            const pickList = (id: string, list: PtrPlace[], value: string, custom: boolean, onPick: (v: string) => void, onCustom: () => void) => (
+              <select id={id} className="var_select ptr_select" value={custom ? CUSTOM : list.some(x => x.text == value.trim()) ? value.trim() : ''} onChange={e => (e.target.value == CUSTOM ? onCustom() : onPick(e.target.value))}>
+                <option value="" disabled>{t('請選擇', 'Choose one')}</option>
+                {list.map(x => <option key={x.text} value={x.text}>{x.label}</option>)}
+                <option value={CUSTOM}>{t('其他（自己寫）', 'Other (type it)')}</option>
+              </select>
+            );
+            const target = f.ptrTarget.trim();
+            const value = f.code.trim();
+            const deref = /^[\p{L}_][\p{L}\p{N}_]*$/u.test(target) ? '*' + target : `*(${target})`;
+            /** 選好之後用一句話說明會發生什麼事 */
+            const meaning = !target ? '' : making ? t(`${target} 存新的那一筆的位址：之後 ${target}->欄位 就是新的那一筆的欄位。`, `${target} keeps the address of the new one. Then ${target}->field is a field of the new one.`)
+              : freeing ? t(`${target} 指到的那一筆還回去；${target} 還存著舊的位址，不能再用 -> 或 *。`, `What ${target} points to is given back. ${target} still has the old address, so do not use -> or * on it again.`)
+              : !value ? ''
+              : mode == 'value' ? t(`改的是 ${target}（指標指到的地方）裡面的值，指標本身還是指到原來的地方。`, `This changes the value at ${target} (where the pointer points). The pointer itself still points to the same place.`)
+              : value == 'nullptr' ? t(`${target} 不指到任何東西；之後要先檢查 ${target} != nullptr，才能用 * 或 ->。`, `${target} points to nothing. Check ${target} != nullptr before using * or ->.`)
+              : value.startsWith(target + '->') ? t(`${target} 往後走一個：改成存 ${value} 裡的位址（${target} 那一筆的下一筆）。`, `${target} moves on: it now keeps the address in ${value} (the one after it).`)
+              : value.startsWith('&') ? t(`${target} 存 ${value.slice(1)} 的位址：之後 ${deref} 就是 ${value.slice(1)}。`, `${target} keeps the address of ${value.slice(1)}. Then ${deref} is ${value.slice(1)}.`)
+              : t(`${target} 存跟 ${value} 一樣的位址：兩個指到同一個地方。`, `${target} keeps the same address as ${value}: both point to the same place.`);
             return (
               <>
-                <p className="rect_action">
-                  {t('怎麼改：', 'How: ')}
-                  {structs.length > 0 && actionRadio('建立', t('建立新的一筆（new）', 'Make a new one (new)'))}
-                  {actionRadio('設為', t('指到別的地方、存一個值（=）', 'Point somewhere else, store a value (=)'))}
-                  {actionRadio('釋放', t('delete（還回去）', 'delete (give it back)'))}
-                </p>
+                <div className="ptr_modes">
+                  {structs.length > 0 && <label><input type="radio" name="rect_action" checked={making} onChange={() => set({ rectAction: '建立', ptrCustom: false })} /><b>{t('建立新的一筆', 'Make a new one')}</b><span className="muted">（new）</span></label>}
+                  <label><input type="radio" name="rect_action" checked={setting && mode == 'addr'} onChange={() => pickMode('addr')} /><b>{t('改指標指到哪裡', 'Change where a pointer points')}</b><span className="muted">{t('（存位址：p = &x、p = q）', ' (store an address: p = &x, p = q)')}</span></label>
+                  <label><input type="radio" name="rect_action" checked={setting && mode == 'value'} onChange={() => pickMode('value')} /><b>{t('改指標指到的東西', 'Change what a pointer points to')}</b><span className="muted">{t('（取值：*p = 5、p->val = 5）', ' (through it: *p = 5, p->val = 5)')}</span></label>
+                  <label><input type="radio" name="rect_action" checked={freeing} onChange={() => set({ rectAction: '釋放', ptrCustom: false })} /><b>{t('還回去', 'Give it back')}</b><span className="muted">（delete）</span></label>
+                </div>
                 <p>
-                  {freeing ? 'delete ' : making ? t('用哪個指標記住它：', 'Keep it in the pointer: ') : t('存到：', 'Store into: ')}
-                  <input
-                    id="ptr_target" style={{ width: '50%' }} value={f.ptrTarget}
-                    placeholder={freeing ? 'p' : making ? t('例如 p、head、p->next', 'like p, head, p->next') : t('例如 p、p->next、*pp、*p', 'like p, p->next, *pp, *p')}
-                    onChange={e => set({ ptrTarget: e.target.value })}
-                  />
+                  {freeing ? t('要還回去的那一筆：', 'Give back what this points to: ') : making ? t('用哪個指標記住它：', 'Keep it in the pointer: ') : mode == 'addr' ? t('要改的指標：', 'The pointer: ') : t('要改的地方：', 'Change: ')}
+                  {targets.length > 0 && pickList('ptr_pick', targets, f.ptrTarget, customTarget, v => set({ ptrTarget: v, ptrCustom: false, ...(mode == 'addr' && setting ? { code: '' } : {}) }), () => set({ ptrCustom: true }))}
+                  {(customTarget || targets.length == 0) && (
+                    <input
+                      id="ptr_target" style={{ width: '40%' }} value={f.ptrTarget}
+                      placeholder={freeing || making ? 'p' : mode == 'addr' ? t('例如 p、p->next、*pp', 'like p, p->next, *pp') : t('例如 *p、p->val', 'like *p, p->val')}
+                      onChange={e => set({ ptrTarget: e.target.value })}
+                    />
+                  )}
                 </p>
-                {helper('ptr_target', f.ptrTarget, v => set({ ptrTarget: v }))}
+                {(customTarget || targets.length == 0) && helper('ptr_target', f.ptrTarget, v => set({ ptrTarget: v }))}
+                {setting && mode == 'addr' && (
+                  <>
+                    <p>
+                      {t('改成存：', 'Store: ')}
+                      {choices.length > 0
+                        ? pickList('ptr_value', choices, f.code, customValue, v => set({ code: v, ptrCustomValue: false }), () => set({ ptrCustomValue: true }))
+                        : <span className="muted">{t('（先選上面的指標）', '(choose the pointer first)')}</span>}
+                    </p>
+                    {customValue && <p>{codeInput}</p>}
+                    {customValue && helper('code', f.code, v => set({ code: v }))}
+                  </>
+                )}
+                {setting && mode == 'value' && (
+                  <>
+                    <p>{t('設為：', 'To: ')}{codeInput}</p>
+                    {helper('code', f.code, v => set({ code: v }))}
+                  </>
+                )}
                 {making && (
                   <>
                     <p>
@@ -1428,21 +1526,22 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                         <tbody>
                           {made.fields.map((field, k) => {
                             const fieldChoices = field.type == '指標' && field.to ? ptrChoices({ s: field.to, level: 1 }, '') : [];
+                            const v = f.ptrFields[k] ?? '';
+                            const pickable = fieldChoices.length > 0 && !(v && !fieldChoices.some(c => c.text == v.trim()));
                             return (
                               <tr key={field.name}>
                                 <th>{field.name}<span className="muted">（{fieldCppType(field)}）</span></th>
                                 <td>
-                                  <input
-                                    id={'ptr_field_' + k} value={f.ptrFields[k] ?? ''}
-                                    placeholder={fieldDefaultText(field.type)}
-                                    onChange={e => setField(k, e.target.value)}
-                                  />
-                                  {fieldChoices.length > 1 && (
-                                    <select className="var_select" value="" aria-label={t('指到哪裡', 'Points to')} onChange={e => setField(k, e.target.value)}>
-                                      <option value="" disabled>{t('指到…', 'Points to…')}</option>
-                                      {fieldChoices.map(c => <option key={c.text} value={c.text}>{c.label}</option>)}
-                                    </select>
-                                  )}
+                                  {pickable
+                                    // 指標欄位：選要存哪個位址（沒選就是 nullptr）
+                                    ? (
+                                      <select id={'ptr_field_' + k} className="var_select ptr_select" value={v.trim() == 'nullptr' ? '' : v.trim()} onChange={e => setField(k, e.target.value == CUSTOM ? ' ' : e.target.value)}>
+                                        <option value="">{t('nullptr：不指到任何東西', 'nullptr: points to nothing')}</option>
+                                        {fieldChoices.filter(c => c.text != 'nullptr').map(c => <option key={c.text} value={c.text}>{c.label}</option>)}
+                                        <option value={CUSTOM}>{t('其他（自己寫）', 'Other (type it)')}</option>
+                                      </select>
+                                    )
+                                    : <input id={'ptr_field_' + k} value={v} placeholder={fieldDefaultText(field.type)} onChange={e => setField(k, e.target.value)} />}
                                 </td>
                               </tr>
                             );
@@ -1451,20 +1550,14 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                       </table>
                     )}
                     <p className="dialog_note">
-                      {t('沒填的欄位先放 0（文字是 ""、指標是 nullptr）。可以現在一次填好，也可以先空著，之後再用「存一個值」改，例如 p->val 設為 x。',
-                        'Empty fields start as 0 ("" for text, nullptr for pointers). Fill them all now, or leave them empty and change them later with "store a value", like p->val to x.')}
+                      {t('沒填的欄位先放 0（文字是 ""、指標是 nullptr）。可以現在一次填好，也可以先空著，之後再用「改指標指到的東西」改，例如 p->val 設為 x。',
+                        'Empty fields start as 0 ("" for text, nullptr for pointers). Fill them all now, or leave them empty and change them later with "change what a pointer points to", like p->val to x.')}
                     </p>
-                    {made && f.ptrTarget.trim() && <p className="muted">C++：<code>{f.ptrTarget.trim()} = {newExprText(sname, f.ptrFields)};</code></p>}
                   </>
                 )}
-                {choices.length > 0 && (
-                  <p>
-                    {t('指到：', 'Point to: ')}
-                    <select className="var_select" value="" aria-label={t('指到哪裡', 'Points to')} onChange={e => set({ code: e.target.value })}>
-                      <option value="" disabled>{t('選一個（會填到下面的「設為」）', 'Choose one (fills "to" below)')}</option>
-                      {choices.map(c => <option key={c.text} value={c.text}>{c.label}</option>)}
-                    </select>
-                  </p>
+                {meaning && <p className="ptr_meaning">{meaning}</p>}
+                {target && (making ? made : freeing || value) && (
+                  <p className="muted">C++：<code>{making ? `${target} = ${newExprText(sname, f.ptrFields)};` : freeing ? `delete ${target};` : `${target} = ${value};`}</code></p>
                 )}
               </>
             );

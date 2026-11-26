@@ -179,7 +179,10 @@ function rectangleValid(vars: VarStore, f: DialogForm, modules: ModuleInfo[]) {
     if (!ptrTargetOk(vars, f.ptrTarget)) return false;
     if (f.rectAction == '建立') return newNodeOk(vars, modules, f);
     if (!f.code.trim()) {
-      alert(t('請填要放什麼，例如 new Node{x, nullptr}、head、p->next、nullptr。', 'Enter what to store, like new Node{x, nullptr}, head, p->next or nullptr.'));
+      const pt = ptrTarget(vars, f.ptrTarget);
+      alert(pt && 'ptr' in pt
+        ? t('請選要存哪個位址，例如 &x、head、p->next、nullptr。', 'Choose which address to store, like &x, head, p->next or nullptr.')
+        : t('請填要設成什麼。', 'Enter the new value.'));
       return false;
     }
     return checkVar(vars, f.code, true) && checkValueType(vars, modules, f.ptrTarget.trim(), f.code, 'var');
