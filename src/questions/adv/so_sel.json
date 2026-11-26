@@ -1,0 +1,48 @@
+{
+  "title": "基本操作｜選擇排序：每次挑最小的",
+  "question": "選擇排序：第 1 輪從全部裡面找出最小的，跟最前面那個交換；第 2 輪從第 2 個以後找最小的，跟第 2 個交換……做 n - 1 輪就排好了。\n請輸入有幾個數字 n，再輸入 n 個數字存進 vector。每一輪交換完就輸出一次整個 vector。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5 29 10 14 37 13",
+      "output": "10 29 14 37 13\n10 13 14 37 29\n10 13 14 37 29\n10 13 14 29 37",
+      "note": "第 3 輪最小的就在原位，跟自己換",
+      "py_input": "5\n29 10 14 37 13"
+    },
+    {
+      "input": "3 3 2 1",
+      "output": "1 2 3\n1 2 3",
+      "note": "第 1 輪換完就排好了，還是要做完",
+      "py_input": "3\n3 2 1"
+    },
+    {
+      "input": "4 1 2 3 4",
+      "output": "1 2 3 4\n1 2 3 4\n1 2 3 4",
+      "note": "本來就排好了也要比",
+      "py_input": "4\n1 2 3 4"
+    }
+  ],
+  "py_question": "選擇排序：第 1 輪從全部裡面找出最小的，跟最前面那個交換；第 2 輪從第 2 個以後找最小的，跟第 2 個交換……做 n - 1 輪就排好了。\n第一行輸入有幾個數字 n，第二行輸入 n 個數字存進 list。每一輪交換完就輸出一次整個 list。",
+  "en": {
+    "title": "Basics | Selection sort: pick the smallest",
+    "question": "Selection sort: in round 1, find the smallest of all and swap it with the first one. In round 2, find the smallest from the 2nd one on and swap it with the 2nd one… After n - 1 rounds, it is sorted.\nInput how many numbers n, then input n numbers into a vector. After each round, output the whole vector.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5 29 10 14 37 13",
+        "output": "10 29 14 37 13\n10 13 14 37 29\n10 13 14 37 29\n10 13 14 29 37",
+        "note": "Round 3: the smallest is already there, so it swaps with itself"
+      },
+      {
+        "input": "3 3 2 1",
+        "output": "1 2 3\n1 2 3",
+        "note": "Sorted after round 1, but still finish all rounds"
+      },
+      {
+        "input": "4 1 2 3 4",
+        "output": "1 2 3 4\n1 2 3 4\n1 2 3 4",
+        "note": "Already sorted: still compares"
+      }
+    ]
+  }
+}

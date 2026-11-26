@@ -1,0 +1,44 @@
+{
+  "title": "密碼夠不夠安全",
+  "question": "註冊帳號時，網站會檢查密碼夠不夠安全。請輸入一個密碼（只有英文字母和數字，沒有空白），一個字一個字看，數出有幾個英文字母、幾個數字。\n先輸出「英文 幾 個」，再輸出「數字 幾 個」。\n密碼至少 8 個字，而且英文字母和數字都至少有 1 個，就輸出「安全」，不然輸出「不安全」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "abc12345",
+      "output": "英文 3 個\n數字 5 個\n安全",
+      "note": ""
+    },
+    {
+      "input": "password",
+      "output": "英文 8 個\n數字 0 個\n不安全",
+      "note": "沒有數字"
+    },
+    {
+      "input": "a1b2",
+      "output": "英文 2 個\n數字 2 個\n不安全",
+      "note": "太短"
+    }
+  ],
+  "en": {
+    "title": "Is the Password Safe?",
+    "question": "When you sign up, a website checks your password. Input a password (only letters and digits, no spaces). Look at it one letter at a time and count the letters and the digits.\nOutput \"Letters: \" and the count, then \"Digits: \" and the count.\nIf the password has at least 8 characters, at least 1 letter and at least 1 digit, output \"Safe\". If not, output \"Not safe\".",
+    "array": [],
+    "test_case": [
+      {
+        "input": "abc12345",
+        "output": "Letters: 3\nDigits: 5\nSafe",
+        "note": ""
+      },
+      {
+        "input": "password",
+        "output": "Letters: 8\nDigits: 0\nNot safe",
+        "note": "No digits"
+      },
+      {
+        "input": "a1b2",
+        "output": "Letters: 2\nDigits: 2\nNot safe",
+        "note": "Too short"
+      }
+    ]
+  }
+}

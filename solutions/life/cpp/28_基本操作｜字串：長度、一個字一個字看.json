@@ -1,0 +1,199 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/str_basic",
+  "questionTitle": "基本操作｜字串：長度、一個字一個字看",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "用 s.length() 知道有幾個字，i 從 0 到 s.length() - 1 一個一個輸出 s[i]",
+    "hint": "s：一個英文單字",
+    "hint2": "長度、每一個字"
+  },
+  "variables": [
+    {
+      "desc": "輸入的單字",
+      "name": "s",
+      "type": "文字",
+      "init": ""
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 130,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 s",
+        "figure": "Parallelogram",
+        "variables": [
+          "s"
+        ]
+      },
+      {
+        "x": 110,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "輸出 s.length()",
+        "figure": "Parallelogram",
+        "variables": [
+          "s"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 420,
+        "w": 220,
+        "h": 80,
+        "text": "for (int i = 0; i < s.length(); i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "s"
+        ]
+      },
+      {
+        "x": 130,
+        "y": 550,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 s[i]",
+        "figure": "Parallelogram",
+        "variables": [
+          "s"
+        ]
+      },
+      {
+        "x": 130,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 130,
+        "y": 730,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 190,
+            "y": 655
+          },
+          {
+            "x": 50,
+            "y": 655
+          },
+          {
+            "x": 50,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 5,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 330,
+            "y": 460
+          },
+          {
+            "x": 330,
+            "y": 705
+          },
+          {
+            "x": 190,
+            "y": 705
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "apple",
+      "5\na\np\np\nl\ne",
+      ""
+    ],
+    [
+      "Hi",
+      "2\nH\ni",
+      "大寫也是一個字"
+    ],
+    [
+      "x",
+      "1\nx",
+      "只有一個字"
+    ]
+  ]
+}

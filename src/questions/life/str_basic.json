@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜字串：長度、一個字一個字看",
+  "question": "字串就是一串字，每個字都有自己的位置（第一個字的位置是 0）。\n請輸入一個英文單字，先輸出它有幾個字（長度），再從第一個字開始，一個字一行輸出。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "apple",
+      "output": "5\na\np\np\nl\ne",
+      "note": ""
+    },
+    {
+      "input": "Hi",
+      "output": "2\nH\ni",
+      "note": "大寫也是一個字"
+    },
+    {
+      "input": "x",
+      "output": "1\nx",
+      "note": "只有一個字"
+    }
+  ],
+  "en": {
+    "title": "Basics | Strings: length, one letter at a time",
+    "question": "A string is a row of letters. Each letter has a position (the first one is 0).\nInput an English word. First output how many letters it has (its length). Then output the letters one per line, from the first one.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "apple",
+        "output": "5\na\np\np\nl\ne",
+        "note": ""
+      },
+      {
+        "input": "Hi",
+        "output": "2\nH\ni",
+        "note": "A capital letter is one letter too"
+      },
+      {
+        "input": "x",
+        "output": "1\nx",
+        "note": "Only one letter"
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "title": "一個一個找 vs 二分搜尋",
+  "question": "書架上有 1 號到 n 號的書，照順序排好。要找 x 號書：\n1. 一個一個找：從 1 號開始一本一本看，看到 x 號就停\n2. 二分搜尋：左 = 1、右 = n，每次看中間那本（(左 + 右) / 2，無條件捨去），太小往右半找、太大往左半找\n輸入 n 和 x，輸出兩種方法各看了幾本：「一個一個找：幾」「二分搜尋：幾」。\n想想看：書變成 1000 倍，兩種方法各要多看幾本？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "100 100",
+      "output": "一個一個找：100\n二分搜尋：7",
+      "note": "最後一本",
+      "py_input": "100\n100"
+    },
+    {
+      "input": "100 50",
+      "output": "一個一個找：50\n二分搜尋：1",
+      "note": "剛好在正中間",
+      "py_input": "100\n50"
+    },
+    {
+      "input": "100000 99999",
+      "output": "一個一個找：99999\n二分搜尋：16",
+      "note": "書很多的時候差很多",
+      "py_input": "100000\n99999"
+    }
+  ],
+  "en": {
+    "title": "One by One vs Binary Search",
+    "question": "A shelf has books 1 to n in order. To find book x:\n1. One by one: look from book 1, one at a time, and stop at book x\n2. Binary search: left = 1, right = n. Each time look at the middle book ((left + right) / 2, round down). If it is too small, look in the right half; if too big, the left half\nInput n and x. Output how many books each way looks at: \"One by one: \" and \"Binary search: \".\nThink: with 1000 times more books, how many more does each way look at?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "100 100",
+        "output": "One by one: 100\nBinary search: 7",
+        "note": "The last book"
+      },
+      {
+        "input": "100 50",
+        "output": "One by one: 50\nBinary search: 1",
+        "note": "Right in the middle"
+      },
+      {
+        "input": "100000 99999",
+        "output": "One by one: 99999\nBinary search: 16",
+        "note": "A big difference with many books"
+      }
+    ]
+  }
+}

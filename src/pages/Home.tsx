@@ -160,7 +160,8 @@ export function QuestionList({ courseId }: { courseId: string }) {
     <Shell>
       <p className="home_breadcrumb"><a href={link('./')}>{t('課程', 'Courses')}</a> › {courseName(course)}</p>
       <h4 className="home_heading">{courseName(course)}</h4>
-      {course.units.map(unit => (
+      {/* 這個學習目標沒有題目的單元不列（例如 Scratch 沒有二維陣列） */}
+      {course.units.filter(u => unitQuestions(u).length > 0).map(unit => (
         <div key={unit.name} className="home_unit">
           <h5>{courseName(unitName(unit))}</h5>
           <ol className="home_questions">

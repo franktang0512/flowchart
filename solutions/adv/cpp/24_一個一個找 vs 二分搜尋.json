@@ -1,0 +1,691 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/c2",
+  "questionTitle": "一個一個找 vs 二分搜尋",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "一個一個找：從 1 看到 x；二分搜尋：每看一次範圍少一半",
+    "hint": "n：幾本書；x：要找幾號",
+    "hint2": "兩種方法各看了幾本"
+  },
+  "variables": [
+    {
+      "desc": "書架上有幾本書",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "要找幾號",
+      "name": "x",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "一個一個找看了幾本",
+      "name": "a",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "二分搜尋看了幾本",
+      "name": "b",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "範圍最左邊",
+      "name": "left",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "範圍最右邊",
+      "name": "right",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "正中間",
+      "name": "mid",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "找到了是 1",
+      "name": "found",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 450,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 450,
+        "y": 290,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 x",
+        "figure": "Parallelogram",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 420,
+        "y": 420,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 1; i <= n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 445,
+        "y": 550,
+        "w": 130,
+        "h": 80,
+        "text": " a 設為 a + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "a"
+        ],
+        "data": ""
+      },
+      {
+        "x": 450,
+        "y": 680,
+        "w": 120,
+        "h": 80,
+        "text": "i = x",
+        "figure": "Diamond",
+        "variables": [
+          "x"
+        ]
+      },
+      {
+        "x": 290,
+        "y": 810,
+        "w": 190,
+        "h": 80,
+        "text": " break",
+        "figure": "Rectangle",
+        "variables": [
+          "a",
+          "b"
+        ]
+      },
+      {
+        "x": 450,
+        "y": 990,
+        "w": 120,
+        "h": 80,
+        "text": " left 設為 1",
+        "figure": "Rectangle",
+        "variables": [
+          "left"
+        ],
+        "data": ""
+      },
+      {
+        "x": 450,
+        "y": 1120,
+        "w": 120,
+        "h": 80,
+        "text": " right 設為 n",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "right"
+        ],
+        "data": ""
+      },
+      {
+        "x": 400,
+        "y": 1250,
+        "w": 220,
+        "h": 80,
+        "text": "left > right or found = 1",
+        "figure": "While_Loop",
+        "variables": [
+          "n",
+          "left",
+          "right",
+          "found"
+        ]
+      },
+      {
+        "x": 440,
+        "y": 1380,
+        "w": 140,
+        "h": 80,
+        "text": " mid 設為 (left + right) / 2",
+        "figure": "Rectangle",
+        "variables": [
+          "left",
+          "right",
+          "mid"
+        ],
+        "data": ""
+      },
+      {
+        "x": 445,
+        "y": 1510,
+        "w": 130,
+        "h": 80,
+        "text": " b 設為 b + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "b"
+        ],
+        "data": ""
+      },
+      {
+        "x": 445,
+        "y": 1640,
+        "w": 130,
+        "h": 80,
+        "text": "mid = x",
+        "figure": "Diamond",
+        "variables": [
+          "x",
+          "mid"
+        ]
+      },
+      {
+        "x": 350,
+        "y": 1770,
+        "w": 130,
+        "h": 80,
+        "text": " found 設為 1",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "found"
+        ],
+        "data": ""
+      },
+      {
+        "x": 675,
+        "y": 1770,
+        "w": 130,
+        "h": 80,
+        "text": "mid < x",
+        "figure": "Diamond",
+        "variables": [
+          "x",
+          "mid"
+        ]
+      },
+      {
+        "x": 550,
+        "y": 1900,
+        "w": 160,
+        "h": 80,
+        "text": " left 設為 mid + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "left",
+          "mid"
+        ],
+        "data": ""
+      },
+      {
+        "x": 770,
+        "y": 1900,
+        "w": 170,
+        "h": 80,
+        "text": " right 設為 mid - 1",
+        "figure": "Rectangle",
+        "variables": [
+          "right",
+          "mid"
+        ],
+        "data": ""
+      },
+      {
+        "x": 415,
+        "y": 2080,
+        "w": 190,
+        "h": 80,
+        "text": "輸出 \"一個一個找：\" + to_string(a)",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "a"
+        ]
+      },
+      {
+        "x": 415,
+        "y": 2210,
+        "w": 190,
+        "h": 80,
+        "text": "輸出 \"二分搜尋：\" + to_string(b)",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "b"
+        ]
+      },
+      {
+        "x": 450,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 450,
+        "y": 2340,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 385,
+            "y": 720
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 385,
+            "y": 915
+          },
+          {
+            "x": 260,
+            "y": 915
+          },
+          {
+            "x": 260,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 2,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 590,
+            "y": 720
+          },
+          {
+            "x": 590,
+            "y": 915
+          },
+          {
+            "x": 260,
+            "y": 915
+          },
+          {
+            "x": 260,
+            "y": 460
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 760,
+            "y": 460
+          },
+          {
+            "x": 760,
+            "y": 965
+          },
+          {
+            "x": 510,
+            "y": 965
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 10,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 11,
+        "to": 12,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 415,
+            "y": 1680
+          }
+        ]
+      },
+      {
+        "from": 13,
+        "to": 14,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 630,
+            "y": 1810
+          }
+        ]
+      },
+      {
+        "from": 13,
+        "to": 15,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 855,
+            "y": 1810
+          }
+        ]
+      },
+      {
+        "from": 11,
+        "to": 13,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 740,
+            "y": 1680
+          }
+        ]
+      },
+      {
+        "from": 10,
+        "to": 11,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 12,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 415,
+            "y": 2005
+          },
+          {
+            "x": 50,
+            "y": 2005
+          },
+          {
+            "x": 50,
+            "y": 1290
+          }
+        ]
+      },
+      {
+        "from": 14,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 630,
+            "y": 2005
+          },
+          {
+            "x": 50,
+            "y": 2005
+          },
+          {
+            "x": 50,
+            "y": 1290
+          }
+        ]
+      },
+      {
+        "from": 15,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 855,
+            "y": 2005
+          },
+          {
+            "x": 50,
+            "y": 2005
+          },
+          {
+            "x": 50,
+            "y": 1290
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 16,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 970,
+            "y": 1290
+          },
+          {
+            "x": 970,
+            "y": 2055
+          },
+          {
+            "x": 510,
+            "y": 2055
+          }
+        ]
+      },
+      {
+        "from": 16,
+        "to": 17,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 18,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 17,
+        "to": 19,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "100 100",
+      "一個一個找：100\n二分搜尋：7",
+      "最後一本"
+    ],
+    [
+      "100 50",
+      "一個一個找：50\n二分搜尋：1",
+      "剛好在正中間"
+    ],
+    [
+      "100000 99999",
+      "一個一個找：99999\n二分搜尋：16",
+      "書很多的時候差很多"
+    ]
+  ]
+}

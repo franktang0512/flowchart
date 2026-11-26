@@ -1,0 +1,44 @@
+{
+  "title": "基本操作｜遞迴：階乘",
+  "question": "n!（n 的階乘）= n × (n − 1) × … × 1，而且 0! = 1。\n請寫一個有回傳值的模組 fact(n)：n 是 0 就回傳 1，不然就回傳 n * fact(n - 1)。模組自己執行自己，叫做遞迴；一定要有一個不用再執行自己的情況（這裡是 n 是 0），才停得下來。\n主流程輸入 n（0 到 12），輸出 fact(n)。\n想想看：fact(3) 會再執行哪些 fact？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "5",
+      "output": "120",
+      "note": ""
+    },
+    {
+      "input": "0",
+      "output": "1",
+      "note": "不用再執行自己的情況"
+    },
+    {
+      "input": "12",
+      "output": "479001600",
+      "note": "int 放得下的最大階乘"
+    }
+  ],
+  "en": {
+    "title": "Basics | Recursion: factorial",
+    "question": "n! (n factorial) = n × (n − 1) × … × 1, and 0! = 1.\nMake a module fact(n) that returns a value: if n is 0, return 1; if not, return n * fact(n - 1). A module that runs itself is recursion. It needs a case that does not run itself (here, n is 0), or it never stops.\nIn the main flow, input n (0 to 12) and output fact(n).\nThink: which fact calls does fact(3) make?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "5",
+        "output": "120",
+        "note": ""
+      },
+      {
+        "input": "0",
+        "output": "1",
+        "note": "The case that does not call itself"
+      },
+      {
+        "input": "12",
+        "output": "479001600",
+        "note": "The biggest factorial that fits in an int"
+      }
+    ]
+  }
+}

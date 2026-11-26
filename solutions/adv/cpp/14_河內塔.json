@@ -1,0 +1,343 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/r2",
+  "questionTitle": "河內塔",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "hanoi(n, from, to, via)：n - 1 個先搬到 via，n 號盤搬到 to，n - 1 個再從 via 搬到 to；n 是 0 什麼都不做",
+    "hint": "n：幾個圓盤",
+    "hint2": "每一步怎麼搬、共幾步"
+  },
+  "variables": [
+    {
+      "desc": "幾個圓盤",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "一共搬了幾步",
+      "name": "moves",
+      "type": "數字",
+      "init": "0",
+      "global": true
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 100,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 290,
+        "w": 160,
+        "h": 80,
+        "text": "hanoi(n, \"A\", \"C\", \"B\")",
+        "figure": "Function",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 420,
+        "w": 240,
+        "h": 85,
+        "text": "輸出 \"共 \" + to_string(moves) + \" 步\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "moves"
+        ]
+      },
+      {
+        "x": 100,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 100,
+        "y": 555,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "hanoi",
+      "params": [
+        {
+          "name": "n",
+          "type": "數字",
+          "desc": "要搬幾個圓盤"
+        },
+        {
+          "name": "from",
+          "type": "文字",
+          "desc": "從哪一根"
+        },
+        {
+          "name": "to",
+          "type": "文字",
+          "desc": "搬到哪一根"
+        },
+        {
+          "name": "via",
+          "type": "文字",
+          "desc": "借放的那一根"
+        }
+      ],
+      "flowchart": {
+        "nodes": [
+          {
+            "x": 250,
+            "y": 160,
+            "w": 120,
+            "h": 80,
+            "text": "n > 0",
+            "figure": "Diamond",
+            "variables": []
+          },
+          {
+            "x": 80,
+            "y": 290,
+            "w": 160,
+            "h": 80,
+            "text": "hanoi(n - 1, from, via, to)",
+            "figure": "Function",
+            "variables": []
+          },
+          {
+            "x": 40,
+            "y": 420,
+            "w": 240,
+            "h": 85,
+            "text": "輸出 to_string(n) + \" 號盤 \" + from + \" → \" + to",
+            "figure": "Parallelogram",
+            "variables": []
+          },
+          {
+            "x": 95,
+            "y": 555,
+            "w": 130,
+            "h": 80,
+            "text": " moves 設為 moves + 1",
+            "figure": "Rectangle",
+            "variables": [],
+            "data": ""
+          },
+          {
+            "x": 80,
+            "y": 685,
+            "w": 160,
+            "h": 80,
+            "text": "hanoi(n - 1, via, to, from)",
+            "figure": "Function",
+            "variables": []
+          },
+          {
+            "x": 250,
+            "y": 30,
+            "w": 120,
+            "h": 80,
+            "text": "開始",
+            "figure": "Circle",
+            "variables": []
+          },
+          {
+            "x": 250,
+            "y": 815,
+            "w": 120,
+            "h": 80,
+            "text": "結束",
+            "figure": "Circle",
+            "variables": []
+          }
+        ],
+        "links": [
+          {
+            "from": 1,
+            "to": 2,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": []
+          },
+          {
+            "from": 2,
+            "to": 3,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": []
+          },
+          {
+            "from": 3,
+            "to": 4,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": []
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "anchorFrom": 0,
+            "anchorTo": 1,
+            "text": "真",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 160,
+                "y": 200
+              }
+            ]
+          },
+          {
+            "from": 5,
+            "to": 0,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": []
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 160,
+                "y": 790
+              },
+              {
+                "x": 310,
+                "y": 790
+              }
+            ]
+          },
+          {
+            "from": 0,
+            "to": 6,
+            "anchorFrom": 2,
+            "anchorTo": 1,
+            "text": "假",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 390,
+                "y": 200
+              },
+              {
+                "x": 390,
+                "y": 790
+              },
+              {
+                "x": 310,
+                "y": 790
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "structs": [],
+  "cases": [
+    [
+      "2",
+      "1 號盤 A → B\n2 號盤 A → C\n1 號盤 B → C\n共 3 步",
+      ""
+    ],
+    [
+      "1",
+      "1 號盤 A → C\n共 1 步",
+      "一個圓盤直接搬"
+    ],
+    [
+      "3",
+      "1 號盤 A → C\n2 號盤 A → B\n1 號盤 C → B\n3 號盤 A → C\n1 號盤 B → A\n2 號盤 B → C\n1 號盤 A → C\n共 7 步",
+      "想想看：4 個要幾步？"
+    ]
+  ]
+}

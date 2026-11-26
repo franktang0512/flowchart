@@ -59,6 +59,12 @@ export const COURSES: Course[] = [
         byTarget: { cpp: { name: '陣列與 vector', nameEn: 'Arrays and vectors' }, python: { name: 'list（清單）', nameEn: 'Lists' } },
         questions: ['life/arr_basic', 'life/vec_basic', 'life/arr1', 'life/arr2'] },
       { name: '陣列搭配迴圈', nameEn: 'Arrays with loops', questions: ['life/arr3', 'life/arr4', 'life/arr5'] },
+      // 字串、二維陣列：Scratch、Blockly 的在「清單」課程（文字也是一串字），這裡只給 C++、Python
+      { name: '字串', nameEn: 'Strings', questions: ['life/str_basic', 'life/str1', 'life/str2'], codeOnly: ['life/str_basic', 'life/str1', 'life/str2'] },
+      {
+        name: '二維陣列（表格）', nameEn: '2D arrays (tables)',
+        byTarget: { cpp: { name: '二維陣列（二維 vector）', nameEn: '2D arrays (2D vectors)' }, python: { name: '二維陣列（二維 list）', nameEn: '2D arrays (2D lists)' } },
+        questions: ['life/grid_basic', 'life/grid1', 'life/grid2'], codeOnly: ['life/grid_basic', 'life/grid1', 'life/grid2'] },
       { name: '排序：泡泡排序', nameEn: 'Sorting: bubble sort', questions: ['life/sort1'] },
       { name: '搜尋：一個一個找、二分搜尋', nameEn: 'Searching: one by one, binary search', questions: ['life/find1', 'life/find2'] },
       { name: '挑戰：怎麼買最划算（背包問題）', nameEn: 'Challenge: the best plan (knapsack)', questions: ['life/bag1'] },
@@ -75,10 +81,14 @@ export const COURSES: Course[] = [
       { name: 'Stack（後進先出）', nameEn: 'Stack (last in, first out)', questions: ['adv/st_array', 'adv/st_basic', 'adv/st1', 'adv/st2'] },
       { name: 'Queue（先進先出）', nameEn: 'Queue (first in, first out)', questions: ['adv/q_array', 'adv/q_basic', 'adv/q1', 'adv/q2'] },
       // 樹、圖放在排序前面：heap sort 會用到樹，圖的 BFS 接著 queue 用
+      // 遞迴放在樹、圖前面：走樹、DFS 都會用到
+      { name: '遞迴', nameEn: 'Recursion', questions: ['adv/r_basic', 'adv/r1', 'adv/r2'] },
       { name: '樹', nameEn: 'Trees', questions: ['adv/t_parent', 'adv/t_bin', 'adv/t1'] },
       { name: '圖', nameEn: 'Graphs', questions: ['adv/gr1'] },
-      { name: '排序', nameEn: 'Sorting', questions: ['adv/so1', 'adv/so2'] },
+      { name: '排序', nameEn: 'Sorting', questions: ['adv/so_sel', 'adv/so1', 'adv/so2'] },
       { name: '搜尋', nameEn: 'Searching', questions: ['adv/se1'] },
+      // 時間複雜度：數迴圈跑幾次，比較一個一個找和二分搜尋
+      { name: '時間複雜度', nameEn: 'Time complexity', questions: ['adv/c1', 'adv/c2'] },
       { name: '窮舉', nameEn: 'Brute force', questions: ['adv/b1', 'adv/b2'] },
       { name: '貪心', nameEn: 'Greedy', questions: ['adv/g1', 'adv/g2'] },
       { name: '動態規劃', nameEn: 'Dynamic programming', questions: ['adv/d1', 'adv/d2'] },

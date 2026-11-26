@@ -1,0 +1,305 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/str2",
+  "questionTitle": "前後念都一樣（回文）",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "從最後一個字往前，一個一個接到 rev 後面；rev 跟原本的一樣就是回文",
+    "hint": "s：一個英文單字",
+    "hint2": "rev：倒過來的字；是不是回文"
+  },
+  "variables": [
+    {
+      "desc": "輸入的單字",
+      "name": "s",
+      "type": "文字",
+      "init": ""
+    },
+    {
+      "desc": "倒過來接成的字",
+      "name": "rev",
+      "type": "文字",
+      "init": ""
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 180,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 s",
+        "figure": "Parallelogram",
+        "variables": [
+          "s"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 290,
+        "w": 240,
+        "h": 90,
+        "text": "for (int i = s.length() - 1; i >= 0; i--)",
+        "figure": "For_Loop",
+        "variables": [
+          "s"
+        ]
+      },
+      {
+        "x": 150,
+        "y": 430,
+        "w": 180,
+        "h": 80,
+        "text": " rev 設為 rev + s[i]",
+        "figure": "Rectangle",
+        "variables": [
+          "s",
+          "rev"
+        ],
+        "data": ""
+      },
+      {
+        "x": 180,
+        "y": 610,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 rev",
+        "figure": "Parallelogram",
+        "variables": [
+          "rev"
+        ]
+      },
+      {
+        "x": 180,
+        "y": 740,
+        "w": 120,
+        "h": 80,
+        "text": "rev = s",
+        "figure": "Diamond",
+        "variables": [
+          "s",
+          "rev"
+        ]
+      },
+      {
+        "x": 60,
+        "y": 870,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"是回文\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 270,
+        "y": 870,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"不是回文\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 180,
+        "y": 1000,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 240,
+            "y": 535
+          },
+          {
+            "x": 90,
+            "y": 535
+          },
+          {
+            "x": 90,
+            "y": 335
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 390,
+            "y": 335
+          },
+          {
+            "x": 390,
+            "y": 585
+          },
+          {
+            "x": 240,
+            "y": 585
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 135,
+            "y": 780
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 355,
+            "y": 780
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 135,
+            "y": 975
+          },
+          {
+            "x": 240,
+            "y": 975
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 355,
+            "y": 975
+          },
+          {
+            "x": 240,
+            "y": 975
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "level",
+      "level\n是回文",
+      ""
+    ],
+    [
+      "hello",
+      "olleh\n不是回文",
+      ""
+    ],
+    [
+      "noon",
+      "noon\n是回文",
+      "偶數個字也可以是回文"
+    ]
+  ]
+}

@@ -1,0 +1,343 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/r1",
+  "questionTitle": "兔子一個月一個月變多（費氏數列）",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "fib(n)：n 是 1 或 2 回傳 1，不然回傳 fib(n - 1) + fib(n - 2)；calls 是全域變數，一進到 fib 就加 1",
+    "hint": "n：第幾個月",
+    "hint2": "fib(n)：幾對兔子；calls：fib 執行了幾次"
+  },
+  "variables": [
+    {
+      "desc": "第幾個月",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "fib(n) 的答案",
+      "name": "ans",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "fib 一共執行了幾次",
+      "name": "calls",
+      "type": "數字",
+      "init": "0",
+      "global": true
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 95,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 80,
+        "y": 290,
+        "w": 150,
+        "h": 80,
+        "text": " ans 設為 fib(n)",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "ans"
+        ],
+        "data": ""
+      },
+      {
+        "x": 95,
+        "y": 420,
+        "w": 120,
+        "h": 80,
+        "text": "輸出 ans",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "ans"
+        ]
+      },
+      {
+        "x": 40,
+        "y": 550,
+        "w": 230,
+        "h": 80,
+        "text": "輸出 \"執行了 \" + to_string(calls) + \" 次\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "calls"
+        ]
+      },
+      {
+        "x": 95,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 95,
+        "y": 680,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "fib",
+      "params": [
+        {
+          "name": "n",
+          "type": "數字",
+          "desc": "第幾個月"
+        }
+      ],
+      "returns": "數字",
+      "flowchart": {
+        "nodes": [
+          {
+            "x": 115,
+            "y": 160,
+            "w": 190,
+            "h": 80,
+            "text": " calls 設為 calls + 1",
+            "figure": "Rectangle",
+            "variables": [],
+            "data": ""
+          },
+          {
+            "x": 150,
+            "y": 290,
+            "w": 120,
+            "h": 80,
+            "text": "n <= 2",
+            "figure": "Diamond",
+            "variables": []
+          },
+          {
+            "x": 60,
+            "y": 420,
+            "w": 120,
+            "h": 80,
+            "text": " 回傳 1",
+            "figure": "Rectangle",
+            "variables": [],
+            "data": ""
+          },
+          {
+            "x": 240,
+            "y": 420,
+            "w": 140,
+            "h": 80,
+            "text": " 回傳 fib(n - 1) + fib(n - 2)",
+            "figure": "Rectangle",
+            "variables": [],
+            "data": ""
+          },
+          {
+            "x": 150,
+            "y": 30,
+            "w": 120,
+            "h": 80,
+            "text": "開始",
+            "figure": "Circle",
+            "variables": []
+          },
+          {
+            "x": 150,
+            "y": 550,
+            "w": 120,
+            "h": 80,
+            "text": "結束",
+            "figure": "Circle",
+            "variables": []
+          }
+        ],
+        "links": [
+          {
+            "from": 1,
+            "to": 2,
+            "anchorFrom": 0,
+            "anchorTo": 1,
+            "text": "真",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 120,
+                "y": 330
+              }
+            ]
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "anchorFrom": 2,
+            "anchorTo": 1,
+            "text": "假",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 310,
+                "y": 330
+              }
+            ]
+          },
+          {
+            "from": 0,
+            "to": 1,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": []
+          },
+          {
+            "from": 4,
+            "to": 0,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": []
+          },
+          {
+            "from": 2,
+            "to": 5,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 120,
+                "y": 525
+              },
+              {
+                "x": 210,
+                "y": 525
+              }
+            ]
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "anchorFrom": 3,
+            "anchorTo": 1,
+            "text": "",
+            "mode": "straight",
+            "bends": [],
+            "points": [
+              {
+                "x": 310,
+                "y": 525
+              },
+              {
+                "x": 210,
+                "y": 525
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "structs": [],
+  "cases": [
+    [
+      "6",
+      "8\n執行了 15 次",
+      ""
+    ],
+    [
+      "1",
+      "1\n執行了 1 次",
+      "不用再執行自己"
+    ],
+    [
+      "20",
+      "6765\n執行了 13529 次",
+      "重複算了很多次"
+    ]
+  ]
+}

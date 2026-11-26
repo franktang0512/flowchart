@@ -1,0 +1,522 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "adv/c1",
+  "questionTitle": "數一數：迴圈跑幾次",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "每跑一次就加 1：一層 n 次、兩層 n × n 次、砍半大約 log₂n 次",
+    "hint": "n：迴圈要跑到多少",
+    "hint2": "三種迴圈各跑幾次"
+  },
+  "variables": [
+    {
+      "desc": "迴圈要跑到多少",
+      "name": "n",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "一層跑幾次",
+      "name": "one",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "兩層跑幾次",
+      "name": "two",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "砍半跑幾次",
+      "name": "half",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "砍半用的數",
+      "name": "k",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 150,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 n",
+        "figure": "Parallelogram",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 290,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 125,
+        "y": 420,
+        "w": 170,
+        "h": 80,
+        "text": " one 設為 one + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "one"
+        ],
+        "data": ""
+      },
+      {
+        "x": 120,
+        "y": 600,
+        "w": 180,
+        "h": 80,
+        "text": "for (int i = 0; i < n; i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 120,
+        "y": 730,
+        "w": 180,
+        "h": 80,
+        "text": "for (int j = 0; j < n; j++)",
+        "figure": "For_Loop",
+        "variables": [
+          "n"
+        ]
+      },
+      {
+        "x": 125,
+        "y": 860,
+        "w": 170,
+        "h": 80,
+        "text": " two 設為 two + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "two"
+        ],
+        "data": ""
+      },
+      {
+        "x": 150,
+        "y": 1090,
+        "w": 120,
+        "h": 80,
+        "text": " k 設為 n",
+        "figure": "Rectangle",
+        "variables": [
+          "n",
+          "k"
+        ],
+        "data": ""
+      },
+      {
+        "x": 150,
+        "y": 1220,
+        "w": 120,
+        "h": 80,
+        "text": "k > 1",
+        "figure": "While_Loop",
+        "variables": [
+          "k"
+        ],
+        "data": "while"
+      },
+      {
+        "x": 150,
+        "y": 1350,
+        "w": 120,
+        "h": 80,
+        "text": " k 設為 k / 2",
+        "figure": "Rectangle",
+        "variables": [
+          "k"
+        ],
+        "data": ""
+      },
+      {
+        "x": 125,
+        "y": 1480,
+        "w": 170,
+        "h": 80,
+        "text": " half 設為 half + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "half"
+        ],
+        "data": ""
+      },
+      {
+        "x": 125,
+        "y": 1660,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"一層：\" + to_string(one)",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "one"
+        ]
+      },
+      {
+        "x": 125,
+        "y": 1790,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"兩層：\" + to_string(two)",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "two"
+        ]
+      },
+      {
+        "x": 125,
+        "y": 1920,
+        "w": 170,
+        "h": 80,
+        "text": "輸出 \"砍半：\" + to_string(half)",
+        "figure": "Parallelogram",
+        "variables": [
+          "n",
+          "half"
+        ]
+      },
+      {
+        "x": 150,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 150,
+        "y": 2050,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 2,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 210,
+            "y": 525
+          },
+          {
+            "x": 90,
+            "y": 525
+          },
+          {
+            "x": 90,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 5,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 210,
+            "y": 965
+          },
+          {
+            "x": 90,
+            "y": 965
+          },
+          {
+            "x": 90,
+            "y": 770
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 4,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 330,
+            "y": 770
+          },
+          {
+            "x": 330,
+            "y": 1015
+          },
+          {
+            "x": 50,
+            "y": 1015
+          },
+          {
+            "x": 50,
+            "y": 640
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 3,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 330,
+            "y": 330
+          },
+          {
+            "x": 330,
+            "y": 575
+          },
+          {
+            "x": 210,
+            "y": 575
+          }
+        ]
+      },
+      {
+        "from": 3,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 370,
+            "y": 640
+          },
+          {
+            "x": 370,
+            "y": 1065
+          },
+          {
+            "x": 210,
+            "y": 1065
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 210,
+            "y": 1585
+          },
+          {
+            "x": 95,
+            "y": 1585
+          },
+          {
+            "x": 95,
+            "y": 1260
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 7,
+        "to": 10,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 325,
+            "y": 1260
+          },
+          {
+            "x": 325,
+            "y": 1635
+          },
+          {
+            "x": 210,
+            "y": 1635
+          }
+        ]
+      },
+      {
+        "from": 10,
+        "to": 11,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 11,
+        "to": 12,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 13,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 12,
+        "to": 14,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "10",
+      "一層：10\n兩層：100\n砍半：3",
+      ""
+    ],
+    [
+      "100",
+      "一層：100\n兩層：10000\n砍半：6",
+      "n 變 10 倍：一層變 10 倍、兩層變 100 倍"
+    ],
+    [
+      "500",
+      "一層：500\n兩層：250000\n砍半：8",
+      "砍半幾乎沒有變多"
+    ]
+  ]
+}

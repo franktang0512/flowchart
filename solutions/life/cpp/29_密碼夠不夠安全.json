@@ -1,0 +1,461 @@
+{
+  "app": "flowchart-worksheet",
+  "version": 1,
+  "savedAt": "2026-11-16T00:00:00.000Z",
+  "question": "life/str1",
+  "questionTitle": "密碼夠不夠安全",
+  "page": 2,
+  "student": {
+    "className": "",
+    "number": "",
+    "name": ""
+  },
+  "step1": {
+    "note": "一個字一個字看：isalpha 是英文字母、isdigit 是數字，各數一個；最後看長度和兩個數",
+    "hint": "pw：密碼",
+    "hint2": "英文幾個、數字幾個、安全或不安全"
+  },
+  "variables": [
+    {
+      "desc": "密碼",
+      "name": "pw",
+      "type": "文字",
+      "init": ""
+    },
+    {
+      "desc": "英文字母有幾個",
+      "name": "letters",
+      "type": "數字",
+      "init": "0"
+    },
+    {
+      "desc": "數字有幾個",
+      "name": "digits",
+      "type": "數字",
+      "init": "0"
+    }
+  ],
+  "flowchart": {
+    "nodes": [
+      {
+        "x": 510,
+        "y": 160,
+        "w": 120,
+        "h": 80,
+        "text": "輸入 pw",
+        "figure": "Parallelogram",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 455,
+        "y": 290,
+        "w": 230,
+        "h": 80,
+        "text": "for (int i = 0; i < pw.length(); i++)",
+        "figure": "For_Loop",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 510,
+        "y": 420,
+        "w": 120,
+        "h": 90,
+        "text": "isalpha(pw[i])",
+        "figure": "Diamond",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 420,
+        "y": 560,
+        "w": 120,
+        "h": 80,
+        "text": " letters 設為 letters + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "letters"
+        ],
+        "data": ""
+      },
+      {
+        "x": 735,
+        "y": 560,
+        "w": 190,
+        "h": 80,
+        "text": "isdigit(pw[i])",
+        "figure": "Diamond",
+        "variables": [
+          "pw"
+        ]
+      },
+      {
+        "x": 600,
+        "y": 690,
+        "w": 200,
+        "h": 80,
+        "text": " digits 設為 digits + 1",
+        "figure": "Rectangle",
+        "variables": [
+          "digits"
+        ],
+        "data": ""
+      },
+      {
+        "x": 450,
+        "y": 870,
+        "w": 240,
+        "h": 80,
+        "text": "輸出 \"英文 \" + to_string(letters) + \" 個\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "letters"
+        ]
+      },
+      {
+        "x": 455,
+        "y": 1000,
+        "w": 230,
+        "h": 80,
+        "text": "輸出 \"數字 \" + to_string(digits) + \" 個\"",
+        "figure": "Parallelogram",
+        "variables": [
+          "digits"
+        ]
+      },
+      {
+        "x": 450,
+        "y": 1130,
+        "w": 240,
+        "h": 170,
+        "text": "pw.length() >= 8 and letters >= 1 and digits >= 1",
+        "figure": "Diamond",
+        "variables": [
+          "pw",
+          "letters",
+          "digits"
+        ]
+      },
+      {
+        "x": 365,
+        "y": 1350,
+        "w": 130,
+        "h": 80,
+        "text": "輸出 \"安全\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 635,
+        "y": 1350,
+        "w": 150,
+        "h": 80,
+        "text": "輸出 \"不安全\"",
+        "figure": "Parallelogram",
+        "variables": []
+      },
+      {
+        "x": 510,
+        "y": 30,
+        "w": 120,
+        "h": 80,
+        "text": "開始",
+        "figure": "Circle",
+        "variables": []
+      },
+      {
+        "x": 510,
+        "y": 1480,
+        "w": 120,
+        "h": 80,
+        "text": "結束",
+        "figure": "Circle",
+        "variables": []
+      }
+    ],
+    "links": [
+      {
+        "from": 2,
+        "to": 3,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 480,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 700,
+            "y": 600
+          }
+        ]
+      },
+      {
+        "from": 2,
+        "to": 4,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 830,
+            "y": 465
+          }
+        ]
+      },
+      {
+        "from": 1,
+        "to": 2,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "進入迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 3,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 480,
+            "y": 795
+          },
+          {
+            "x": 50,
+            "y": 795
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 5,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 0,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 700,
+            "y": 795
+          },
+          {
+            "x": 50,
+            "y": 795
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 4,
+        "to": 1,
+        "anchorFrom": 2,
+        "anchorTo": 0,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 945,
+            "y": 600
+          },
+          {
+            "x": 945,
+            "y": 795
+          },
+          {
+            "x": 50,
+            "y": 795
+          },
+          {
+            "x": 50,
+            "y": 330
+          }
+        ]
+      },
+      {
+        "from": 0,
+        "to": 1,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 1,
+        "to": 6,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "離開迴圈",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 1090,
+            "y": 330
+          },
+          {
+            "x": 1090,
+            "y": 845
+          },
+          {
+            "x": 570,
+            "y": 845
+          }
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 8,
+        "to": 9,
+        "anchorFrom": 0,
+        "anchorTo": 1,
+        "text": "真",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 430,
+            "y": 1215
+          }
+        ]
+      },
+      {
+        "from": 8,
+        "to": 10,
+        "anchorFrom": 2,
+        "anchorTo": 1,
+        "text": "假",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 710,
+            "y": 1215
+          }
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 11,
+        "to": 0,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": []
+      },
+      {
+        "from": 9,
+        "to": 12,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 430,
+            "y": 1455
+          },
+          {
+            "x": 570,
+            "y": 1455
+          }
+        ]
+      },
+      {
+        "from": 10,
+        "to": 12,
+        "anchorFrom": 3,
+        "anchorTo": 1,
+        "text": "",
+        "mode": "straight",
+        "bends": [],
+        "points": [
+          {
+            "x": 710,
+            "y": 1455
+          },
+          {
+            "x": 570,
+            "y": 1455
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [],
+  "structs": [],
+  "cases": [
+    [
+      "abc12345",
+      "英文 3 個\n數字 5 個\n安全",
+      ""
+    ],
+    [
+      "password",
+      "英文 8 個\n數字 0 個\n不安全",
+      "沒有數字"
+    ],
+    [
+      "a1b2",
+      "英文 2 個\n數字 2 個\n不安全",
+      "太短"
+    ]
+  ]
+}

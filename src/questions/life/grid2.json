@@ -1,0 +1,47 @@
+{
+  "title": "電影院找空位",
+  "question": "電影院有 4 排、每排 5 個位置，0 是空位、1 是有人坐。請一排一排輸入，存進 4 列 5 行的表格。\n先輸出每一排有幾個空位（一排一行），最後輸出「第 幾 排」空位最多（排從 1 開始數；一樣多的話選前面那一排）。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1 1 0 1 1\n0 0 1 0 0\n1 1 1 1 1\n0 1 0 1 0",
+      "output": "1\n4\n0\n3\n第 2 排",
+      "note": "",
+      "py_input": "1\n1\n0\n1\n1\n0\n0\n1\n0\n0\n1\n1\n1\n1\n1\n0\n1\n0\n1\n0"
+    },
+    {
+      "input": "0 0 0 0 0\n0 0 0 0 0\n1 1 1 1 1\n1 0 1 0 1",
+      "output": "5\n5\n0\n2\n第 1 排",
+      "note": "第 1、2 排一樣多，選前面的",
+      "py_input": "0\n0\n0\n0\n0\n0\n0\n0\n0\n0\n1\n1\n1\n1\n1\n1\n0\n1\n0\n1"
+    },
+    {
+      "input": "1 1 1 1 1\n1 1 1 1 1\n1 1 1 1 0\n1 1 1 1 1",
+      "output": "0\n0\n1\n0\n第 3 排",
+      "note": "只剩一個空位",
+      "py_input": "1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n0\n1\n1\n1\n1\n1"
+    }
+  ],
+  "en": {
+    "title": "Find Empty Seats",
+    "question": "A movie theater has 4 rows with 5 seats each. 0 is an empty seat and 1 is taken. Input the seats row by row into a table with 4 rows and 5 columns.\nFirst output how many empty seats each row has (one row per line). At the end, output \"Row \" and the row with the most empty seats (rows start from 1; if two rows tie, choose the first one).",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1 1 0 1 1\n0 0 1 0 0\n1 1 1 1 1\n0 1 0 1 0",
+        "output": "1\n4\n0\n3\nRow 2",
+        "note": ""
+      },
+      {
+        "input": "0 0 0 0 0\n0 0 0 0 0\n1 1 1 1 1\n1 0 1 0 1",
+        "output": "5\n5\n0\n2\nRow 1",
+        "note": "Rows 1 and 2 tie: choose the first"
+      },
+      {
+        "input": "1 1 1 1 1\n1 1 1 1 1\n1 1 1 1 0\n1 1 1 1 1",
+        "output": "0\n0\n1\n0\nRow 3",
+        "note": "Only one empty seat"
+      }
+    ]
+  }
+}

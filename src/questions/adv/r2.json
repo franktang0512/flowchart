@@ -1,0 +1,44 @@
+{
+  "title": "河內塔",
+  "question": "有 A、B、C 三根柱子，A 上面有 n 個圓盤，由上到下是 1 號（最小）到 n 號（最大）。要把全部的圓盤搬到 C：一次只能搬最上面的一個，大的不能放在小的上面。\n請寫一個模組 hanoi(n, from, to, via)，把 n 個圓盤從 from 搬到 to（via 是借放的柱子）：\n1. 先把上面 n - 1 個從 from 搬到 via\n2. 把 n 號盤從 from 搬到 to，輸出「n 號盤 from → to」\n3. 再把那 n - 1 個從 via 搬到 to\nn 是 0 就什麼都不用做。用一個全域變數數一共搬了幾步。\n主流程輸入 n，執行 hanoi(n, \"A\", \"C\", \"B\")，最後輸出「共 幾 步」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "2",
+      "output": "1 號盤 A → B\n2 號盤 A → C\n1 號盤 B → C\n共 3 步",
+      "note": ""
+    },
+    {
+      "input": "1",
+      "output": "1 號盤 A → C\n共 1 步",
+      "note": "一個圓盤直接搬"
+    },
+    {
+      "input": "3",
+      "output": "1 號盤 A → C\n2 號盤 A → B\n1 號盤 C → B\n3 號盤 A → C\n1 號盤 B → A\n2 號盤 B → C\n1 號盤 A → C\n共 7 步",
+      "note": "想想看：4 個要幾步？"
+    }
+  ],
+  "en": {
+    "title": "Tower of Hanoi",
+    "question": "There are three poles A, B and C. Pole A has n disks, from disk 1 (smallest) on top to disk n (biggest) at the bottom. Move all the disks to C. Move only the top disk each time, and never put a big disk on a small one.\nMake a module hanoi(n, from, to, via) that moves n disks from \"from\" to \"to\" (\"via\" is the spare pole):\n1. Move the top n - 1 disks from \"from\" to \"via\"\n2. Move disk n from \"from\" to \"to\", and output \"Disk n: from → to\"\n3. Move those n - 1 disks from \"via\" to \"to\"\nIf n is 0, do nothing. Use a global variable to count the moves.\nIn the main flow, input n, run hanoi(n, \"A\", \"C\", \"B\"), and output \"Moves: \" and the count at the end.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "2",
+        "output": "Disk 1: A → B\nDisk 2: A → C\nDisk 1: B → C\nMoves: 3",
+        "note": ""
+      },
+      {
+        "input": "1",
+        "output": "Disk 1: A → C\nMoves: 1",
+        "note": "One disk: just move it"
+      },
+      {
+        "input": "3",
+        "output": "Disk 1: A → C\nDisk 2: A → B\nDisk 1: C → B\nDisk 3: A → C\nDisk 1: B → A\nDisk 2: B → C\nDisk 1: A → C\nMoves: 7",
+        "note": "Think: how many moves for 4?"
+      }
+    ]
+  }
+}

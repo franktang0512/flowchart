@@ -1,0 +1,44 @@
+{
+  "title": "數一數：迴圈跑幾次",
+  "question": "程式快不快，可以看「n 變大時，要做幾次」。請輸入 n，數三種迴圈各跑了幾次：\n1. 一層迴圈：i 從 0 到 n - 1\n2. 兩層迴圈：i、j 都從 0 到 n - 1（迴圈裡面還有迴圈）\n3. 每次砍半：k 從 n 開始，k 大於 1 就 k = k / 2（無條件捨去）\n輸出「一層：幾」「兩層：幾」「砍半：幾」。\n想想看：n 變成 10 倍，三種各變成幾倍？這就是 O(n)、O(n²)、O(log n)。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "10",
+      "output": "一層：10\n兩層：100\n砍半：3",
+      "note": ""
+    },
+    {
+      "input": "100",
+      "output": "一層：100\n兩層：10000\n砍半：6",
+      "note": "n 變 10 倍：一層變 10 倍、兩層變 100 倍"
+    },
+    {
+      "input": "500",
+      "output": "一層：500\n兩層：250000\n砍半：8",
+      "note": "砍半幾乎沒有變多"
+    }
+  ],
+  "en": {
+    "title": "Count the Loop Steps",
+    "question": "Is a program fast? Look at how many steps it takes when n gets big. Input n and count how many times each loop runs:\n1. One loop: i from 0 to n - 1\n2. Two loops: i and j both from 0 to n - 1 (a loop inside a loop)\n3. Halving: k starts at n; while k is bigger than 1, k = k / 2 (round down)\nOutput \"One loop: \", \"Two loops: \" and \"Halving: \" with the counts.\nThink: when n is 10 times bigger, how many times bigger is each count? This is O(n), O(n²) and O(log n).",
+    "array": [],
+    "test_case": [
+      {
+        "input": "10",
+        "output": "One loop: 10\nTwo loops: 100\nHalving: 3",
+        "note": ""
+      },
+      {
+        "input": "100",
+        "output": "One loop: 100\nTwo loops: 10000\nHalving: 6",
+        "note": "n is 10 times bigger: one loop 10 times, two loops 100 times"
+      },
+      {
+        "input": "500",
+        "output": "One loop: 500\nTwo loops: 250000\nHalving: 8",
+        "note": "Halving hardly grows"
+      }
+    ]
+  }
+}

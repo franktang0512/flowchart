@@ -1,0 +1,47 @@
+{
+  "title": "基本操作｜二維陣列：存進去、讀出來、改一格",
+  "question": "教室有 2 排、每排 3 個座位，可以用一張 2 列 3 行的表格（二維陣列）記每個座位坐的是幾號：第 r 列第 c 行寫成 [r][c]，r、c 都從 0 開始。\n請一排一排輸入每個座位的座號存進表格，再輸入第幾列 r、第幾行 c，輸出那個座位的座號。\n那位同學請假了，把那一格改成 0，最後一列一行輸出整張表格（同一列用空格隔開）。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "1 2 3\n4 5 6\n1 2",
+      "output": "6\n1 2 3\n4 5 0",
+      "note": "",
+      "py_input": "1\n2\n3\n4\n5\n6\n1\n2"
+    },
+    {
+      "input": "7 8 9\n10 11 12\n0 0",
+      "output": "7\n0 8 9\n10 11 12",
+      "note": "左上角",
+      "py_input": "7\n8\n9\n10\n11\n12\n0\n0"
+    },
+    {
+      "input": "3 1 4\n1 5 9\n1 0",
+      "output": "1\n3 1 4\n0 5 9",
+      "note": "第二列的第一個",
+      "py_input": "3\n1\n4\n1\n5\n9\n1\n0"
+    }
+  ],
+  "en": {
+    "title": "Basics | 2D arrays: store, read, change one cell",
+    "question": "A classroom has 2 rows with 3 seats each. A table with 2 rows and 3 columns (a 2D array) can keep the number of the student in each seat. Row r, column c is [r][c], and r and c start from 0.\nInput the numbers row by row into the table. Then input a row r and a column c, and output the number in that seat.\nThat student is absent, so change that cell to 0. At the end, output the whole table, one row per line (spaces between the numbers in a row).",
+    "array": [],
+    "test_case": [
+      {
+        "input": "1 2 3\n4 5 6\n1 2",
+        "output": "6\n1 2 3\n4 5 0",
+        "note": ""
+      },
+      {
+        "input": "7 8 9\n10 11 12\n0 0",
+        "output": "7\n0 8 9\n10 11 12",
+        "note": "Top left"
+      },
+      {
+        "input": "3 1 4\n1 5 9\n1 0",
+        "output": "1\n3 1 4\n0 5 9",
+        "note": "First seat of the second row"
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "title": "前後念都一樣（回文）",
+  "question": "「level」從前面念、從後面念都一樣，這種字叫回文。\n請輸入一個英文單字，先輸出它倒過來的樣子（從最後一個字往前接成新的字串），再判斷是不是回文：是就輸出「是回文」，不是就輸出「不是回文」。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "level",
+      "output": "level\n是回文",
+      "note": ""
+    },
+    {
+      "input": "hello",
+      "output": "olleh\n不是回文",
+      "note": ""
+    },
+    {
+      "input": "noon",
+      "output": "noon\n是回文",
+      "note": "偶數個字也可以是回文"
+    }
+  ],
+  "en": {
+    "title": "Same Both Ways (Palindrome)",
+    "question": "\"level\" reads the same from the front and from the back. A word like this is a palindrome.\nInput an English word. First output it backward (join the letters from the last one to the first one into a new string). Then output \"Yes\" if it is a palindrome, or \"No\" if it is not.",
+    "array": [],
+    "test_case": [
+      {
+        "input": "level",
+        "output": "level\nYes",
+        "note": ""
+      },
+      {
+        "input": "hello",
+        "output": "olleh\nNo",
+        "note": ""
+      },
+      {
+        "input": "noon",
+        "output": "noon\nYes",
+        "note": "An even number of letters can work too"
+      }
+    ]
+  }
+}

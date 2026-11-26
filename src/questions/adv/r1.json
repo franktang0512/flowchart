@@ -1,0 +1,44 @@
+{
+  "title": "兔子一個月一個月變多（費氏數列）",
+  "question": "一對小兔子一個月後長大，長大的兔子每個月生一對小兔子。第 1、2 個月都只有 1 對，之後每個月的兔子 = 上個月的 + 上上個月的：1, 1, 2, 3, 5, 8, …（費氏數列）。\n請寫一個有回傳值的模組 fib(n)：n 是 1 或 2 就回傳 1，不然回傳 fib(n - 1) + fib(n - 2)。\n再用一個全域變數數 fib 一共被執行了幾次（每次一進到 fib 就加 1）。\n輸入 n（1 到 20），先輸出 fib(n)，再輸出「執行了 幾 次」。\n想想看：n 多 1，執行的次數大約變幾倍？為什麼會重複算？",
+  "array": [],
+  "test_case": [
+    {
+      "input": "6",
+      "output": "8\n執行了 15 次",
+      "note": ""
+    },
+    {
+      "input": "1",
+      "output": "1\n執行了 1 次",
+      "note": "不用再執行自己"
+    },
+    {
+      "input": "20",
+      "output": "6765\n執行了 13529 次",
+      "note": "重複算了很多次"
+    }
+  ],
+  "en": {
+    "title": "Rabbits Month by Month (Fibonacci)",
+    "question": "A pair of baby rabbits grows up in one month. Each grown-up pair has a new baby pair every month. Months 1 and 2 have 1 pair. After that, each month = last month + the month before: 1, 1, 2, 3, 5, 8, … (the Fibonacci numbers).\nMake a module fib(n) that returns a value: if n is 1 or 2, return 1; if not, return fib(n - 1) + fib(n - 2).\nUse a global variable to count how many times fib runs (add 1 each time fib starts).\nInput n (1 to 20). Output fib(n), then \"Calls: \" and the count.\nThink: when n goes up by 1, about how many times more calls are there? Why is work repeated?",
+    "array": [],
+    "test_case": [
+      {
+        "input": "6",
+        "output": "8\nCalls: 15",
+        "note": ""
+      },
+      {
+        "input": "1",
+        "output": "1\nCalls: 1",
+        "note": "No more calls"
+      },
+      {
+        "input": "20",
+        "output": "6765\nCalls: 13529",
+        "note": "Lots of repeated work"
+      }
+    ]
+  }
+}

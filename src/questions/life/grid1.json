@@ -1,0 +1,47 @@
+{
+  "title": "成績表：每人總分、每科最高分",
+  "question": "老師用一張表格記成績：每一列是一位同學，每一行是一科（國文、英文、數學）。\n請一位一位輸入 3 位同學的 3 科成績，存進 3 列 3 行的表格。\n先輸出每一位同學的總分（一列加起來，一位一行），再輸出每一科的最高分（一行裡找最大的，一科一行）。",
+  "array": [],
+  "test_case": [
+    {
+      "input": "80 90 70\n60 75 88\n95 85 92",
+      "output": "240\n223\n272\n95\n90\n92",
+      "note": "",
+      "py_input": "80\n90\n70\n60\n75\n88\n95\n85\n92"
+    },
+    {
+      "input": "100 100 100\n0 0 0\n50 60 70",
+      "output": "300\n0\n180\n100\n100\n100",
+      "note": "有人考 0 分",
+      "py_input": "100\n100\n100\n0\n0\n0\n50\n60\n70"
+    },
+    {
+      "input": "60 60 60\n60 60 60\n60 60 60",
+      "output": "180\n180\n180\n60\n60\n60",
+      "note": "大家都一樣",
+      "py_input": "60\n60\n60\n60\n60\n60\n60\n60\n60"
+    }
+  ],
+  "en": {
+    "title": "Score Table: Totals and Top Scores",
+    "question": "A teacher keeps scores in a table. Each row is a student. Each column is a subject (Chinese, English, math).\nInput the 3 scores of 3 students, one student at a time, into a table with 3 rows and 3 columns.\nFirst output the total of each student (add up a row, one student per line). Then output the top score of each subject (the biggest in a column, one subject per line).",
+    "array": [],
+    "test_case": [
+      {
+        "input": "80 90 70\n60 75 88\n95 85 92",
+        "output": "240\n223\n272\n95\n90\n92",
+        "note": ""
+      },
+      {
+        "input": "100 100 100\n0 0 0\n50 60 70",
+        "output": "300\n0\n180\n100\n100\n100",
+        "note": "Someone got 0"
+      },
+      {
+        "input": "60 60 60\n60 60 60\n60 60 60",
+        "output": "180\n180\n180\n60\n60\n60",
+        "note": "All the same"
+      }
+    ]
+  }
+}
