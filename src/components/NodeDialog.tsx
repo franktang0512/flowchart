@@ -39,7 +39,7 @@ export interface DialogForm {
   /** C++ 的指標「建立新的一筆」：建立哪一種 struct、每個欄位放什麼（空的放 0、""、nullptr） */
   ptrStruct: string;
   ptrFields: string[];
-  /** 指標「=」分成兩種：改指標存的位址（p = &x），或改指標指到的東西（*p = 5、p->val = 5）；空的照存到的地方決定 */
+  /** 指標「=」分成兩種：改指標存的位址（p = &x），或改指標指到的那塊記憶體內容（*p = 5、p->val = 5）；空的照存到的地方決定 */
   ptrMode: '' | 'addr' | 'value';
   /** 存到的地方、要放的值不在選單裡：自己寫 */
   ptrCustom: boolean;
@@ -1469,7 +1469,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
             const meaning = !target ? '' : making ? t(`${target} 存新的那一筆的位址：之後 ${target}->欄位 就是新的那一筆的欄位。`, `${target} keeps the address of the new one. Then ${target}->field is a field of the new one.`)
               : freeing ? t(`${target} 指到的那一筆還回去；${target} 還存著舊的位址，不能再用 -> 或 *。`, `What ${target} points to is given back. ${target} still has the old address, so do not use -> or * on it again.`)
               : !value ? ''
-              : mode == 'value' ? t(`改的是 ${target}（指標指到的地方）裡面的值，指標本身還是指到原來的地方。`, `This changes the value at ${target} (where the pointer points). The pointer itself still points to the same place.`)
+              : mode == 'value' ? t(`改的是 ${target}（指標指到的那塊記憶體）裡面的內容，指標本身存的位址不變，還是指到原來的地方。`, `This changes the value at ${target} (where the pointer points). The pointer itself still points to the same place.`)
               : value == 'nullptr' ? t(`${target} 不指到任何東西；之後要先檢查 ${target} != nullptr，才能用 * 或 ->。`, `${target} points to nothing. Check ${target} != nullptr before using * or ->.`)
               : value.startsWith(target + '->') ? t(`${target} 往後走一個：改成存 ${value} 裡的位址（${target} 那一筆的下一筆）。`, `${target} moves on: it now keeps the address in ${value} (the one after it).`)
               : value.startsWith('&') ? t(`${target} 存 ${value.slice(1)} 的位址：之後 ${deref} 就是 ${value.slice(1)}。`, `${target} keeps the address of ${value.slice(1)}. Then ${deref} is ${value.slice(1)}.`)
@@ -1479,7 +1479,7 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                 <div className="ptr_modes">
                   {structs.length > 0 && <label><input type="radio" name="rect_action" checked={making} onChange={() => set({ rectAction: '建立', ptrCustom: false })} /><b>{t('建立新的一筆', 'Make a new one')}</b><span className="muted">（new）</span></label>}
                   <label><input type="radio" name="rect_action" checked={setting && mode == 'addr'} onChange={() => pickMode('addr')} /><b>{t('改指標指到哪裡', 'Change where a pointer points')}</b><span className="muted">{t('（存位址：p = &x、p = q）', ' (store an address: p = &x, p = q)')}</span></label>
-                  <label><input type="radio" name="rect_action" checked={setting && mode == 'value'} onChange={() => pickMode('value')} /><b>{t('改指標指到的東西', 'Change what a pointer points to')}</b><span className="muted">{t('（取值：*p = 5、p->val = 5）', ' (through it: *p = 5, p->val = 5)')}</span></label>
+                  <label><input type="radio" name="rect_action" checked={setting && mode == 'value'} onChange={() => pickMode('value')} /><b>{t('改指標指到的那塊記憶體內容', 'Change the memory a pointer points to')}</b><span className="muted">{t('（取值：*p = 5、p->val = 5）', ' (through it: *p = 5, p->val = 5)')}</span></label>
                   <label><input type="radio" name="rect_action" checked={freeing} onChange={() => set({ rectAction: '釋放', ptrCustom: false })} /><b>{t('還回去', 'Give it back')}</b><span className="muted">（delete）</span></label>
                 </div>
                 <p>
@@ -1550,8 +1550,8 @@ function DialogBody({ request, onClose, varTypes, modules, holds: globalHolds, g
                       </table>
                     )}
                     <p className="dialog_note">
-                      {t('沒填的欄位先放 0（文字是 ""、指標是 nullptr）。可以現在一次填好，也可以先空著，之後再用「改指標指到的東西」改，例如 p->val 設為 x。',
-                        'Empty fields start as 0 ("" for text, nullptr for pointers). Fill them all now, or leave them empty and change them later with "change what a pointer points to", like p->val to x.')}
+                      {t('沒填的欄位先放 0（文字是 ""、指標是 nullptr）。可以現在一次填好，也可以先空著，之後再用「改指標指到的那塊記憶體內容」改，例如 p->val 設為 x。',
+                        'Empty fields start as 0 ("" for text, nullptr for pointers). Fill them all now, or leave them empty and change them later with "change the memory a pointer points to", like p->val to x.')}
                     </p>
                   </>
                 )}

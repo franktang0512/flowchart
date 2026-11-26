@@ -825,6 +825,8 @@ export function App() {
     setVars([...varsRef.current, row]);
   };
   const autoVars = (desc: string) => (el: HTMLInputElement) => {
+    // C++ 要自己想變數的型態，不自動建立
+    if (getTarget() == 'cpp') return;
     for (const token of el.value.split(/[^\w一-龥]+/g)) {
       if (token && !varStore.var_list.name.includes(token)) createRow(token, desc);
     }
