@@ -9,6 +9,7 @@ import { t, useLang } from '../i18n';
 import { byTarget, canReturn as canReturnTarget, getTarget, isCode, isPython, itemWord, moduleWord } from '../target';
 import { forInit, INT_PTR, parseExpr, ptrOf, pyFor, type VarInfo } from '../engine/structure';
 import { fieldCppType, findStruct, getStructs, type StructDef } from '../engine/structs';
+import { DragBar, placeDialog, ResizeHandles } from './DialogFrame';
 
 export type DialogKind =
   | 'Circle' | 'Parallelogram' | 'Diamond' | 'Loop' | 'For_Loop' | 'While_Loop'
@@ -624,7 +625,11 @@ export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, gl
 
   useEffect(() => {
     const dialog = ref.current!;
-    if (request && !dialog.open) dialog.showModal();
+    if (request && !dialog.open) {
+      // 從畫面中間打開；拉過大小的話用上次的大小
+      placeDialog(dialog, true);
+      dialog.showModal();
+    }
     if (!request && dialog.open) dialog.close();
   }, [request]);
 
@@ -638,7 +643,11 @@ export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, gl
         onClose();
       }}
     >
+      <DragBar target={ref} />
+      <ResizeHandles target={ref} />
+      <div className="dlg_scroll">
       {request && <DialogBody key={request.id} request={request} onClose={onClose} varTypes={request.inModule && getTarget() == 'cpp' && globalTypes ? globalTypes : varTypes} modules={modules} holds={request.inModule && getTarget() == 'cpp' && globalHolds ? globalHolds : holds} globals={globals} shadowed={shadowed} globalTypes={globalTypes} />}
+      </div>
     </dialog>
   );
 }

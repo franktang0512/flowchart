@@ -7,6 +7,7 @@ import { FlowError } from '../engine/decoder';
 import { BlockError, fromBlockly, type FromBlocks } from '../engine/fromBlockly';
 import { applyBlocklyMessages, blocklyToolbox, defineBlocks, scratchToolbox, setupScratchEditing } from '../engine/scratchBlocks';
 import { ScratchProcDialog } from './ScratchProcDialog';
+import { placeDialog, ResizeHandles, startDrag } from './DialogFrame';
 import { cppNameProblem, GLOBAL_PREFIX, type ParamInfo } from '../engine/modules';
 import type { ModuleSource } from '../engine/modules';
 import { isCppOnlyType, structure, structureModules, type ModuleProgram, type Stmt, type VarInfo } from '../engine/structure';
@@ -90,81 +91,19 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
     const dialog = ref.current!;
     if (open && !dialog.open) {
       // 每次打開都從畫面中間開始（上次拖到哪裡、拉多大都不留）
-      dialog.style.left = dialog.style.top = dialog.style.margin = dialog.style.width = dialog.style.height = '';
+      placeDialog(dialog, false);
       dialog.showModal();
     }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  /** 拖曳標題列移動視窗：學生可以把程式移到旁邊，對照流程圖看 */
-  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button != 0 || (e.target as HTMLElement).closest('button')) return;
-    const dialog = ref.current!;
-    const head = e.currentTarget;
-    const box = dialog.getBoundingClientRect();
-    const dx = e.clientX - box.left, dy = e.clientY - box.top;
-    // 改成用 left / top 決定位置（原本是置中的 margin: auto）
-    dialog.style.margin = '0';
-    dialog.style.left = box.left + 'px';
-    dialog.style.top = box.top + 'px';
-    head.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => {
-      // 標題列至少留一點在畫面裡，才拉得回來
-      const x = Math.min(Math.max(ev.clientX - dx, 80 - box.width), window.innerWidth - 80);
-      const y = Math.min(Math.max(ev.clientY - dy, 0), window.innerHeight - 40);
-      dialog.style.left = x + 'px';
-      dialog.style.top = y + 'px';
-    };
-    const up = () => {
-      head.removeEventListener('pointermove', move);
-      head.removeEventListener('pointerup', up);
-      head.removeEventListener('pointercancel', up);
-    };
-    head.addEventListener('pointermove', move);
-    head.addEventListener('pointerup', up);
-    head.addEventListener('pointercancel', up);
-  };
-
-  /** 拉四個邊、四個角調大小（dir 是方向：n 上、s 下、w 左、e 右） */
-  const startResize = (dir: string) => (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button != 0) return;
-    e.preventDefault();
-    const dialog = ref.current!;
-    const handle = e.currentTarget;
-    const box = dialog.getBoundingClientRect();
-    const x0 = e.clientX, y0 = e.clientY;
-    const MIN_W = 360, MIN_H = 260;
-    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
-    dialog.style.margin = '0';
-    dialog.style.left = box.left + 'px';
-    dialog.style.top = box.top + 'px';
-    handle.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - x0, dy = ev.clientY - y0;
-      let { left, top, width, height } = box;
-      if (dir.includes('e')) width = clamp(box.width + dx, MIN_W, window.innerWidth - box.left);
-      if (dir.includes('w')) { width = clamp(box.width - dx, MIN_W, box.right); left = box.right - width; }
-      if (dir.includes('s')) height = clamp(box.height + dy, MIN_H, window.innerHeight - box.top);
-      if (dir.includes('n')) { height = clamp(box.height - dy, MIN_H, box.bottom); top = box.bottom - height; }
-      Object.assign(dialog.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' });
-    };
-    const up = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', up);
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
-  };
 
   const target = getTarget();
   return (
     <dialog id="code_view" ref={ref} onCancel={onClose}>
-      {['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'].map(d => (
-        <div key={d} className={`code_resize code_resize_${d}`} onPointerDown={startResize(d)} title={t('拉這裡調大小', 'Drag to resize')} />
-      ))}
-      <div className="code_view_head" onPointerDown={startDrag} title={t('拖曳這裡可以移動視窗；拉視窗的邊或角可以調大小', 'Drag here to move. Drag an edge or corner to resize.')}>
+      <ResizeHandles target={ref} minWidth={360} minHeight={260} />
+      {/* 拖曳標題列移動視窗：學生可以把程式移到旁邊，對照流程圖看 */}
+      <div className="code_view_head" onPointerDown={e => startDrag(ref.current, e)} title={t('拖曳這裡可以移動視窗；拉視窗的邊或角可以調大小', 'Drag here to move. Drag an edge or corner to resize.')}>
         <h5 className="card_title" style={{ margin: 0 }}>
           {t('看程式', 'See the code')}<span className="target_badge">{targetName(target)}</span>
         </h5>

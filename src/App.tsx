@@ -22,7 +22,7 @@ import { callText, cppNameProblem, cppType, pyTypeName, GLOBAL_PREFIX, isName, p
 import { buildFlowchart } from './engine/toFlowchart';
 import { addMainNode, editDialogFor, editMainNode } from './nodeActions';
 import { allowedVarTypes, EMPTY_QUESTION, loadQuestion, questionIn, type Question } from './questions';
-import { fitRowOnInput } from './textareaSizing';
+import { fitRow, fitRowOnInput, rememberPulled } from './textareaSizing';
 import { LangToggle } from './components/LangToggle';
 import { getLang, link, onLangChange, t, useLang } from './i18n';
 import { getTarget, isCode, isPython, moduleWord, setTarget, targetName, useTarget, type Target } from './target';
@@ -109,6 +109,10 @@ export function App() {
   const [tool, setToolState] = useState('none');
   const [vars, setVarsState] = useState<VarRow[]>([]);
   const [cases, setCases] = useState<string[]>(() => Array(9).fill(''));
+  // 測資換了（匯入作品、換題目）或回到第二步：每一列的高度照內容重新算，貼很多行也看得到全部
+  useLayoutEffect(() => {
+    document.querySelectorAll<HTMLTextAreaElement>('#case_table tr td:nth-child(2) textarea').forEach(fitRow);
+  }, [cases, page]);
   const [dialog, setDialog] = useState<DialogRequest | null>(null);
   /** 「看程式」視窗開著嗎 */
   const [codeOpen, setCodeOpen] = useState(false);
@@ -1231,6 +1235,7 @@ export function App() {
                               setCases(next);
                             }}
                             onInput={e => fitRowOnInput(e.currentTarget)}
+                            onPointerUp={e => rememberPulled(e.currentTarget)}
                           ></textarea>
                         </td>
                       ))}

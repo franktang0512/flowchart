@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { isName, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
+import { ResizeHandles, startDrag } from './DialogFrame';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BlocklyModule = any;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ScratchProcDialog({ Blockly, theme, existing, onConfirm, onCancel }: Props) {
+  const boxRef = useRef<HTMLDivElement>(null);
   useLang();
   const [name, setName] = useState(t('新積木', 'new block'));
   const [params, setParams] = useState<ParamInfo[]>([]);
@@ -77,8 +79,10 @@ export function ScratchProcDialog({ Blockly, theme, existing, onConfirm, onCance
 
   return (
     <div className="proc_overlay">
-      <div className="proc_dialog" role="dialog" aria-label={t('建立一個積木', 'Make a block')}>
-        <h5 className="proc_title">{t('建立一個積木', 'Make a block')}</h5>
+      <div className="proc_dialog" id="proc_dialog" ref={boxRef} role="dialog" aria-label={t('建立一個積木', 'Make a block')}>
+        <ResizeHandles target={boxRef} />
+        {/* 標題列按住拖曳可以移動 */}
+        <h5 className="proc_title dlg_title_drag" onPointerDown={e => startDrag(boxRef.current, e)} title={t('按住這裡拖曳可以移動視窗；拉視窗的邊或角可以調大小', 'Drag here to move. Drag an edge or corner to resize.')}>{t('建立一個積木', 'Make a block')}</h5>
         <label className="proc_label" htmlFor="proc_name">{t('積木名稱', 'Block name')}</label>
         <input id="proc_name" className="proc_name" value={name} onChange={e => setName(e.target.value)} autoFocus />
 

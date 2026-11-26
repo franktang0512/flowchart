@@ -5,6 +5,7 @@ import { isName, type ModuleInfo, type ParamInfo } from '../engine/modules';
 import { t, useLang } from '../i18n';
 import { canReturn, getTarget, isCode, isPython, moduleWord } from '../target';
 import { fromTypeValue, TypeOptions, typeValue } from './VarTable';
+import { DragBar, placeDialog, ResizeHandles } from './DialogFrame';
 
 export interface ModuleRequest {
   /** 每次開對話框都不同，用來重設表單 */
@@ -29,12 +30,19 @@ export function ModuleDialog({ request, onClose }: { request: ModuleRequest | nu
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current!;
-    if (request && !dialog.open) dialog.showModal();
+    if (request && !dialog.open) {
+      placeDialog(dialog, true);
+      dialog.showModal();
+    }
     if (!request && dialog.open) dialog.close();
   }, [request]);
   return (
     <dialog id="module_dialog" ref={ref} onCancel={onClose}>
-      {request && <ModuleForm key={request.id} request={request} onClose={onClose} />}
+      <DragBar target={ref} />
+      <ResizeHandles target={ref} />
+      <div className="dlg_scroll">
+        {request && <ModuleForm key={request.id} request={request} onClose={onClose} />}
+      </div>
     </dialog>
   );
 }
