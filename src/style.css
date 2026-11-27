@@ -403,7 +403,8 @@ input, textarea, select, button {
     min-height: 56px;
     /* 右下角可以往下拉高（貼很多行時） */
     resize: vertical;
-    overflow: hidden;
+    /* 拉得比內容矮時可以捲 */
+    overflow-y: auto;
 }
 .delete_var {
     display: inline-flex;

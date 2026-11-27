@@ -31,7 +31,7 @@ export function ModuleDialog({ request, onClose }: { request: ModuleRequest | nu
   useEffect(() => {
     const dialog = ref.current!;
     if (request && !dialog.open) {
-      placeDialog(dialog, true);
+      placeDialog(dialog);
       dialog.showModal();
     }
     if (!request && dialog.open) dialog.close();

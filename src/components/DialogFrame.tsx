@@ -4,9 +4,6 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 type RefObject<T> = { readonly current: T | null };
 import { t } from '../i18n';
 
-/** 拉過的大小：同一種視窗下次打開還是一樣大（位置每次都回到中間） */
-const pulledSize = new Map<string, { width: number; height: number }>();
-
 /** 改成用 left / top 決定位置（原本是置中） */
 function pin(el: HTMLElement) {
   const box = el.getBoundingClientRect();
@@ -15,7 +12,7 @@ function pin(el: HTMLElement) {
 }
 
 /** 按住之後一直跟著指標，放開就停 */
-function follow(handle: HTMLElement, pointerId: number, move: (ev: PointerEvent) => void, done?: () => void) {
+function follow(handle: HTMLElement, pointerId: number, move: (ev: PointerEvent) => void) {
   try {
     handle.setPointerCapture(pointerId);
   }
@@ -26,7 +23,6 @@ function follow(handle: HTMLElement, pointerId: number, move: (ev: PointerEvent)
     handle.removeEventListener('pointermove', move);
     handle.removeEventListener('pointerup', up);
     handle.removeEventListener('pointercancel', up);
-    done?.();
   };
   handle.addEventListener('pointermove', move);
   handle.addEventListener('pointerup', up);
@@ -46,17 +42,9 @@ export function startDrag(el: HTMLElement | null, e: ReactPointerEvent<HTMLEleme
   });
 }
 
-/** 打開時：回到畫面中間；remember 的話用上次拉的大小 */
-export function placeDialog(el: HTMLElement, remember: boolean) {
+/** 打開時：回到畫面中間，大小照內容（每個積木要設定的東西不一樣多，不沿用上次拉的大小） */
+export function placeDialog(el: HTMLElement) {
   Object.assign(el.style, { position: '', left: '', top: '', margin: '', width: '', height: '', maxWidth: '', maxHeight: '' });
-  const size = remember && el.id ? pulledSize.get(el.id) : undefined;
-  if (size) {
-    Object.assign(el.style, {
-      width: Math.min(size.width, window.innerWidth) + 'px',
-      height: Math.min(size.height, window.innerHeight) + 'px',
-      maxWidth: 'none', maxHeight: 'none',
-    });
-  }
 }
 
 const DIRS = ['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'];
@@ -78,8 +66,6 @@ export function ResizeHandles({ target, minWidth = 300, minHeight = 160 }: { tar
       if (dir.includes('s')) height = clamp(box.height + dy, minHeight, window.innerHeight - box.top);
       if (dir.includes('n')) { height = clamp(box.height - dy, minHeight, box.bottom); top = box.bottom - height; }
       Object.assign(el.style, { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px', maxWidth: 'none', maxHeight: 'none' });
-    }, () => {
-      if (el.id) pulledSize.set(el.id, { width: el.offsetWidth, height: el.offsetHeight });
     });
   };
   return (

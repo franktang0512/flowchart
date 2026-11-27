@@ -627,7 +627,7 @@ export function NodeDialog({ request, onClose, varTypes, modules, holds = {}, gl
     const dialog = ref.current!;
     if (request && !dialog.open) {
       // 從畫面中間打開；拉過大小的話用上次的大小
-      placeDialog(dialog, true);
+      placeDialog(dialog);
       dialog.showModal();
     }
     if (!request && dialog.open) dialog.close();

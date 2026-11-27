@@ -91,7 +91,7 @@ export function CodeView({ open, onClose, diagram, vars, modules, onApply }: Pro
     const dialog = ref.current!;
     if (open && !dialog.open) {
       // 每次打開都從畫面中間開始（上次拖到哪裡、拉多大都不留）
-      placeDialog(dialog, false);
+      placeDialog(dialog);
       dialog.showModal();
     }
     if (!open && dialog.open) dialog.close();
